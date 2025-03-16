@@ -74,7 +74,48 @@ pub struct BestSwap {
     pub reverse_price: f64,
 }
 
+pub enum TychoSupportedProtocol {
+    Pancakeswap,
+    Sushiswap,
+    UniswapV2,
+    UniswapV3,
+    UniswapV4,
+    BalancerV2,
+    Curve,
+}
+
+impl ToString for TychoSupportedProtocol {
+    fn to_string(&self) -> String {
+        match self {
+            TychoSupportedProtocol::Pancakeswap => "pancakeswap_v2".to_string(),
+            TychoSupportedProtocol::Sushiswap => "sushiswap_v2".to_string(),
+            TychoSupportedProtocol::UniswapV2 => "uniswap_v2".to_string(),
+            TychoSupportedProtocol::UniswapV3 => "uniswap_v3".to_string(),
+            TychoSupportedProtocol::UniswapV4 => "uniswap_v4".to_string(),
+            TychoSupportedProtocol::BalancerV2 => "vm:balancer_v2".to_string(),
+            TychoSupportedProtocol::Curve => "vm:curve".to_string(),
+        }
+    }
+}
+
+// Impl vectorize for TychoSupportedProtocol
+impl TychoSupportedProtocol {
+    pub fn vectorize() -> Vec<String> {
+        vec![
+            TychoSupportedProtocol::Pancakeswap.to_string(),
+            TychoSupportedProtocol::Sushiswap.to_string(),
+            TychoSupportedProtocol::UniswapV2.to_string(),
+            TychoSupportedProtocol::UniswapV3.to_string(),
+            TychoSupportedProtocol::UniswapV4.to_string(),
+            TychoSupportedProtocol::BalancerV2.to_string(),
+            TychoSupportedProtocol::Curve.to_string(),
+        ]
+    }
+}
+
 pub enum AmmType {
+    Pancakeswap,
+    Sushiswap,
     UniswapV2,
     UniswapV3,
     UniswapV4,
@@ -85,6 +126,8 @@ pub enum AmmType {
 impl ToString for AmmType {
     fn to_string(&self) -> String {
         match self {
+            AmmType::Pancakeswap => "pancakeswap_v2_pool".to_string(),
+            AmmType::Sushiswap => "sushiswap_v2_pool".to_string(),
             AmmType::UniswapV2 => "uniswap_v2_pool".to_string(),
             AmmType::UniswapV3 => "uniswap_v3_pool".to_string(),
             AmmType::UniswapV4 => "uniswap_v4_pool".to_string(),
@@ -97,6 +140,8 @@ impl ToString for AmmType {
 impl From<&str> for AmmType {
     fn from(s: &str) -> Self {
         match s {
+            "pancakeswap_v2_pool" => AmmType::Pancakeswap,
+            "sushiswap_v2_pool" => AmmType::Sushiswap,
             "uniswap_v2_pool" => AmmType::UniswapV2,
             "uniswap_v3_pool" => AmmType::UniswapV3,
             "uniswap_v4_pool" => AmmType::UniswapV4,

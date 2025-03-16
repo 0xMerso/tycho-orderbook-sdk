@@ -12,13 +12,13 @@ use tap2::shd::data::fmt::SrzUniswapV2State;
 use tap2::shd::data::fmt::SrzUniswapV3State;
 use tap2::shd::data::fmt::SrzUniswapV4State;
 use tap2::shd::r#static::data::keys;
-use tap2::shd::r#static::TychoDex;
 use tap2::shd::types::AmmType;
 use tap2::shd::types::EnvConfig;
 use tap2::shd::types::Network;
 use tap2::shd::types::SharedTychoStreamState;
 use tap2::shd::types::SyncState;
 use tap2::shd::types::TychoStreamState;
+use tap2::shd::types::TychoSupportedProtocol;
 use tokio::sync::RwLock;
 use tycho_simulation::evm::protocol::filters::curve_pool_filter;
 use tycho_simulation::evm::protocol::filters::uniswap_v4_pool_with_hook_filter;
@@ -26,7 +26,6 @@ use tycho_simulation::evm::protocol::uniswap_v3::state::UniswapV3State;
 use tycho_simulation::evm::protocol::uniswap_v4::state::UniswapV4State;
 
 use tycho_simulation::models::Token;
-use tycho_simulation::protocol::state::ProtocolSim;
 use tycho_simulation::tycho_core::Bytes;
 use tycho_simulation::{
     evm::{
@@ -53,11 +52,13 @@ async fn stream_state(network: Network, shared: SharedTychoStreamState, config: 
 
     match tycho_simulation::tycho_client::stream::TychoStreamBuilder::new("tycho-beta.propellerheads.xyz", chain)
         .auth_key(Some(config.tycho_api_key))
-        .exchange(TychoDex::UniswapV2.to_string().as_str(), filter.clone())
-        .exchange(TychoDex::UniswapV3.to_string().as_str(), filter.clone())
-        .exchange(TychoDex::UniswapV4.to_string().as_str(), filter.clone())
-        .exchange(TychoDex::BalancerV2.to_string().as_str(), filter.clone())
-        .exchange(TychoDex::Curve.to_string().as_str(), filter.clone())
+        .exchange(TychoSupportedProtocol::Sushiswap.to_string().as_str(), filter.clone())
+        .exchange(TychoSupportedProtocol::Pancakeswap.to_string().as_str(), filter.clone())
+        .exchange(TychoSupportedProtocol::UniswapV2.to_string().as_str(), filter.clone())
+        .exchange(TychoSupportedProtocol::UniswapV3.to_string().as_str(), filter.clone())
+        .exchange(TychoSupportedProtocol::UniswapV4.to_string().as_str(), filter.clone())
+        .exchange(TychoSupportedProtocol::BalancerV2.to_string().as_str(), filter.clone())
+        .exchange(TychoSupportedProtocol::Curve.to_string().as_str(), filter.clone())
         .build()
         .await
     {
@@ -69,7 +70,7 @@ async fn stream_state(network: Network, shared: SharedTychoStreamState, config: 
                 let _before = updated.len();
                 drop(mtx);
                 let before = updated.len();
-                let amms = TychoDex::vectorize();
+                let amms = TychoSupportedProtocol::vectorize();
                 for amm in amms.clone() {
                     match fm.state_msgs.get(amm.as_str()) {
                         Some(msg) => {
@@ -157,15 +158,18 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
         toktag.insert(usdt.clone().address, usdt.clone());
     }
     // ===== Tycho Stream Builder =====
+
     'retry: loop {
         let endpoint = network.tycho.trim_start_matches("https://");
         log::info!("Connecting to >>> ProtocolStreamBuilder <<< at {} on {:?} ...\n", endpoint, chain);
         let psb = ProtocolStreamBuilder::new(endpoint, chain)
-            .exchange::<UniswapV2State>("uniswap_v2", filter.clone(), None) // ! Filter ?
-            .exchange::<UniswapV3State>("uniswap_v3", filter.clone(), None) // ! Filter ?
-            .exchange::<UniswapV4State>("uniswap_v4", filter.clone(), Some(u4)) // ! Filter ?
-            .exchange::<EVMPoolState<PreCachedDB>>("vm:balancer_v2", filter.clone(), Some(balancer))
-            .exchange::<EVMPoolState<PreCachedDB>>("vm:curve", filter.clone(), Some(curve))
+            .exchange::<UniswapV2State>(TychoSupportedProtocol::Sushiswap.to_string().as_str(), filter.clone(), None) // ! Filter ?
+            .exchange::<UniswapV2State>(TychoSupportedProtocol::Pancakeswap.to_string().as_str(), filter.clone(), None) // ! Filter ?
+            .exchange::<UniswapV2State>(TychoSupportedProtocol::UniswapV2.to_string().as_str(), filter.clone(), None) // ! Filter ?
+            .exchange::<UniswapV3State>(TychoSupportedProtocol::UniswapV3.to_string().as_str(), filter.clone(), None) // ! Filter ?
+            .exchange::<UniswapV4State>(TychoSupportedProtocol::UniswapV4.to_string().as_str(), filter.clone(), Some(u4)) // ! Filter ?
+            .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::BalancerV2.to_string().as_str(), filter.clone(), Some(balancer))
+            .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::Curve.to_string().as_str(), filter.clone(), Some(curve))
             .auth_key(Some(config.tycho_api_key.clone()))
             .skip_state_decode_failures(true)
             .set_tokens(hmt.clone()) // ALL Tokens
@@ -274,7 +278,7 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                         // log::info!(" - first Token : {:?} | Spot Price first/second = {:?}", first.symbol, proto.spot_price(first, second));
                                         // log::info!(" - second Token: {:?} | Spot Price second/first = {:?}", second.symbol, proto.spot_price(second, first));
                                         match AmmType::from(comp.protocol_type_name.as_str()) {
-                                            AmmType::UniswapV2 => {
+                                            AmmType::Pancakeswap | AmmType::Sushiswap | AmmType::UniswapV2 => {
                                                 if let Some(state) = proto.as_any().downcast_ref::<UniswapV2State>() {
                                                     // log::info!("Good downcast to UniswapV2State");
                                                     // log::info!(" - reserve0: {}", state.reserve0.to_string());
@@ -383,7 +387,7 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                 shd::data::redis::set(key.as_str(), components.clone()).await;
                                 // ===== Set SyncState to up and running =====
                                 shd::data::redis::set(keys::stream::status(network.name.clone()).as_str(), SyncState::Running as u128).await;
-                                log::info!("✅ Stream initialised successfully. SyncState set to 'Running' on {}", network.name.clone());
+                                log::info!("✅ Proto Stream initialised successfully. SyncState set to 'Running' on {}", network.name.clone());
                             } else {
                                 // ===== Update Shared State =====
                                 // log::info!("Stream already initialised. Updating the mutex-shared state with new data, and updating Redis.");

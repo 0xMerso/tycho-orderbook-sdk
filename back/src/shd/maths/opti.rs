@@ -32,11 +32,9 @@ pub fn optimizer(
     let sizebg = BigUint::from(size as u32);
     let mut allocations: Vec<BigUint> = vec![&inputpow / &sizebg; size]; // Which is naive I guess
 
-    let min_alloc = &inputpow * BigUint::from(10u32) / BigUint::from(100u32);
-
     // @notice epsilon is key here. It tells us the marginal benefit of giving a little more to that pool. The smaller epsilon is, the more accurately we capture that local behavior
     let epsilon = &inputpow / BigUint::from(10_000u32); // Choose a fixed epsilon for finite difference. May 1e9 is better, IDK.
-    let max_iterations = 100u32; // We'll run a maximum of 100 iterations.
+    let max_iterations = 50u32; // We'll run a maximum of 100 iterations.
     let tolerance = BigUint::zero(); // Tolerance: if the difference between max and min marginal is zero.
     for _iter in 0..max_iterations {
         // Compute marginal returns for each pool as: f(x+epsilon) - f(x).
@@ -85,7 +83,10 @@ pub fn optimizer(
         // log::info!("Iteration {}: Pool {} marginal = {} , Pool {} marginal = {}, transfer = {}", iter, max, max_marginal, mini, min_marginal, adjusted);
     }
 
-    // First, identify surplus from pools below threshold and set their allocation to zero.
+    // Define minimum allocation per pool as 5% of total input.
+    let min_alloc = &inputpow * BigUint::from(5u32) / BigUint::from(100u32);
+
+    // Identify surplus from pools below threshold and set their allocation to zero.
     let mut surplus = BigUint::zero();
     for alloc in allocations.iter_mut() {
         if *alloc < min_alloc {
@@ -98,16 +99,15 @@ pub fn optimizer(
     let total_valid: BigUint = allocations.iter().filter(|alloc| **alloc > BigUint::zero()).fold(BigUint::zero(), |acc, x| acc + x);
 
     // Reallocate the surplus proportionally to the valid pools.
-    if total_valid > BigUint::zero() && surplus.clone() > BigUint::zero() {
+    if total_valid > BigUint::zero() && surplus > BigUint::zero() {
         for alloc in allocations.iter_mut() {
             if *alloc > BigUint::zero() {
-                // additional allocation proportional to the pool's share of the valid allocation
+                // Multiply surplus by the current allocation and then divide by total_valid.
                 let additional = (&surplus * alloc.clone()) / &total_valid;
                 *alloc += additional;
             }
         }
     }
-
     // ------- Compute total output (raw) and distribution -------
     let mut total_output_raw = BigUint::zero();
     let mut distribution: Vec<f64> = Vec::with_capacity(size);

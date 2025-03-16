@@ -38,7 +38,7 @@ pub fn feebps(protocol: String, _id: String, value: String) -> u128 {
     let fee = u128::from_str_radix(fee, 16).unwrap_or(0);
     // log::info!("Fee value: {} (from {})", fee, value);
     let fee = match AmmType::from(protocol.as_str()) {
-        AmmType::UniswapV2 => fee, // Already in bps
+        AmmType::Pancakeswap | AmmType::Sushiswap | AmmType::UniswapV2 => fee, // Already in bps
         AmmType::UniswapV3 | AmmType::UniswapV4 => fee * (BPD as u128) / 1_000_000,
         AmmType::Curve => 4, // Not implemented, assuming 4 bps by default
         AmmType::Balancer => (fee * (BPD as u128)) / 1e18 as u128,

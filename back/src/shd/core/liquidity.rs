@@ -152,7 +152,7 @@ pub async fn build(network: Network, datapools: Vec<ProtoTychoState>, tokens: Ve
         let price = proto.spot_price(&base, &quote).unwrap_or_default();
         log::info!("Spot price for {}-{} => {}", base.symbol, quote.symbol, price);
         match AmmType::from(pdata.component.protocol_type_name.clone().as_str()) {
-            AmmType::UniswapV2 => {
+            AmmType::Pancakeswap | AmmType::Sushiswap | AmmType::UniswapV2 => {
                 if let Some(state) = proto.as_any().downcast_ref::<UniswapV2State>() {
                     let state = SrzUniswapV2State::from((state.clone(), pdata.component.id.clone()));
                     let fee = proto.fee();
