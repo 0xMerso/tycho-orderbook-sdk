@@ -54,12 +54,10 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # - ./front:/app
-      - ./front:/app
+      - ./front/public:/app/public
+      - ./front/src:/app/src
       - /app/node_modules
-      - /app/.next/static  # Preserve built static files
-      - /app/public  # Ensure public assets persist
-
+      - /app/.next
     environment:
       - NEXT_PUBLIC_STREAM_API_URL=http://ethereum:42001
       - NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=572586a808fa0462edb485f181680943
@@ -69,3 +67,4 @@ services:
     restart: always
     networks:
       - tycho
+  
