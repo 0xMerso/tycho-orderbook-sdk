@@ -54,10 +54,11 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # - ./front:/app
-      - ./front:/app
-      - /app/node_modules
-      - /app/.next
+      - ./front:/app  # Mount source code
+      - /app/node_modules  # Prevent overwriting dependencies
+      - /app/.next/static  # Preserve built static files
+      - /app/public  # Ensure public assets persist
+      
     environment:
       - NEXT_PUBLIC_STREAM_API_URL=http://ethereum:42001
       - NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=572586a808fa0462edb485f181680943

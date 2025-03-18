@@ -44,6 +44,9 @@ RUN adduser --system --uid 1001 nextjs
 # Only copy public/ if it exists
 COPY --from=builder /app/public ./public
 
+# >>> ADDED <<<
+COPY --from=builder /app/.next/static ./.next/static
+
 # Ensure standalone exists before copying
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 
