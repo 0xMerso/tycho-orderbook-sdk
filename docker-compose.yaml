@@ -64,6 +64,7 @@ services:
     depends_on:
       - ethereum
     restart: always
+    user: root
     networks:
       - tycho
   
