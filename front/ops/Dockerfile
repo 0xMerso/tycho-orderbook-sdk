@@ -36,7 +36,11 @@ RUN mkdir -p /app/public
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
+# ENV NODE_ENV=development
+ENV NODE_ENV=development
+
+# Enable corepack and prepare pnpm as root
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -50,10 +54,12 @@ COPY --from=builder /app/.next/static ./.next/static
 # Ensure standalone exists before copying
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 
+
 USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", ".next/standalone/server.js"]
+# CMD ["node", ".next/standalone/server.js"]
+CMD ["pnpm", "start"]

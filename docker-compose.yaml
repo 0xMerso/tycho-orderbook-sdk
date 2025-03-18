@@ -58,7 +58,7 @@ services:
       - ./front/src:/app/src
       - /app/node_modules
       # - /app/.next
-    command: sh -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm dev"
+    command: pnpm dev
     environment:
       - NEXT_PUBLIC_STREAM_API_URL=http://ethereum:42001
       - NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=572586a808fa0462edb485f181680943
