@@ -55,7 +55,7 @@ services:
       - "3000:3000"
     volumes:
       - ./front:/app
-      # - /app/node_modules
+      - node_modules:/app/node_modules
     command: pnpm dev
     environment:
       - NEXT_PUBLIC_STREAM_API_URL=http://ethereum:42001
@@ -64,7 +64,8 @@ services:
     depends_on:
       - ethereum
     restart: always
-    user: root
     networks:
       - tycho
   
+volumes:
+  node_modules:
