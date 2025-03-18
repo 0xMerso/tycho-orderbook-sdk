@@ -54,10 +54,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./front/public:/app/public
-      - ./front/src:/app/src
+      - ./front:/app
       - /app/node_modules
-      # - /app/.next
     command: pnpm dev
     environment:
       - NEXT_PUBLIC_STREAM_API_URL=http://ethereum:42001
