@@ -57,7 +57,8 @@ services:
       - ./front/public:/app/public
       - ./front/src:/app/src
       - /app/node_modules
-      - /app/.next
+      # - /app/.next
+    command: pnpm dev
     environment:
       - NEXT_PUBLIC_STREAM_API_URL=http://ethereum:42001
       - NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=572586a808fa0462edb485f181680943
