@@ -52,11 +52,12 @@ services:
       context: front
       dockerfile: ops/Dockerfile
     ports:
-      - "41777:3000"
+      - "3000:3000"
     volumes:
       - ./front:/app
     environment:
       - NEXT_PUBLIC_STREAM_API_URL=http://ethereum:42001
+      - NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=572586a808fa0462edb485f181680943
       - NEXT_PUBLIC_ORDERBOOK_ENDPOINT=/orderbook?tag=0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48-0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2&z0to1=false
     depends_on:
       - ethereum
@@ -64,7 +65,3 @@ services:
     networks:
       - tycho
   
-  # base:
-  # arbitrum:
-  # starknet:
-
