@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -8,12 +10,58 @@ use reqwest::Client;
 use tycho_client::rpc::HttpRPCClient;
 use tycho_client::rpc::RPCClient;
 
+use tycho_core::dto::ProtocolStateRequestBody;
+use tycho_core::models::protocol::ComponentBalance;
 use tycho_simulation::models::Token;
 
 use crate::shd;
 use crate::shd::types::EnvConfig;
 use crate::shd::types::Network;
 use crate::shd::types::IERC20;
+
+/**
+ * Get the balances of the component in the specified protocol system.
+ */
+pub async fn get_component_balances(network: Network, config: EnvConfig, cp: String, protosys: String) -> Option<HashMap<String, u128>> {
+    log::info!("Getting component balances on {}", network.name);
+    let client = match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(&config.tycho_api_key)) {
+        Ok(client) => client,
+        Err(e) => {
+            log::error!("Failed to create client: {:?}", e.to_string());
+            return None;
+        }
+    };
+    let (chain, _, _) = shd::types::chain(network.name.clone()).expect("Invalid chain");
+    let body = ProtocolStateRequestBody {
+        protocol_ids: Some(vec![cp]),
+        protocol_system: protosys.to_string(),
+        chain,
+        include_balances: true,                            // We want to include account balances.
+        version: tycho_core::dto::VersionParam::default(), // { timestamp: None, block: None },
+        pagination: tycho_core::dto::PaginationParams {
+            page: 0,        // Start at the first page.
+            page_size: 100, // Maximum page size supported is 100.
+        },
+    };
+    match client.get_protocol_states(&body).await {
+        Ok(response) => {
+            let component_balances = response.states.into_iter().map(|state| state.balances.clone()).collect::<Vec<_>>();
+            let mut result = HashMap::new();
+            for cb in component_balances.iter() {
+                for c in cb.iter() {
+                    // result.push(u128::from_str_radix(c.1.to_string().trim_start_matches("0x"), 16).unwrap());
+                    result.insert(c.0.clone().to_string(), u128::from_str_radix(c.1.to_string().trim_start_matches("0x"), 16).unwrap());
+                }
+            }
+            log::info!("Successfully retrieved {} component balances on {}", component_balances.len(), network.name);
+            Some(result)
+        }
+        Err(e) => {
+            log::error!("Failed to get protocol states: {:?}", e.to_string());
+            None
+        }
+    }
+}
 
 pub async fn get_all_tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>> {
     log::info!("Getting all tokens on {}", network.name);
@@ -53,7 +101,7 @@ pub async fn get_all_tokens(network: &Network, config: &EnvConfig) -> Option<Vec
 /**
  * Get the balance of the owner for the specified tokens.
  */
-pub async fn get_balances(provider: &RootProvider<Http<Client>>, owner: String, tokens: Vec<String>) -> Result<Vec<u128>, String> {
+pub async fn get_erc20_balances(provider: &RootProvider<Http<Client>>, owner: String, tokens: Vec<String>) -> Result<Vec<u128>, String> {
     let mut balances = vec![];
     let client = Arc::new(provider);
     for t in tokens.iter() {
