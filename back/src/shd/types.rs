@@ -253,7 +253,7 @@ pub fn chain_timing(name: String) -> u64 {
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct OrderbookRequestBody {
     pub tag: String, // Pair uniq identifier: token0-token1
-    pub spsq: Option<SinglePointSimulation>,
+    pub sps: Option<SinglePointSimulation>,
 }
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
@@ -317,8 +317,8 @@ pub struct TradeResult {
     pub gas_costs: Vec<u128>,
     #[schema(example = "[0.42, 0.37, 0.77]")]
     pub gas_costs_usd: Vec<f64>,
-    #[schema(example = "[1.77, 2.42, 2.37]")]
-    pub gas_costs_output: Vec<f64>,
+    // #[schema(example = "[1.77, 2.42, 2.37]")]
+    // pub gas_costs_output: Vec<f64>,
     #[schema(example = "0.0005")]
     pub ratio: f64, // output per unit input (human–readable)
 }
