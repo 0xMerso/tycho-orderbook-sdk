@@ -183,7 +183,7 @@ pub async fn swap(network: Network, request: ExecutionRequest, config: EnvConfig
         }
     };
     let provider = ProviderBuilder::new().with_chain(nchain).on_http(network.rpc.parse().expect("Failed to parse RPC_URL"));
-    match super::client::get_balances(&provider, request.sender.clone(), vec![request.input.address.clone()]).await {
+    match super::client::get_erc20_balances(&provider, request.sender.clone(), vec![request.input.address.clone()]).await {
         Ok(balances) => {
             log::info!("Building swap calldata and transactions ...");
             if let Some(solution) = prepare(network.clone(), chain, &provider, request.clone(), config.clone(), balances).await {
