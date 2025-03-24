@@ -350,6 +350,8 @@ pub struct PairSimulatedOrderbook {
     // pub best1to0: TradeResult, // Bid of Ask, it's a pov
     pub mpd0to1: MidPriceData,
     pub mpd1to0: MidPriceData,
+    pub t0_worth_eth: f64, // One unit, multi-hop spot_price, needed to value the TVL and other stuff
+    pub t1_worth_eth: f64, // One unit, multi-hop spot_price, needed to value the TVL and other stuff
 }
 
 /// ====================================================================================================================================================================================================

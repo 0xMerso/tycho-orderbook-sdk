@@ -96,6 +96,7 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
     // Best bid/ask
     let best0to1 = best(&pcsdata, eth_usd, gas_price, &t0, &t1, aggbt0.clone(), utk1_ethworth);
     let best1to0 = best(&pcsdata, eth_usd, gas_price, &t1, &t0, aggbt1.clone(), utk0_ethworth);
+
     let mpd0to1 = mid_price_data(best0to1.clone(), best1to0.clone());
     let mpd1to0 = mid_price_data(best1to0.clone(), best0to1.clone());
 
@@ -114,6 +115,8 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
         // best1to0: best1to0.clone(),
         mpd0to1: mpd0to1.clone(),
         mpd1to0: mpd1to0.clone(),
+        t0_worth_eth: utk0_ethworth.clone(),
+        t1_worth_eth: utk1_ethworth.clone(),
     };
     match body.spsq {
         Some(spsq) => {
@@ -151,13 +154,7 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
 pub fn optimize(pcs: &Vec<ProtoTychoState>, ethusd: f64, gasp: u128, from: &SrzToken, to: &SrzToken, aggb: u128, output_u_ethworth: f64) -> Vec<TradeResult> {
     let mut trades = Vec::new();
     let start = aggb as f64 / TEN_MILLIONTH / 10f64.powi(from.decimals as i32);
-    log::info!(
-        "Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth: {}",
-        from.symbol,
-        aggb,
-        aggb as f64 / 10f64.powi(from.decimals as i32),
-        output_u_ethworth
-    );
+    log::info!("Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth: {}", from.symbol, aggb, start, output_u_ethworth);
     let steps = shd::maths::steps::exponential(
         shd::r#static::maths::simu::COUNT,
         shd::r#static::maths::simu::START_MULTIPLIER,
@@ -193,10 +190,10 @@ pub fn optimize(pcs: &Vec<ProtoTychoState>, ethusd: f64, gasp: u128, from: &SrzT
  * --- --- --- --- ---
  * Amount out is net of gas cost
  */
-pub fn best(pcs: &Vec<ProtoTychoState>, ethusd: f64, gasp: u128, from: &SrzToken, to: &SrzToken, aggb: u128, output_u_ethworth: f64) -> TradeResult {
+pub fn best(pcs: &Vec<ProtoTychoState>, ethusd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: u128, output_u_ethworth: f64) -> TradeResult {
     let amount = aggb as f64 / TEN_MILLIONTH / 10f64.powi(from.decimals as i32);
     log::info!(" - 🥇 Computing best price for {} (amount in = {})", from.symbol, amount);
-    let result = shd::maths::opti::gradient(amount, pcs, from.clone(), to.clone(), ethusd, gasp, output_u_ethworth);
+    let result = shd::maths::opti::gradient(amount, pcs, from.clone(), to.clone(), ethusd, gas_price, output_u_ethworth);
     log::info!(
         " - (best) Input: {} {}, Output: {} {} at price {} | Distribution: {:?} ",
         result.amount,
@@ -215,19 +212,19 @@ pub fn best(pcs: &Vec<ProtoTychoState>, ethusd: f64, gasp: u128, from: &SrzToken
  */
 pub fn mid_price_data(trade0t1: TradeResult, trade1to0: TradeResult) -> MidPriceData {
     let best_ask = trade0t1.ratio;
-    // log::info!("mid_price_data: best_ask: {}", best_ask);
+    // log::info!(" - mid_price_data: best_ask: {}", best_ask);
     let best_bid = 1. / trade1to0.ratio;
-    // log::info!("mid_price_data: best_bid: {}", best_bid);
+    // log::info!(" - mid_price_data: best_bid: {}", best_bid);
     let mid = (best_ask + best_bid) / 2.;
-    // log::info!("mid_price_data: mid: {}", mid);
+    log::info!(" - mid_price_data: mid: {}", mid);
     let spread = (best_ask - best_bid).abs();
-    // log::info!("mid_price_data: spread: {}", spread);
-    let spread_pct = spread / mid;
-    // log::info!("mid_price_data: spread_pct: {}", spread_pct);
+    log::info!(" - mid_price_data: spread: {}", spread);
+    let spread_pct = (spread / mid) * 100.;
+    log::info!(" - mid_price_data: spread_pct: {}", spread_pct);
     let _inverse_price0t1 = 1. / best_ask;
-    // log::info!("mid_price_data: inverse_price0t1: {}", inverse_price0t1);
+    // log::info!(" - mid_price_data: inverse_price0t1: {}", inverse_price0t1);
     let _inverse_price1t0 = 1. / trade1to0.ratio;
-    // log::info!("mid_price_data: inverse_price1t0: {}", inverse_price1t0);
+    // log::info!(" - mid_price_data: inverse_price1t0: {}", inverse_price1t0);
     MidPriceData {
         best_ask,
         best_bid,
