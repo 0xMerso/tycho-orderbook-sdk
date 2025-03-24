@@ -170,14 +170,13 @@ pub async fn presimulate(network: Network, nchain: NamedChain, config: EnvConfig
     Ok("Simulation successful".to_string())
 }
 
-/**
- * Swaps tokens on the specified network.
- */
+/// Swaps tokens on the specified network.
 pub async fn swap(network: Network, request: ExecutionRequest, config: EnvConfig) -> Result<ExecutionPayload, String> {
     let (_, _, chain) = shd::types::chain(network.name.clone()).unwrap();
     let nchain = match network.name.as_str() {
         "ethereum" => NamedChain::Mainnet,
         "base" => NamedChain::Base,
+        "arbitrum" => NamedChain::Arbitrum,
         _ => {
             log::error!("Unsupported network: {}", network.name);
             return Err("Unsupported network".to_string());
@@ -186,45 +185,41 @@ pub async fn swap(network: Network, request: ExecutionRequest, config: EnvConfig
     let provider = ProviderBuilder::new().with_chain(nchain).on_http(network.rpc.parse().expect("Failed to parse RPC_URL"));
     match super::client::get_balances(&provider, request.sender.clone(), vec![request.input.address.clone()]).await {
         Ok(balances) => {
-            if request.execute {
-                log::info!("Executing swap");
-                if let Some(solution) = prepare(network.clone(), chain, &provider, request.clone(), config.clone(), balances).await {
-                    let header: alloy::rpc::types::Block = provider.get_block_by_number(alloy::eips::BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
-                    let nonce = provider.get_transaction_count(solution.sender.to_string().parse().unwrap()).await.unwrap();
-                    let encoder = EVMEncoderBuilder::new()
-                        .chain(chain)
-                        // .initialize_tycho_router_with_permit2(config.pvkey.clone()) // ! Needed ?
-                        // .expect("Failed to create encoder builder")
-                        .build()
-                        .expect("Failed to build encoder");
-                    let transaction = encoder.encode_router_calldata(vec![solution.clone()]).expect("Failed to encode router calldata");
-                    let transaction = transaction[0].clone();
-                    // let (approval, swap) = batch2tx(network.clone(), solution.clone(), transaction.clone(), header, nonce).unwrap();
-                    match batch2tx(network.clone(), solution.clone(), transaction.clone(), header, nonce) {
-                        Some((approval, swap)) => {
-                            log::info!("--- Raw Transactions ---");
-                            log::info!("Approval: {:?}", approval);
-                            log::info!("Swap: {:?}", swap);
-                            log::info!("--- Formatted Transactions ---");
-                            let ep = ExecutionPayload {
-                                swap: SrzTransactionRequest::from(swap),
-                                approve: SrzTransactionRequest::from(approval),
-                            };
-                            log::info!("Approval: {:?}", ep.approve);
-                            log::info!("Swap: {:?}", ep.swap);
-                            return Ok(ep);
-                        }
-                        None => {
-                            log::error!("Failed to build transactions");
-                        }
-                    };
-                }
-            } else {
-                log::info!("Building swap calldata only");
+            log::info!("Building swap calldata and transactions ...");
+            if let Some(solution) = prepare(network.clone(), chain, &provider, request.clone(), config.clone(), balances).await {
+                let header: alloy::rpc::types::Block = provider.get_block_by_number(alloy::eips::BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+                let nonce = provider.get_transaction_count(solution.sender.to_string().parse().unwrap()).await.unwrap();
+                let encoder = EVMEncoderBuilder::new()
+                    .chain(chain)
+                    // .initialize_tycho_router_with_permit2(config.pvkey.clone()) // ! Needed ?
+                    // .expect("Failed to create encoder builder")
+                    .build()
+                    .expect("Failed to build encoder");
+                let transaction = encoder.encode_router_calldata(vec![solution.clone()]).expect("Failed to encode router calldata");
+                let transaction = transaction[0].clone();
+                // let (approval, swap) = batch2tx(network.clone(), solution.clone(), transaction.clone(), header, nonce).unwrap();
+                match batch2tx(network.clone(), solution.clone(), transaction.clone(), header, nonce) {
+                    Some((approval, swap)) => {
+                        log::info!("--- Raw Transactions ---");
+                        log::info!("Approval: {:?}", approval);
+                        log::info!("Swap: {:?}", swap);
+                        log::info!("--- Formatted Transactions ---");
+                        let ep = ExecutionPayload {
+                            swap: SrzTransactionRequest::from(swap),
+                            approve: SrzTransactionRequest::from(approval),
+                        };
+                        log::info!("Approval: {:?}", ep.approve);
+                        log::info!("Swap: {:?}", ep.swap);
+                        return Ok(ep);
+                    }
+                    None => {
+                        log::error!("Failed to build transactions");
+                    }
+                };
             }
         }
         Err(e) => {
-            log::error!("Failed to get balances: {:?}", e);
+            log::error!("Failed to get balances of sender: {:?}", e);
         }
     };
     Err("Failed to build transactions".to_string())
