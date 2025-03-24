@@ -32,10 +32,11 @@ use utoipa_swagger_ui::SwaggerUi;
         status,
         tokens,
         components,
-        orderbook
+        orderbook,
+        execute
     ),
     components(
-        schemas(APIVersion, Network, Status, SrzToken, SrzProtocolComponent, PairSimulatedOrderbook)
+        schemas(APIVersion, Network, Status, SrzToken, SrzProtocolComponent, PairSimulatedOrderbook, ExecutionPayload, ExecutionRequest)
     ),
     tags(
         (name = "API", description = "Endpoints")
@@ -196,7 +197,7 @@ async fn components(Extension(network): Extension<Network>) -> impl IntoResponse
     path = "/execute",
     summary = "Build transaction for a given orderbook point",
     request_body = ExecutionRequest,
-    description = "Using Tycho execution engine, build a transaction according to a given orderbook point, split according to distribution",
+    description = "Using Tycho execution engine, build a transaction according to a given orderbook point/distribution",
     responses(
         (status = 200, description = "The trade result", body = ExecutionPayload)
     ),
@@ -226,7 +227,8 @@ async fn execute(Extension(network): Extension<Network>, Extension(config): Exte
     )
 )]
 async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extension(network): Extension<Network>, AxumExJson(params): AxumExJson<OrderbookRequestBody>) -> impl IntoResponse {
-    log::info!("👾 API: Querying orderbook endpoint: {:?} | OrderbookRequestBody: {:?}", params.tag, params);
+    let single = params.spsq.is_none();
+    log::info!("👾 API: Querying orderbook endpoint: {:?} | OrderbookRequestBody: {:?} | Single point: {}", params.tag, params, single);
     match (_tokens(network.clone()).await, _components(network.clone()).await) {
         (Some(atks), Some(acps)) => {
             let target = params.tag.clone();
@@ -246,8 +248,8 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
             let mtx = shtss.read().await;
             let balances = mtx.balances.clone();
             drop(mtx);
-            let (t0_to_eth_path, t0_to_eth_comps) = shd::maths::path::ethpath(acps.clone(), srzt0.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
-            let (t1_to_eth_path, t1_to_eth_comps) = shd::maths::path::ethpath(acps.clone(), srzt1.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
+            let (t0_to_eth_path, t0_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
+            let (t1_to_eth_path, t1_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
             // log::info!("Path from {} to network.ETH is {:?}", srzt0.symbol, t0_to_eth_path);
             if tokens.len() == 2 {
                 let mut ptss: Vec<ProtoTychoState> = vec![];
@@ -295,8 +297,10 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                 log::info!(" - One unit of quote token ({}) quoted to ETH = {}", srzt1.symbol, utk1_ethworth);
                 // let ptss = vec![ptss[0].clone()];
                 let result = shd::core::orderbook::build(network.clone(), balances.clone(), ptss.clone(), tokens.clone(), params.clone(), utk0_ethworth, utk1_ethworth).await;
-                let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
-                crate::shd::utils::misc::save1(result.clone(), path.as_str());
+                if !single {
+                    let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
+                    crate::shd::utils::misc::save1(result.clone(), path.as_str());
+                }
                 AxumJson(json!({ "orderbook": result.clone() }))
             } else {
                 log::error!("Query param Tag must contain only 2 tokens separated by a dash '-'");
@@ -321,22 +325,21 @@ pub async fn start(n: Network, shared: SharedTychoStreamState, config: EnvConfig
     drop(rstate);
 
     // Add /api prefix
-    let app = Router::new()
+    let inner = Router::new()
         .route("/", get(root))
         .route("/version", get(version))
         .route("/network", get(network))
         .route("/status", get(status))
         .route("/tokens", get(tokens))
-        // .route("/pairs", get(pairs))
-        // .route("/pool/{id}", get(pool))
         .route("/components", get(components))
         .route("/orderbook", get(orderbook))
         .route("/execute", get(execute))
         // Swagger
-        .merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(Extension(shared.clone())) // Shared state
         .layer(Extension(n.clone()))
         .layer(Extension(config.clone())); // EnvConfig
+
+    let app = Router::new().nest("/api", inner).merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()));
 
     match tokio::net::TcpListener::bind(format!("0.0.0.0:{}", n.port)).await {
         Ok(listener) => match axum::serve(listener, app).await {

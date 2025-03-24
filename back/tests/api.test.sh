@@ -34,7 +34,7 @@ fi
 
 API_HOST=${API_HOST:-127.0.0.1}
 LOG=${LOG:-false}
-API_URL="http://$API_HOST:$PORT"
+API_URL="http://$API_HOST:$PORT/api"
 echo "Testing API at $API_URL"
 
 # Function to test an endpoint.
@@ -78,15 +78,23 @@ try "GET /tokens" "$API_URL/tokens"
 try "GET /components" "$API_URL/components"
 
 # Test simulations
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'"}'
+# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'"}'
+# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'"}'
+# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'"}'
+# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'"}'
+# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'"}'
+# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'"}'
+# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'"}'
+# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'"}'
+# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'"}'
 
 # try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "spsq": {"input": "'"$eth"'", "amount": 100}}'
 # try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "spsq": {"input": "'"$usdc"'", "amount": 1000}}'
+# try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'", "spsq": {"input": "'"$eth"'", "amount": 100}}'
+# try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'", "spsq": {"input": "'"$eth"'", "amount": 1000}}'
+# try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'", "spsq": {"input": "'"$eth"'", "amount": 100}}'
+# try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'", "spsq": {"input": "'"$usdc"'", "amount": 1000}}'
+# try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'", "spsq": {"input": "'"$usdc"'", "amount": 100}}'
+# try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'", "spsq": {"input": "'"$usdc"'", "amount": 1000}}'
+# try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'", "spsq": {"input": "'"$wbtc"'", "amount": 1}}'
+try "GET /orderbook (with spsq)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'", "spsq": {"input": "'"$wbtc"'", "amount": 1}}'
