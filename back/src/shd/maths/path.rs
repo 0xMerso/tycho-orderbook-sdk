@@ -22,7 +22,7 @@ struct CryptoPrice {
  * But can be used to price any token to any other token
  * Only return the path, not the price
  */
-pub fn ethpath(cps: Vec<SrzProtocolComponent>, input: String, target: String) -> Option<(Vec<String>, Vec<String>)> {
+pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) -> Option<(Vec<String>, Vec<String>)> {
     // (destination token address, component id that provides this conversion)
     let mut graph: HashMap<String, Vec<(String, String)>> = HashMap::new();
     for comp in cps {

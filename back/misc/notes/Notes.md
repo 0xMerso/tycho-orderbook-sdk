@@ -56,58 +56,17 @@ You can view tick/fees stuff when creating a pool.
 
 The liquidityNet of a tick is an aggregate measure of all the liquidity referencing the tick across different liquidity positions where the tick could simultaneously be the lower tick of one position and the upper tick of another position. It's a signed 128-bit integer(i.e. int128) reflecting the net effect of all changes in liquidity at that particular tick
 
-UniswapV3State {
-    liquidity: 7604754235727710538,
-    sqrt_price: 1664747471972170483223414323336827,
-    fee: Medium,
-    tick: 199066,
-    ticks: TickList {
-        tick_spacing: 60,
-        [...]
-        TickInfo {
-            index: 199020,
-            net_liquidity: -76233701736333,
-            sqrt_price: 1660840414613703419255027962631956,
-        },
-        // In this range is the spot price of the pool
+he ProtocolComponent struct is the only way to specify a swap route, so every Substream integration must use it. However, a "component" doesn’t necessarily mean a pool - it can be anything that allows users to swap one token for another.  
 
-        TickInfo {
-            index: 199080,
-            net_liquidity: 158548481117613,
-            sqrt_price: 1665830167260914083394296520001936,
-        },
-        TickInfo {
-            index: 199140,
-            net_liquidity: -1955624850397014467,
-            sqrt_price: 1670834910891762472170837580010842,
-        },
-        TickInfo {
-            index: 199200,
-            net_liquidity: -1840590113610899,
-            sqrt_price: 1675854690544471182080396908980501,
-        }
-        [...]
-    }
-}
+The allowed tick indexes range from -887,272 to 887,272
+If the tick index is negative, this corresponds to a price less than 1, since  will be less than 1 if is negative.
+If then the price is 1 (meaning the assets have equal value) because any value raised to 0 is 1.
+If is greater than or equal to 1, then the price will be greater than one.
+The value 1.0001 was chosen because “This has the desirable property of each tick being a .01% (1 basis point) price movement away from each of its neighboring ticks.”
+The “current tick” is the current price rounded down to the nearest tick. If the price increases and crosses a tick, then the tick that was just crossed becomes the current tick. “Crossed” doesn’t require that the priced “passed over” the tick.
+If the price stops on the tick, the tick is considered crossed.
 
-
-Let's take the ETH-USDC pair
-Assuming we find 5 pools on Uniswap v3
-The liquidity is the aggregated value
-
-
-the ProtocolComponent struct is the only way to specify a swap route, so every Substream integration must use it. However, a "component" doesn’t necessarily mean a pool - it can be anything that allows users to swap one token for another.  
-
-// The allowed tick indexes range from -887,272 to 887,272
-// If the tick index is negative, this corresponds to a price less than 1, since  will be less than 1 if is negative.
-// If then the price is 1 (meaning the assets have equal value) because any value raised to 0 is 1.
-// If is greater than or equal to 1, then the price will be greater than one.
-// The value 1.0001 was chosen because “This has the desirable property of each tick being a .01% (1 basis point) price movement away from each of its neighboring ticks.”
-// The “current tick” is the current price rounded down to the nearest tick. If the price increases and crosses a tick, then the tick that was just crossed becomes the current tick. “Crossed” doesn’t require that the priced “passed over” the tick.
-// If the price stops on the tick, the tick is considered crossed.
-
-// How decimals affect price
-// The tick can be negative due to the difference in decimal places, as ETH has 18 decimals while USDC has only 6 decimals.
-
-// Assuming ETH is worth $1000, the smallest unit of ETH is worth (or ), while the smallest unit of USDC is worth
-// So, although we assume that 1 ETH is “worth” more than 1 USDC, considering its smallest unit, 1 smallest unit of USDC is worth more than 1 smallest unit of ETH.
+How decimals affect price
+The tick can be negative due to the difference in decimal places, as ETH has 18 decimals while USDC has only 6 decimals.
+Assuming ETH is worth $1000, the smallest unit of ETH is worth (or ), while the smallest unit of USDC is worth
+So, although we assume that 1 ETH is “worth” more than 1 USDC, considering its smallest unit, 1 smallest unit of USDC is worth more than 1 smallest unit of ETH.

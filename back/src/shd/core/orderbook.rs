@@ -9,7 +9,7 @@ use crate::shd::{
 use std::{collections::HashMap, time::Instant};
 
 /// @notice Reading 'state' from Redis DB while using TychoStreamState state and functions to compute/simulate might create a inconsistency
-pub async fn build(network: Network, balances: HashMap<String, HashMap<String, u128>>, ptss: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, query: OrderbookRequestBody, utk0_ethworth: f64, utk1_ethworth: f64) -> PairSimulatedOrderbook {
+pub async fn build(network: Network, balances: HashMap<String, HashMap<String, u128>>, ptss: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, query: OrderbookRequestBody, t0_worth_eth: f64, t1_worth_eth: f64) -> PairSimulatedOrderbook {
     log::info!("Got {} pools to compute for pair: '{}'", ptss.len(), query.tag);
     let mut pools = Vec::new();
     let mut prices0to1 = vec![];
@@ -60,7 +60,7 @@ pub async fn build(network: Network, balances: HashMap<String, HashMap<String, u
     //     pools: vec![],
     // };
 
-    let mut pso = simulate(network.clone(), pools.clone(), tokens, query.clone(), aggregated.clone(), utk0_ethworth, utk1_ethworth).await;
+    let mut pso = simulate(network.clone(), pools.clone(), tokens, query.clone(), aggregated.clone(), t0_worth_eth, t1_worth_eth).await;
     pso.prices0to1 = prices0to1.clone();
     pso.prices1to0 = prices1to0.clone();
     pso.aggt0lqdty = aggt0lqdty.clone();
@@ -75,7 +75,7 @@ pub async fn build(network: Network, balances: HashMap<String, HashMap<String, u
  * The optimizer uses a simple gradient-based approach to move a fixed fraction of the allocation from the pool with the lowest marginal return to the one with the highest.
  * If the query specifies a specific token to sell with a specific amount, the optimizer will only run for that token and amount.
  */
-pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, body: OrderbookRequestBody, balances: HashMap<String, u128>, utk0_ethworth: f64, utk1_ethworth: f64) -> PairSimulatedOrderbook {
+pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, body: OrderbookRequestBody, balances: HashMap<String, u128>, t0_worth_eth: f64, t1_worth_eth: f64) -> PairSimulatedOrderbook {
     let eth_usd = shd::core::gas::eth_usd().await;
     let gas_price = shd::core::gas::gas_price(network.rpc).await;
     let t0 = tokens[0].clone();
@@ -94,8 +94,8 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
     let pools = pcsdata.iter().map(|x| x.component.clone()).collect::<Vec<SrzProtocolComponent>>();
 
     // Best bid/ask
-    let best0to1 = best(&pcsdata, eth_usd, gas_price, &t0, &t1, aggbt0.clone(), utk1_ethworth);
-    let best1to0 = best(&pcsdata, eth_usd, gas_price, &t1, &t0, aggbt1.clone(), utk0_ethworth);
+    let best0to1 = best(&pcsdata, eth_usd, gas_price, &t0, &t1, aggbt0.clone(), t1_worth_eth);
+    let best1to0 = best(&pcsdata, eth_usd, gas_price, &t1, &t0, aggbt1.clone(), t0_worth_eth);
 
     let mpd0to1 = mid_price_data(best0to1.clone(), best1to0.clone());
     let mpd1to0 = mid_price_data(best1to0.clone(), best0to1.clone());
@@ -115,43 +115,34 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
         // best1to0: best1to0.clone(),
         mpd0to1: mpd0to1.clone(),
         mpd1to0: mpd1to0.clone(),
-        t0_worth_eth: utk0_ethworth.clone(),
-        t1_worth_eth: utk1_ethworth.clone(),
+        t0_worth_eth: t0_worth_eth.clone(),
+        t1_worth_eth: t1_worth_eth.clone(),
     };
     match body.spsq {
         Some(spsq) => {
-            log::info!("🎯 Partial Optimisation: input: {} and amount: {}", spsq.input, spsq.amount);
+            log::info!(" 🎯 Partial Optimisation: input: {} and amount: {}", spsq.input, spsq.amount);
             if spsq.input.to_lowercase() == t0.address.to_lowercase() {
-                let power = 10f64.powi(t0.decimals as i32);
-                let amount = (spsq.amount * power).floor();
-                // result.trades0to1 = optimize(&balances, &pcsdata, eth_usd, gas_price, &t0, &t1, utk1_ethworth);
-                result.trades0to1 = vec![shd::maths::opti::gradient(amount, &pcsdata, t0.clone(), t1.clone(), eth_usd, gas_price, utk1_ethworth)];
-                dbg!(result.trades0to1.clone());
+                result.trades0to1 = vec![shd::maths::opti::gradient(spsq.amount, &pcsdata, t0.clone(), t1.clone(), eth_usd, gas_price, t1_worth_eth)];
             } else if spsq.input.to_lowercase() == t1.address.to_lowercase() {
-                let power = 10f64.powi(t1.decimals as i32);
-                let amount = (spsq.amount * power).floor();
-                // result.trades1to0 = optimize(&balances, &pcsdata, eth_usd, gas_price, &t1, &t0, utk0_ethworth);
-                result.trades1to0 = vec![shd::maths::opti::gradient(amount, &pcsdata, t1.clone(), t0.clone(), eth_usd, gas_price, utk0_ethworth)];
-                dbg!(result.trades1to0.clone());
+                result.trades1to0 = vec![shd::maths::opti::gradient(spsq.amount, &pcsdata, t1.clone(), t0.clone(), eth_usd, gas_price, t0_worth_eth)];
             }
         }
         None => {
             // FuLL Orderbook optimization
-            let trades0to1 = optimize(&pcsdata, eth_usd, gas_price, &t0, &t1, aggbt0.clone(), utk1_ethworth);
+            let trades0to1 = optimize(&pcsdata, eth_usd, gas_price, &t0, &t1, aggbt0.clone(), t1_worth_eth);
             result.trades0to1 = trades0to1;
             log::info!(" 🔄  Switching to 1to0");
-            let trades1to0 = optimize(&pcsdata, eth_usd, gas_price, &t1, &t0, aggbt1.clone(), utk0_ethworth);
+            let trades1to0 = optimize(&pcsdata, eth_usd, gas_price, &t1, &t0, aggbt1.clone(), t0_worth_eth);
             result.trades1to0 = trades1to0;
         }
     }
-
     result
 }
 
 /**
  * Executes the optimizer for a given token pair and a set of pools.
  */
-pub fn optimize(pcs: &Vec<ProtoTychoState>, ethusd: f64, gasp: u128, from: &SrzToken, to: &SrzToken, aggb: u128, output_u_ethworth: f64) -> Vec<TradeResult> {
+pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: u128, output_u_ethworth: f64) -> Vec<TradeResult> {
     let mut trades = Vec::new();
     let start = aggb as f64 / TEN_MILLIONTH / 10f64.powi(from.decimals as i32);
     log::info!("Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth: {}", from.symbol, aggb, start, output_u_ethworth);
@@ -164,7 +155,7 @@ pub fn optimize(pcs: &Vec<ProtoTychoState>, ethusd: f64, gasp: u128, from: &SrzT
     let steps = steps.iter().map(|x| x * start).collect::<Vec<f64>>();
     for (x, amount) in steps.iter().enumerate() {
         let start = Instant::now();
-        let result = shd::maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), ethusd, gasp, output_u_ethworth);
+        let result = shd::maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
         let elapsed = start.elapsed();
         log::info!(
             " - #{x} | Input: {} {}, Output: {} {} at price {} | Distribution: {:?} | Took: {:?}",
@@ -190,10 +181,10 @@ pub fn optimize(pcs: &Vec<ProtoTychoState>, ethusd: f64, gasp: u128, from: &SrzT
  * --- --- --- --- ---
  * Amount out is net of gas cost
  */
-pub fn best(pcs: &Vec<ProtoTychoState>, ethusd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: u128, output_u_ethworth: f64) -> TradeResult {
+pub fn best(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: u128, output_u_ethworth: f64) -> TradeResult {
     let amount = aggb as f64 / TEN_MILLIONTH / 10f64.powi(from.decimals as i32);
     log::info!(" - 🥇 Computing best price for {} (amount in = {})", from.symbol, amount);
-    let result = shd::maths::opti::gradient(amount, pcs, from.clone(), to.clone(), ethusd, gas_price, output_u_ethworth);
+    let result = shd::maths::opti::gradient(amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
     log::info!(
         " - (best) Input: {} {}, Output: {} {} at price {} | Distribution: {:?} ",
         result.amount,
@@ -212,26 +203,21 @@ pub fn best(pcs: &Vec<ProtoTychoState>, ethusd: f64, gas_price: u128, from: &Srz
  */
 pub fn mid_price_data(trade0t1: TradeResult, trade1to0: TradeResult) -> MidPriceData {
     let best_ask = trade0t1.ratio;
-    // log::info!(" - mid_price_data: best_ask: {}", best_ask);
     let best_bid = 1. / trade1to0.ratio;
-    // log::info!(" - mid_price_data: best_bid: {}", best_bid);
     let mid = (best_ask + best_bid) / 2.;
-    log::info!(" - mid_price_data: mid: {}", mid);
     let spread = (best_ask - best_bid).abs();
-    log::info!(" - mid_price_data: spread: {}", spread);
     let spread_pct = (spread / mid) * 100.;
-    log::info!(" - mid_price_data: spread_pct: {}", spread_pct);
     let _inverse_price0t1 = 1. / best_ask;
-    // log::info!(" - mid_price_data: inverse_price0t1: {}", inverse_price0t1);
     let _inverse_price1t0 = 1. / trade1to0.ratio;
+
+    log::info!(" - mid_price_data: best_ask: {}", best_ask);
+    log::info!(" - mid_price_data: best_bid: {}", best_bid);
+    log::info!(" - mid_price_data: trade1to0.ratio: {}", trade1to0.ratio);
+    log::info!(" - mid_price_data: mid: {}", mid);
+    log::info!(" - mid_price_data: spread: {}", spread);
+    // log::info!(" - mid_price_data: spread_pct: {}", spread_pct);
+    // log::info!(" - mid_price_data: inverse_price0t1: {}", inverse_price0t1);
     // log::info!(" - mid_price_data: inverse_price1t0: {}", inverse_price1t0);
-    MidPriceData {
-        best_ask,
-        best_bid,
-        mid,
-        spread,
-        spread_pct,
-        // inverse_price0t1,
-        // inverse_price1t0,
-    }
+
+    MidPriceData { best_ask, best_bid, mid, spread, spread_pct }
 }
