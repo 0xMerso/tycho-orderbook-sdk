@@ -354,12 +354,10 @@ pub struct PairSimulatedOrderbook {
     pub t1_worth_eth: f64, // One unit, multi-hop spot_price, needed to value the TVL and other stuff
 }
 
-/// ====================================================================================================================================================================================================
-/// Execution
+// =================================================================================== EXECUTION =======================================================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ExecutionRequest {
-    pub execute: bool,
     pub sender: String,
     pub tag: String,
     pub input: SrzToken,

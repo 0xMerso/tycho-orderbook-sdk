@@ -78,6 +78,12 @@ path = "src/lib.rs"
 name = "stream"
 path = "src/stream.rs"
 
+
+[[bin]]
+name = "cowop"
+path = "src/co.wop.rs"
+
+
 # === DRAFTS ===
 
 # [[bin]]
