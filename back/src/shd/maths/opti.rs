@@ -144,8 +144,10 @@ pub fn gradient(
                     gas_quantity.push(gas);
                     let gas_cost_usd = (gas * gas_price) as f64 * ethusd / 1e18f64;
                     gas_costs_usd.push(gas_cost_usd);
-                    let total_gas_cost_in_output_token = ((gas * gas_price) as f64 / 1e18f64) * output_u_ethworth;
-                    gas_costs_output.push(total_gas_cost_in_output_token);
+                    let total_gas_cost_in_eth = ((gas * gas_price) as f64 / 1e18f64) * output_u_ethworth;
+                    gas_costs_output.push(total_gas_cost_in_eth);
+                    // total_gas_cost_in_eth to output amount
+                    let gas_worth_output = total_gas_cost_in_eth / output_u_ethworth; // Unsure, TO CONTINUE.
 
                     // log::info!("Pool {} | Input: {} | Output: {} | Gas: {}", i, alloc, output, gas);
                     total_output_raw += &output;
