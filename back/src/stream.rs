@@ -446,6 +446,7 @@ async fn main() {
     let networks: Vec<Network> = shd::utils::misc::read(&path);
     let network = networks.clone().into_iter().filter(|x| x.enabled).find(|x| x.name == config.network).expect("Network not found or not enabled");
     log::info!("Tycho Stream for '{}' network", network.name.clone());
+
     shd::data::redis::set(keys::stream::status(network.name.clone()).as_str(), SyncState::Launching as u128).await;
     shd::data::redis::set(keys::stream::stream2(network.name.clone()).as_str(), SyncState::Launching as u128).await;
     shd::data::redis::set(keys::stream::latest(network.name.clone().to_string()).as_str(), 0).await;
