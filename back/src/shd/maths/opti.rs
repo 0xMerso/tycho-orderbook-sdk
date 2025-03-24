@@ -1,187 +1,189 @@
-use tycho_simulation::{models::Token, protocol::state::ProtocolSim};
-
 use crate::shd::{
     data::fmt::SrzToken,
+    r#static::maths::{FRACTION_REALLOC, MAX_ITERATIONS},
     types::{ProtoTychoState, TradeResult},
 };
 use num_bigint::BigUint;
-use num_traits::Zero;
+use num_traits::{ToPrimitive, Zero};
+use tycho_simulation::{models::Token, protocol::state::ProtocolSim};
 
-/**
- * A gradient-based optimizer that uses fixed iterations (100 max) and
- * moves a fixed fraction (10%) of the allocation from the pool with the lowest marginal
- * return to the one with the highest.
- * All arithmetic is done with BigUint.
- */
+/// A gradient-based optimizer that takes into account gas cost for activating an extra pool.
+/// Only “activate” an additional pool if the net benefit (output after gas cost) exceeds a fixed activation penalty.
 pub fn gradient(
     amount: f64, // human–readable amount (e.g. 100 meaning 100 ETH)
     pools: &Vec<ProtoTychoState>,
     token_in: SrzToken,
     token_out: SrzToken,
-    ethusd: f64,            // ETH price in USD
-    gas_price: u128,        // Gas price in Gwei
-    output_u_ethworth: f64, // How much is one unit of token_out worth in ETH (divided by 1e18). It would be 1. for ETH obviously, or 0.0005 for USD for instance.
+    eth_usd: f64,           // ETH price in USD
+    gas_price: u128,        // Gas price in wei (or converted to wei)
+    output_u_ethworth: f64, // How much is one unit of token_out worth in ETH (e.g. 1.0 for ETH, 0.0005 for USDC)
 ) -> TradeResult {
-    // Convert tokens to tycho-simulation tokens
     let token_in = Token::from(token_in.clone());
     let token_out = Token::from(token_out.clone());
     let amountpow = amount * 10f64.powi(token_in.decimals as i32).round();
-
-    // let output_u_ethworth = output_u_ethworth * 1e18f64;
-    // let output_u_ethworth = BigUint::from(output_u_ethworth as u128);
     let amountpow = BigUint::from(amountpow as u128);
-    let size = pools.len();
-    let sizebg = BigUint::from(size as u32);
-    let mut allocations: Vec<BigUint> = vec![&amountpow / &sizebg; size]; // Which is naive I guess
-                                                                          // Reallocate 10% of the allocation from the pool with the lowest marginal.
-    let fraction = BigUint::from(10u32);
-    // @notice epsilon is key here. It tells us the marginal benefit of giving a little more to that pool. The smaller epsilon is, the more accurately we capture that local behavior
-    let epsilon = &amountpow / BigUint::from(10_000u32); // Choose a fixed epsilon for finite difference. May 1e9 is better, IDK.
-    let max_iterations = 50u32; // Maximum of iterations.
-    let tolerance = BigUint::zero(); // Tolerance: if the difference between max and min marginal is zero.
+    let num_pools = pools.len();
+
+    // Fixed parameters
+    let fraction = BigUint::from(FRACTION_REALLOC); // 10% reallocation fraction.
+    let epsilon = &amountpow / BigUint::from(10_000u32); // finite difference step.
+    let max_iterations = MAX_ITERATIONS;
+
+    // 1. INITIAL CONCENTRATION:
+    // Evaluate net output for each pool for the full amount (i.e. if used solely).
+    // (Net output = gross output - gas cost converted to output token units.)
+    let mut best_index = 0;
+    let mut best_net_output = 0.0;
+    for (i, pool) in pools.iter().enumerate() {
+        if let Ok(result) = pool.protosim.get_amount_out(amountpow.clone(), &token_in, &token_out) {
+            let gross_output = result.amount.to_f64().unwrap_or(0.0);
+            // Compute gas cost in ETH: (gas * gas_price) / 1e18, then convert to output token units:
+            let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or(0);
+            let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18;
+            let gas_cost_in_output = gas_cost_eth / output_u_ethworth; // output token penalty
+            let net_output = gross_output - gas_cost_in_output;
+            if net_output > best_net_output {
+                best_net_output = net_output;
+                best_index = i;
+            }
+        }
+    }
+    // Start with 100% allocation in the best-performing pool.
+    // Instead of starting with an equal split, we begin with a concentrated allocation
+    let mut allocations = vec![BigUint::zero(); num_pools];
+    allocations[best_index] = amountpow.clone();
+
+    // 2 & 3. ITERATIVE REBALANCING WITH NET MARGINAL CALCULATION AND ACTIVATION PENALTY
+    // In each iteration, compute the net marginal return for each pool.
+    // For an inactive pool, subtract the fixed activation penalty from its marginal.
     for _iter in 0..max_iterations {
-        // @dev This is very inneficient
-        // Compute marginal returns for each pool as: f(x+epsilon) - f(x).
-        let mut marginals: Vec<BigUint> = Vec::with_capacity(size);
-        // If the difference between the best and worst marginal return becomes zero (or falls below a tiny tolerance),
-        // then the algorithm stops early because it has “converged” on an allocation where no pool can provide a better extra return than any other.
+        let mut net_marginals: Vec<f64> = Vec::with_capacity(num_pools);
         for (i, pool) in pools.iter().enumerate() {
             let current_alloc = allocations[i].clone();
-            // log::info!("Current allocation for pool {}: {} | TokenIn {} TokenOut {}", i, current_alloc, token_in.address, token_out.address.clone());
-            let result_got = pool.protosim.get_amount_out(current_alloc.clone(), &token_in, &token_out);
-
-            // Tmp
-            // let result_x = pool.protosim.get_amount_out(current_alloc.clone(), &token_in, &token_out).unwrap();
-            // let gas = result_x.gas * output_u_ethworth.clone();
-            // // ! Need gas_price * gas_amount to get the actual cost.
-            // let gas_price = BigUint::from(1_000_000_000u64); // 1 Gwei
-            // let gas_cost = gas * gas_price;
-            // // log::info!("Gas cost for pool {}: {}", i, gas_cost);
-            // let output_equivalent = gas_cost / output_u_ethworth.clone();
-            // let output_net = result_x.amount - output_equivalent;
-
-            let (amount_got, gas) = if result_got.is_err() {
-                // log::error!("get_amount_out on pool #{} at {} failed", i, pool.component.id);
-                (BigUint::ZERO, BigUint::ZERO)
+            // Evaluate net output at current allocation:
+            let base = if let Ok(result) = pool.protosim.get_amount_out(current_alloc.clone(), &token_in, &token_out) {
+                let gross = result.amount.to_f64().unwrap_or(0.0);
+                let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or(0);
+                let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18;
+                let gas_cost_out = gas_cost_eth / output_u_ethworth;
+                gross - gas_cost_out
             } else {
-                let got = result_got.unwrap();
-                (got.amount, got.gas)
+                0.0
             };
 
-            // let gas = gas.to_string().parse::<u128>().unwrap_or_default();
-            // let total_gas_cost_in_output_token = ((gas * gas_price) as f64 / 1e18f64) * output_u_ethworth;
-            // let total_gas_cost_usd = (gas * gas_price) as f64 * ethusd / 1e18f64;
-            let result_esplison_got = pool.protosim.get_amount_out(&current_alloc + &epsilon, &token_in, &token_out);
-            let amount_esplison_got = if result_esplison_got.is_err() {
-                // log::error!("get_amount_out on pool #{} at {} failed", i, pool.component.id);
-                BigUint::ZERO
+            // Evaluate net output at (current_alloc + epsilon)
+            let perturbed_alloc = &current_alloc + &epsilon;
+            let perturbed = if let Ok(result) = pool.protosim.get_amount_out(perturbed_alloc.clone(), &token_in, &token_out) {
+                let gross = result.amount.to_f64().unwrap_or(0.0);
+                let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or(0);
+                let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18;
+                let gas_cost_out = gas_cost_eth / output_u_ethworth;
+                gross - gas_cost_out
             } else {
-                result_esplison_got.unwrap().amount
+                0.0
             };
 
-            let marginal = if amount_esplison_got > amount_got { &amount_esplison_got - &amount_got } else { BigUint::zero() };
-            marginals.push(marginal);
+            let marginal = perturbed - base;
+
+            let activation_penalty = if current_alloc.is_zero() {
+                if let Ok(result) = pool.protosim.get_amount_out(amountpow.clone(), &token_in, &token_out) {
+                    let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or(0);
+                    let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18f64;
+                    gas_cost_eth / output_u_ethworth
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+
+            let adjusted_marginal = if current_alloc.is_zero() { marginal - activation_penalty } else { marginal };
+
+            net_marginals.push(adjusted_marginal);
         }
-        // Identify pools with maximum and minimum marginals.
-        let (max, max_marginal) = marginals.iter().enumerate().max_by(|a, b| a.1.cmp(b.1)).unwrap();
-        let (mini, min_marginal) = marginals.iter().enumerate().min_by(|a, b| a.1.cmp(b.1)).unwrap();
-        // If difference is zero (or below tolerance), stop.
-        if max_marginal.clone() - min_marginal.clone() <= tolerance {
-            // log::info!("Converged after {} iterations", iter);
-            break; // ? If I'm correct in theory it will never converge, unless we take a very small epsilon that would make no difference = convergence
+
+        // Determine the best (highest net marginal) and worst (lowest net marginal) among active pools.
+        // We only consider pools with nonzero allocation for worst-case; for best, we can consider inactive ones as potential new activations.
+        let (max_index, max_net_marginal) = net_marginals.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap();
+        // For the pool to lose allocation, we consider only currently active pools.
+        let active_indices: Vec<usize> = allocations.iter().enumerate().filter(|(_, a)| !a.is_zero()).map(|(i, _)| i).collect();
+        let (min_active_index, min_net_marginal) = active_indices.iter().map(|&i| (i, net_marginals[i])).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
+
+        // If the net marginal difference is negligible, break.
+        if (max_net_marginal - min_net_marginal).abs() < 1e-12 {
+            break;
         }
-        // => Moving a fixed fraction (10%) of the allocation from the worst-performing pool to the best-performing one
-        // Too high a percentage might cause the allocation to swing too quickly, overshooting the optimal balance.
-        // Too low a percentage would make convergence very slow.
-        let adjusted = &allocations[mini] / &fraction;
-        allocations[mini] = &allocations[mini] - &adjusted;
-        allocations[max] = &allocations[max] + &adjusted;
-        // Once the iterations finish, the optimizer:
-        // - Computes the total output by summing the outputs from all pools using the final allocations.
-        // - Calculates the percentage of the total input that was allocated to each pool.
-        // log::info!("Iteration {}: Pool {} marginal = {} , Pool {} marginal = {}, transfer = {}", iter, max, max_marginal, mini, min_marginal, adjusted);
+
+        // Reallocate a fixed fraction from the worst-performing active pool to the best one.
+        let reallocate_amount = &allocations[min_active_index] / &fraction;
+        allocations[min_active_index] = &allocations[min_active_index] - &reallocate_amount;
+        allocations[max_index] = &allocations[max_index] + &reallocate_amount;
     }
 
-    // Define minimum allocation per pool as 5% of total input.
-    let min_alloc = &amountpow * BigUint::from(5u32) / BigUint::from(100u32);
-
-    // Identify surplus from pools below threshold and set their allocation to zero.
-    let mut surplus = BigUint::zero();
-    for alloc in allocations.iter_mut() {
-        if *alloc < min_alloc {
-            surplus += alloc.clone();
-            *alloc = BigUint::zero();
-        }
-    }
-
-    // Sum the allocation that is above threshold (i.e. pools that will receive the surplus).
-    let total_valid: BigUint = allocations.iter().filter(|alloc| **alloc > BigUint::zero()).fold(BigUint::zero(), |acc, x| acc + x);
-
-    // Reallocate the surplus proportionally to the valid pools.
-    if total_valid > BigUint::zero() && surplus > BigUint::zero() {
-        for alloc in allocations.iter_mut() {
-            if *alloc > BigUint::zero() {
-                // Multiply surplus by the current allocation and then divide by total_valid.
-                let additional = (&surplus * alloc.clone()) / &total_valid;
-                *alloc += additional;
-            }
-        }
-    }
-    // ------- Compute total output (raw) and distribution -------
-    let mut total_output_raw = BigUint::zero();
-    let mut distribution: Vec<f64> = Vec::with_capacity(size);
-    let mut gas_quantity: Vec<u128> = Vec::with_capacity(size);
-    let mut gas_costs_usd: Vec<f64> = Vec::with_capacity(size);
-    let mut gas_costs_output: Vec<f64> = Vec::with_capacity(size);
+    // ------- Compute total net output (raw) and distribution -------
+    let mut total_net_output: f64 = 0.0;
+    let mut distribution: Vec<f64> = Vec::with_capacity(num_pools);
+    let mut gas_quantity: Vec<u128> = Vec::with_capacity(num_pools);
+    let mut gas_costs_usd: Vec<f64> = Vec::with_capacity(num_pools);
+    let mut gas_costs_output: Vec<f64> = Vec::with_capacity(num_pools);
     for (i, pool) in pools.iter().enumerate() {
         let alloc = allocations[i].clone();
-        if alloc > BigUint::zero() {
-            match pool.protosim.get_amount_out(alloc.clone(), &token_in, &token_out) {
-                Ok(result) => {
-                    // log::info!("Pool {} | Input: {} | Output: {} | Gas: {}", i, alloc, result.amount, result.gas);
-                    let output = result.amount;
-                    let gas = result.gas.to_string().parse::<u128>().unwrap_or_default();
-                    gas_quantity.push(gas);
-                    let gas_cost_usd = (gas * gas_price) as f64 * ethusd / 1e18f64;
-                    gas_costs_usd.push(gas_cost_usd);
-                    let total_gas_cost_in_eth = ((gas * gas_price) as f64 / 1e18f64) * output_u_ethworth;
-                    gas_costs_output.push(total_gas_cost_in_eth);
-                    // total_gas_cost_in_eth to output amount
-                    let gas_worth_output = total_gas_cost_in_eth / output_u_ethworth; // Unsure, TO CONTINUE.
-
-                    // log::info!("Pool {} | Input: {} | Output: {} | Gas: {}", i, alloc, output, gas);
-                    total_output_raw += &output;
-                    let percent = (alloc.to_string().parse::<f64>().unwrap() * 100.0f64) / amountpow.to_string().parse::<f64>().unwrap(); // Distribution percentage (integer percentage).
-                    distribution.push((percent * 100.).round() / 100.); // Round to 3 decimal places.
-                }
-                Err(_e) => {
-                    // Often due to 'No Liquidity' error.
-                    distribution.push(0.);
-                    gas_quantity.push(0);
-                    gas_costs_usd.push(0.);
-                    gas_costs_output.push(0.);
-                }
+        if !alloc.is_zero() {
+            if let Ok(result) = pool.protosim.get_amount_out(alloc.clone(), &token_in, &token_out) {
+                // Get the gross output as f64.
+                let gross_output = result.amount.to_f64().unwrap_or(0.0);
+                // Parse gas (as u128).
+                let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or_default();
+                gas_quantity.push(gas_units);
+                // Compute gas cost in ETH: (gas_units * gas_price) / 1e18.
+                let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18f64;
+                // Compute gas cost in USD if needed.
+                let gas_cost_usd_val = gas_cost_eth * eth_usd;
+                gas_costs_usd.push(gas_cost_usd_val);
+                // Convert gas cost in ETH to output token units:
+                let gas_cost_out = gas_cost_eth / output_u_ethworth;
+                gas_costs_output.push(gas_cost_out);
+                // Compute net output = gross output minus gas cost in output tokens.
+                let net_output = (gross_output - gas_cost_out).max(0.0); // <--- Ensure non-negative.
+                total_net_output += net_output;
+                // Also record distribution (as percentage of the total input).
+                let alloc_f64 = alloc.to_f64().unwrap_or(0.0);
+                let total_input_f = amountpow.to_f64().unwrap_or(1.0);
+                let percent = (alloc_f64 * 100.0) / total_input_f;
+                distribution.push((percent * 100.).round() / 100.);
+            } else {
+                distribution.push(0.);
+                gas_quantity.push(0);
+                gas_costs_usd.push(0.);
+                gas_costs_output.push(0.);
             }
-            // log::info!("Pool {} | Input: {}", i, alloc);
         } else {
-            // Empty alloc still needs to be accounted for.
+            // If the allocation is zero.
             distribution.push(0.);
             gas_quantity.push(0);
             gas_costs_usd.push(0.);
             gas_costs_output.push(0.);
         }
     }
+
+    // Convert final amounts to human–readable values using token multipliers.
     let token_in_multiplier = 10f64.powi(token_in.decimals as i32);
     let token_out_multiplier = 10f64.powi(token_out.decimals as i32);
-    let output = total_output_raw.to_string().parse::<f64>().unwrap() / token_out_multiplier; // Convert raw output to human–readable (divide by token_out multiplier).
-    let ratio = ((total_output_raw.to_string().parse::<f64>().unwrap() * token_in_multiplier) / amountpow.to_string().parse::<f64>().unwrap()) / token_out_multiplier; // Compute unit price (as integer ratio of raw outputs times token multipliers).
+    // Here, total_net_output is the sum (in output token units) of each pool's net output (gross output minus gas cost)
+    // We convert that to a human–readable output:
+    let output = total_net_output / token_out_multiplier;
+    // Also, compute the effective ratio (unit price) as the net output per unit of input.
+    // Note that amountpow is the total input (in smallest units), so we first convert it to f64:
+    let input_f = amountpow.to_f64().unwrap_or(1.0);
+    let ratio = ((total_net_output * token_in_multiplier) / input_f) / token_out_multiplier;
+
     TradeResult {
-        amount: amount.to_string().parse().unwrap(),
-        output: output.to_string().parse().unwrap(),
-        distribution: distribution.clone(),
-        gas_costs: gas_quantity.clone(),
-        gas_costs_usd: gas_costs_usd.clone(),
-        gas_costs_output: gas_costs_output.clone(),
-        ratio: ratio.to_string().parse().unwrap(),
+        amount,
+        output,
+        distribution,
+        gas_costs: gas_quantity,
+        gas_costs_usd,
+        // gas_costs_output,
+        ratio,
     }
 }
