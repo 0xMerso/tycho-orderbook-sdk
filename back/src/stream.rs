@@ -461,6 +461,10 @@ async fn main() {
 
     let readable = Arc::clone(&stss);
 
+    // let ps = "uniswap_v3".to_string();
+    // let res = shd::core::client::get_component_balances(network.clone(), config.clone(), "0x391e8501b626c623d39474afca6f9e46c2686649".to_string(), ps).await;
+    // dbg!(res);
+
     // Start the server, only reading from the shared state
     let dupn = network.clone();
     let dupc = config.clone();
