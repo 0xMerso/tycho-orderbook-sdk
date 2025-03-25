@@ -264,7 +264,7 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                                 });
                             }
                             None => {
-                                log::error!("Couldn't find protosim for component {}", cp.id);
+                                log::error!("matchcp: couldn't find protosim for component {}", cp.id);
                             }
                         }
                         drop(mtx);
@@ -279,14 +279,14 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                                 });
                             }
                             None => {
-                                log::error!("Couldn't find protosim for component {}", cp.id);
+                                log::error!("contains: couldn't find protosim for component {}", cp.id);
                             }
                         }
                         drop(mtx);
                     }
                 }
                 if ptss.is_empty() {
-                    return AxumJson(json!({ "orderbook": "backend error: ProtoTychoState vec is_empty" }));
+                    return AxumJson(json!({ "orderbook": "backend error: ProtoTychoState vector is empty" }));
                 }
                 // Token 0
                 let utk0_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t0_to_eth_path.clone()).unwrap_or_default();

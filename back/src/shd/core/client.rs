@@ -84,7 +84,7 @@ pub async fn tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>>
                         });
                     }
                     let elasped = time.elapsed().unwrap().as_millis();
-                    log::info!("Took {:?} ms to get {} tokens on {}. Saving on Redis", elasped, tokens.len(), network.name);
+                    log::info!("Took {:?} ms to get {} tokens on {}", elasped, tokens.len(), network.name);
                     Some(tokens)
                 }
                 Err(e) => {

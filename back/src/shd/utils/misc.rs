@@ -56,7 +56,7 @@ pub mod log {
             })
             .chain(std::io::stdout())
             .level(LevelFilter::Off) // Disable all logging from crates
-            .level_for(prog.clone(), LevelFilter::Info) // Launcher logging
+            .level_for(prog.clone(), LevelFilter::Debug) // Launcher logging
             .level_for("tap2", LevelFilter::Info) // Library logging
             .level_for("tests", LevelFilter::Debug) // Library logging
             .apply()
@@ -149,9 +149,5 @@ pub fn balances() -> HashMap<String, HashMap<String, u128>> {
 
 // Check if a component has the desired tokens
 pub fn matchcp(cptks: Vec<SrzToken>, tokens: Vec<SrzToken>) -> bool {
-    // if cptks.len() != 2 {
-    //     log::error!("Component {} has {} tokens instead of 2. Component with >2 tokens are not handled yet.", cp.id, cptks.len());
-    //     return false;
-    // }
     tokens.iter().all(|token| cptks.iter().any(|cptk| cptk.address.eq_ignore_ascii_case(&token.address)))
 }
