@@ -9,6 +9,6 @@ async fn main() {
     let mut stream = provider.stream;
     // Log each message that is streamed by the WOP provider.
     while let Some(message) = stream.recv().await {
-        println!("Received stream message: {}", message);
+        log::info!("Received stream message: {}", message);
     }
 }
