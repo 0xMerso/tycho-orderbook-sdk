@@ -228,7 +228,7 @@ async fn execute(Extension(network): Extension<Network>, Extension(config): Exte
 )]
 async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extension(network): Extension<Network>, AxumExJson(params): AxumExJson<OrderbookRequestBody>) -> impl IntoResponse {
     let single = params.sps.is_some();
-    log::info!("👾 API: Querying orderbook endpoint: {:?} | OrderbookRequestBody: {:?} | Single point: {}", params.tag, params, single);
+    log::info!("👾 API: OrderbookRequestBody: {:?} | Single point: {}", params, single);
     match (_tokens(network.clone()).await, _components(network.clone()).await) {
         (Some(atks), Some(acps)) => {
             let target = params.tag.clone();
