@@ -22,6 +22,8 @@ use tycho_simulation::{
 use tycho_client::stream::StreamError;
 
 use crate::shd;
+use crate::shd::r#static::filter::ADD_TVL_THRESHOLD;
+use crate::shd::r#static::filter::REMOVE_TVL_THRESHOLD;
 use crate::shd::types::TychoSupportedProtocol;
 
 use super::types::{EnvConfig, Network, SharedTychoStreamState}; // adjust module path as needed
@@ -65,7 +67,7 @@ pub async fn prebuild(network: Network, config: EnvConfig) -> ProtocolStreamBuil
     let u4 = uniswap_v4_pool_with_hook_filter;
     let balancer = balancer_pool_filter;
     let curve = curve_pool_filter;
-    let filter = ComponentFilter::with_tvl_range(1.0, 500.0); // ! Important. 250 ETH minimum
+    let filter = ComponentFilter::with_tvl_range(REMOVE_TVL_THRESHOLD, ADD_TVL_THRESHOLD);
     let tokens = shd::core::client::tokens(&network, &config).await.unwrap();
     let mut hmt = HashMap::new();
     tokens.iter().for_each(|t| {

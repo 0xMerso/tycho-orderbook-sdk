@@ -18,6 +18,11 @@ pub mod maths {
     }
 }
 
+pub mod filter {
+    pub static REMOVE_TVL_THRESHOLD: f64 = 1.; // 50 iteration maximum to optimize allocation
+    pub static ADD_TVL_THRESHOLD: f64 = 500.; // 50 iteration maximum to optimize allocation
+}
+
 pub mod execution {
     pub static EXEC_DEFAULT_SLIPPAGE: f64 = 0.0025;
     pub static APPROVE_FN_SIGNATURE: &str = "approve(address,uint256)";
