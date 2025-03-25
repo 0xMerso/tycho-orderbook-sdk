@@ -1,10 +1,9 @@
 use axum::{
-    extract::{Json as AxumExJson, Query},
+    extract::Json as AxumExJson,
     response::IntoResponse,
-    routing::{get, post},
+    routing::get,
     Extension, Json as AxumJson, Router,
 };
-use env_logger::Env;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tap2::shd::{
@@ -205,11 +204,11 @@ async fn components(Extension(network): Extension<Network>) -> impl IntoResponse
 )]
 async fn execute(Extension(network): Extension<Network>, Extension(config): Extension<EnvConfig>, AxumExJson(execution): AxumExJson<ExecutionRequest>) -> impl IntoResponse {
     log::info!("👾 API: Querying execute endpoint: {:?}", execution);
-    let response = match shd::core::execute::swap(network.clone(), execution.clone(), config.clone()).await {
+    
+    match shd::core::execute::swap(network.clone(), execution.clone(), config.clone()).await {
         Ok(result) => AxumJson(json!({ "execute": result })),
         Err(e) => AxumJson(json!({ "execute": e.to_string() })),
-    };
-    response
+    }
 }
 
 // GET /orderbook/{0xt0-0xt1} => Simulate the orderbook

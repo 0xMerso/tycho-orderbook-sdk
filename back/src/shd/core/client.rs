@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -11,7 +10,6 @@ use tycho_client::rpc::HttpRPCClient;
 use tycho_client::rpc::RPCClient;
 
 use tycho_core::dto::ProtocolStateRequestBody;
-use tycho_core::models::protocol::ComponentBalance;
 use tycho_simulation::models::Token;
 
 use crate::shd;

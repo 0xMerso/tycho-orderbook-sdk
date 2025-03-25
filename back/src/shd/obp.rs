@@ -1,20 +1,14 @@
-use alloy::rpc::types::Block;
-use futures::{Stream, StreamExt};
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::{mpsc, RwLock};
+use futures::StreamExt;
+use std::collections::HashMap;
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tycho_simulation::evm::decoder::StreamDecodeError;
-use tycho_simulation::protocol::models::BlockUpdate;
-
-use std::str::FromStr;
 
 use tycho_simulation::evm::protocol::filters::curve_pool_filter;
 use tycho_simulation::evm::protocol::filters::uniswap_v4_pool_with_hook_filter;
 use tycho_simulation::evm::protocol::uniswap_v3::state::UniswapV3State;
 use tycho_simulation::evm::protocol::uniswap_v4::state::UniswapV4State;
 
-use tycho_simulation::models::Token;
-use tycho_simulation::tycho_core::Bytes;
 use tycho_simulation::{
     evm::{
         engine_db::tycho_db::PreCachedDB,
@@ -23,8 +17,6 @@ use tycho_simulation::{
     },
     tycho_client::feed::component_tracker::ComponentFilter,
 };
-
-use tycho_simulation::protocol::models::ProtocolComponent;
 
 // Assume these imports point to your existing types.
 use tycho_client::stream::StreamError;
@@ -119,7 +111,7 @@ impl OBP {
                 match item {
                     Ok(update) => {
                         // Update the shared state based on the block update.
-                        let mut mtx = dupstate.write().await;
+                        let mtx = dupstate.write().await;
                         drop(mtx);
                         // TODO: Update state.protosims or state.components based on `update`.
                         // state.protosims.insert("some_key".to_string(), some_value);

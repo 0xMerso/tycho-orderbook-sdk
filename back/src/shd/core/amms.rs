@@ -1,12 +1,8 @@
-use std::sync::Arc;
 
-use alloy::{providers::RootProvider, transports::http::Http};
-use reqwest::Client;
 
 use crate::shd::{
-    data::fmt::SrzProtocolComponent,
     r#static::maths::BPD,
-    types::{AmmType, IBalancer2Vault, Network, IERC20},
+    types::AmmType,
 };
 
 /**

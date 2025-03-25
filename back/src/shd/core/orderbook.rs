@@ -112,13 +112,13 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
         prices1to0: vec![], // Set later
         aggt0lqdty: vec![], // Set later
         aggt1lqdty: vec![], // Set later
-        eth_usd: eth_usd.clone(),
+        eth_usd,
         // best0to1: best0to1.clone(),
         // best1to0: best1to0.clone(),
         mpd0to1: mpd0to1.clone(),
         mpd1to0: mpd1to0.clone(),
-        t0_worth_eth: t0_worth_eth.clone(),
-        t1_worth_eth: t1_worth_eth.clone(),
+        t0_worth_eth,
+        t1_worth_eth,
     };
     match body.sps {
         Some(spsq) => {
@@ -131,10 +131,10 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
         }
         None => {
             // FuLL Orderbook optimization
-            let trades0to1 = optimize(&pcsdata, eth_usd, gas_price, &t0, &t1, aggbt0.clone(), t1_worth_eth);
+            let trades0to1 = optimize(&pcsdata, eth_usd, gas_price, &t0, &t1, *aggbt0, t1_worth_eth);
             result.trades0to1 = trades0to1;
             log::info!(" 🔄  Switching to 1to0");
-            let trades1to0 = optimize(&pcsdata, eth_usd, gas_price, &t1, &t0, aggbt1.clone(), t0_worth_eth);
+            let trades1to0 = optimize(&pcsdata, eth_usd, gas_price, &t1, &t0, *aggbt1, t0_worth_eth);
             result.trades1to0 = trades1to0;
         }
     }

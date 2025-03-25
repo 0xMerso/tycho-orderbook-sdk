@@ -410,10 +410,10 @@ impl From<TransactionRequest> for SrzTransactionRequest {
             max_priority_fee_per_gas: tr.max_priority_fee_per_gas.unwrap_or(0),
             max_fee_per_blob_gas: tr.max_fee_per_blob_gas.unwrap_or(0),
             gas: tr.gas.unwrap_or(0),
-            value: value,
+            value,
             input: input.clone(),
-            nonce: nonce,
-            chain_id: chain_id,
+            nonce,
+            chain_id,
         }
     }
 }
