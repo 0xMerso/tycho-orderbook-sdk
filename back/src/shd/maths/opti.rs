@@ -175,7 +175,7 @@ pub fn gradient(
     // Also, compute the effective ratio (unit price) as the net output per unit of input.
     // Note that amountpow is the total input (in smallest units), so we first convert it to f64:
     let input_f = amountpow.to_f64().unwrap_or(1.0);
-    let ratio = ((total_net_output * token_in_multiplier) / input_f) / token_out_multiplier;
+    let average_sell_price = ((total_net_output * token_in_multiplier) / input_f) / token_out_multiplier;
 
     TradeResult {
         amount,
@@ -184,6 +184,6 @@ pub fn gradient(
         gas_costs: gas_quantity,
         gas_costs_usd,
         // gas_costs_output,
-        ratio,
+        average_sell_price,
     }
 }

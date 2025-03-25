@@ -36,8 +36,8 @@ fn test_simulations() {
                         log::info!("🔺 Warning: Distribution sum must be within 99-101 in {:?}, got {}", path, distribution_sum);
                     }
 
-                    if trade.ratio > last_ratio {
-                        let diff = trade.ratio - last_ratio;
+                    if trade.average_sell_price > last_ratio {
+                        let diff = trade.average_sell_price - last_ratio;
                         let diff_percent = (diff / last_ratio) * 100.0;
 
                         log::info!(
@@ -46,7 +46,7 @@ fn test_simulations() {
                             path,
                             trade.amount,
                             last_ratio,
-                            trade.ratio,
+                            trade.average_sell_price,
                             diff,
                             diff_percent,
                             trade.distribution.iter().map(|x| format!("{:.4}", x)).collect::<Vec<String>>().join(", ")
@@ -57,7 +57,7 @@ fn test_simulations() {
 
                     last_input = trade.amount;
                     last_output = trade.output;
-                    last_ratio = trade.ratio;
+                    last_ratio = trade.average_sell_price;
                 }
                 log::info!("Ratio violations: {} on {} trades", ratio_violations, trades.len());
             }
