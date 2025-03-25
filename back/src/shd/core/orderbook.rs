@@ -3,7 +3,7 @@ use tycho_simulation::{models::Token, protocol::state::ProtocolSim};
 use crate::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
-    r#static::maths::TEN_MILLIONTH,
+    r#static::maths::TEN_MILLIONS,
     types::{MidPriceData, Network, OrderbookRequestBody, PairSimulatedOrderbook, ProtoTychoState, TradeResult},
 };
 use std::{collections::HashMap, time::Instant};
@@ -21,6 +21,7 @@ pub async fn build(network: Network, balances: HashMap<String, HashMap<String, u
     let (base, quote) = (t0, t1);
     let mut aggt0lqdty = vec![];
     let mut aggt1lqdty = vec![];
+    let mut balances = HashMap::new();
     for pdata in ptss.clone() {
         pools.push(pdata.clone());
         let proto = pdata.protosim.clone();
@@ -37,11 +38,19 @@ pub async fn build(network: Network, balances: HashMap<String, HashMap<String, u
             price0to1,
             price1to0
         );
-        if let Some(cpbs) = balances.get(&pdata.component.id.to_lowercase()) {
+        if let Some(cpbs) = shd::core::client::cpbs(network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone()).await {
             let t0b = cpbs.get(&srzt0.address.to_lowercase()).unwrap_or(&0u128);
-            aggt0lqdty.push(*t0b as f64 / 10f64.powi(srzt0.decimals as i32));
+            let t0b = *t0b as f64 / 10f64.powi(srzt0.decimals as i32);
+            aggt0lqdty.push(t0b);
             let t1b = cpbs.get(&srzt1.address.to_lowercase()).unwrap_or(&0u128);
-            aggt1lqdty.push(*t1b as f64 / 10f64.powi(srzt1.decimals as i32));
+            let t1b = *t1b as f64 / 10f64.powi(srzt1.decimals as i32);
+            aggt1lqdty.push(t1b);
+            let mut tmpb = HashMap::new();
+            tmpb.insert(srzt0.address.clone(), t0b);
+            tmpb.insert(srzt1.address.clone(), t1b);
+            balances.insert(pdata.component.id.clone().to_lowercase(), tmpb);
+            // log::info!(" - t0b => {}", *t0b as f64 / 10f64.powi(srzt0.decimals as i32));
+            // log::info!(" - t1b => {}", *t1b as f64 / 10f64.powi(srzt1.decimals as i32));
         }
     }
     let cps: Vec<SrzProtocolComponent> = pools.clone().iter().map(|p| p.component.clone()).collect();
@@ -64,7 +73,7 @@ pub async fn build(network: Network, balances: HashMap<String, HashMap<String, u
  * The optimizer uses a simple gradient-based approach to move a fixed fraction of the allocation from the pool with the lowest marginal return to the one with the highest.
  * If the query specifies a specific token to sell with a specific amount, the optimizer will only run for that token and amount.
  */
-pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, body: OrderbookRequestBody, balances: HashMap<String, u128>, t0_worth_eth: f64, t1_worth_eth: f64) -> PairSimulatedOrderbook {
+pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, body: OrderbookRequestBody, balances: HashMap<String, f64>, t0_worth_eth: f64, t1_worth_eth: f64) -> PairSimulatedOrderbook {
     let eth_usd = shd::core::gas::eth_usd().await;
     let gas_price = shd::core::gas::gas_price(network.rpc).await;
     let t0 = tokens[0].clone();
@@ -73,12 +82,14 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
     let aggbt1 = balances.iter().find(|x| x.0.to_lowercase() == t1.address.to_lowercase()).unwrap().1;
 
     log::info!(
-        "🔎 Optimisation | Network: {} | ETH is worth {} in USD | Got {} pools to optimize for pair: {}-{}",
+        "🔎 Optimisation | Network: {} | ETH is worth {} in USD | Got {} pools to optimize for pair: {}-{} with aggbs {:.4} and {:.4}",
         network.name,
         eth_usd,
         pcsdata.len(),
         t0.symbol,
-        t1.symbol
+        t1.symbol,
+        aggbt0,
+        aggbt1
     );
     let pools = pcsdata.iter().map(|x| x.component.clone()).collect::<Vec<SrzProtocolComponent>>();
     // Best bid/ask. Need to remove gas consideration here ? I don't think so
@@ -133,24 +144,25 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
 /**
  * Executes the optimizer for a given token pair and a set of pools.
  */
-pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: u128, output_u_ethworth: f64) -> Vec<TradeResult> {
+pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
     let mut trades = Vec::new();
-    let start = aggb as f64 / TEN_MILLIONTH / 10f64.powi(from.decimals as i32);
+    let start = aggb / TEN_MILLIONS; // No longer needed: / 10f64.powi(from.decimals as i32);
     log::info!("Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}", from.symbol, aggb, start, output_u_ethworth);
     let steps = shd::maths::steps::exponential(
         shd::r#static::maths::simu::COUNT,
         shd::r#static::maths::simu::START_MULTIPLIER,
         shd::r#static::maths::simu::END_MULTIPLIER,
-        shd::r#static::maths::simu::MIN_EXP_DELTA,
+        shd::r#static::maths::simu::END_MULTIPLIER * shd::r#static::maths::simu::MIN_EXP_DELTA_PCT,
     );
     let steps = steps.iter().map(|x| x * start).collect::<Vec<f64>>();
     for (x, amount) in steps.iter().enumerate() {
-        let start = Instant::now();
+        let tmstp = Instant::now();
         let result = shd::maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
-        let elapsed = start.elapsed();
+        let elapsed = tmstp.elapsed().as_millis();
         let gas_cost = result.gas_costs_usd.iter().sum::<f64>();
         log::info!(
-            " - #{x} | In: {} {}, Out: {} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {:?}",
+            " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {} ms",
+            x,
             result.amount,
             from.symbol,
             result.output,
@@ -169,7 +181,7 @@ pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from:
  * Computes the mid price for a given token pair
  * We cannot replicate the logic of a classic orderbook as we don't have best bid/ask exacly
  * In theory it would be : Mid Price = (Best Bid Price + Best Ask Price) / 2
- * Applied to AMM, we choose to use a small amountIn = 1 / TEN_MILLIONTH of the aggregated liquidity
+ * Applied to AMM, we choose to use a small amountIn = 1 / TEN_MILLIONS of the aggregated liquidity
  * Doing that for 0to1 and 1to0 we have our best bid/ask, then we can compute the mid price
  * --- --- --- --- ---
  * Amount out is net of gas cost

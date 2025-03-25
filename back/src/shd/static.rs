@@ -2,7 +2,7 @@ pub mod maths {
 
     pub static UNISWAP_Q96: u128 = 1 << 96;
     pub static BPD: f64 = 10_000.0;
-    pub static TEN_MILLIONTH: f64 = 10_000_000.0;
+    pub static TEN_MILLIONS: f64 = 10_000_000.0;
     pub static ONE_PERCENT_IN_MN: f64 = 10_000.; // 1% in millionths
     pub static MAX_ITERATIONS: u32 = 50; // 50 iteration maximum to optimize allocation
     pub static FRACTION_REALLOC: u32 = 10; // 50 iteration maximum to optimize allocation
@@ -11,8 +11,10 @@ pub mod maths {
         // Config for incrementing amountIn
         pub static COUNT: usize = 25;
         pub static START_MULTIPLIER: f64 = 1.;
-        pub static END_MULTIPLIER: f64 = 500_000.; // 25% is enough
-        pub static MIN_EXP_DELTA: f64 = 15.;
+        pub static END_MULTIPLIER: f64 = 2_500_000.; // 25% of TEN_MILLIONS
+
+        // pub static MIN_EXP_DELTA: f64 = 15.; Instead of hardcoding it, we use a % of the end multiplier
+        pub static MIN_EXP_DELTA_PCT: f64 = 0.0001; // To ensure distance between points
     }
 }
 
