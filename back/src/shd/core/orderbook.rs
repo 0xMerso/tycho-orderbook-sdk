@@ -167,7 +167,7 @@ pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from:
             from.symbol,
             result.output,
             to.symbol,
-            result.ratio,
+            result.average_sell_price,
             gas_cost,
             result.distribution,
             elapsed
@@ -195,7 +195,7 @@ pub fn best(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &Sr
         from.symbol,
         result.output,
         to.symbol,
-        result.ratio,
+        result.average_sell_price,
         result.distribution
     );
     result
@@ -206,8 +206,8 @@ pub fn best(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &Sr
  * ! We assume that => trade0t1 = ask and trade1to0 = bid
  */
 pub fn mid_price_data(trade0t1: TradeResult, trade1to0: TradeResult) -> MidPriceData {
-    let best_ask = trade0t1.ratio;
-    let best_bid = 1. / trade1to0.ratio;
+    let best_ask = trade0t1.average_sell_price;
+    let best_bid = 1. / trade1to0.average_sell_price;
     let mid = (best_ask + best_bid) / 2.;
     let spread = (best_ask - best_bid).abs();
     let spread_pct = (spread / mid) * 100.;
