@@ -208,12 +208,10 @@ use super::data::fmt::{SrzProtocolComponent, SrzToken};
 pub type SharedTychoStreamState = Arc<RwLock<TychoStreamState>>;
 
 pub struct TychoStreamState {
-    // Maps a network name to its ProtocolSim instance.
     pub protosims: HashMap<String, Box<dyn ProtocolSim>>,
-    // pub states: HashMap<String, String>,
-    // Maps a network name to its new ProtocolComponent.
-    // pub components: HashMap<String, ProtocolComponent>,
     pub components: HashMap<String, ProtocolComponent>,
+    // Indicates whether the ProtocolStreamBuilder has been initialised (true if first stream has been received and saved)
+    pub initialised: bool,
 }
 
 pub type ChainCore = tycho_core::dto::Chain;
@@ -296,14 +294,6 @@ pub struct LiquidityPoolBook {
     pub asks: Vec<LiquidityTickAmounts>,
 }
 
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// pub struct TradeResult {
-//     pub input: BigUint,             // e.g. 100 (meaning 100 ETH)
-//     pub output: BigUint,            // in token_out human–readable units
-//     pub distribution: Vec<BigUint>, // percentage distribution per pool (0–100)
-//     pub ratio: BigUint,             // output per unit input (human–readable)
-// }
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TradeResult {
     #[schema(example = "1.0")]
@@ -319,7 +309,7 @@ pub struct TradeResult {
     // #[schema(example = "[1.77, 2.42, 2.37]")]
     // pub gas_costs_output: Vec<f64>,
     #[schema(example = "0.0005")]
-    pub ratio: f64, // output per unit input (human–readable)
+    pub average_sell_price: f64, // output per unit input (human–readable)
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
