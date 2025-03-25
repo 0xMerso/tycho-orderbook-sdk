@@ -288,7 +288,7 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                     }
                 }
                 if ptss.is_empty() {
-                    return AxumJson(json!({ "orderbook": {} }));
+                    return AxumJson(json!({ "orderbook": "backend error: ProtoTychoState vec is_empty" }));
                 }
                 // Token 0
                 let utk0_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t0_to_eth_path.clone()).unwrap_or_default();
