@@ -42,15 +42,16 @@ pub mod api;
 /**
  * Stream the entire state from each AMMs, with TychoStreamBuilder.
  */
-async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tokens: Vec<Token>, config: EnvConfig) {
+async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, config: EnvConfig) {
     log::info!("2️⃣  Launching ProtocolStreamBuilder task for {}", network.name);
     // ===== Tycho Filters =====
     let u4 = uniswap_v4_pool_with_hook_filter;
     let balancer = balancer_pool_filter;
     let curve = curve_pool_filter;
-    let (_, _, chain) = shd::types::chain(network.name.clone()).expect("Invalid chain");
     let filter = ComponentFilter::with_tvl_range(1.0, 500.0); // ! Important. 250 ETH minimum
+    let (_, _, chain) = shd::types::chain(network.name.clone()).expect("Invalid chain");
 
+    let tokens = shd::core::client::tokens(&network, &config).await.unwrap();
     // ===== Tycho Tokens =====
     let mut hmt = HashMap::new();
     tokens.iter().for_each(|t| {
@@ -78,23 +79,10 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
     // ===== Tycho Stream Builder =====
     'retry: loop {
         log::info!("Connecting to >>> ProtocolStreamBuilder <<< at {} on {:?} ...\n", network.tycho, chain);
-        let mut psb = ProtocolStreamBuilder::new(&network.tycho, chain)
-            .exchange::<UniswapV2State>(TychoSupportedProtocol::UniswapV2.to_string().as_str(), filter.clone(), None) // ! Filter ?
-            .exchange::<UniswapV3State>(TychoSupportedProtocol::UniswapV3.to_string().as_str(), filter.clone(), None) // ! Filter ?
-            .exchange::<UniswapV4State>(TychoSupportedProtocol::UniswapV4.to_string().as_str(), filter.clone(), Some(u4)) // ! Filter ?
-            .auth_key(Some(config.tycho_api_key.clone()))
-            .skip_state_decode_failures(true)
-            .set_tokens(hmt.clone())
-            // block_time - timeout - auth_key - skip_state_decode_failures - set_tokens
-            .await;
 
-        if network.name.as_str() == "ethereum" {
-            psb = psb
-                .exchange::<UniswapV2State>(TychoSupportedProtocol::Sushiswap.to_string().as_str(), filter.clone(), None) // ! Filter ?
-                .exchange::<UniswapV2State>(TychoSupportedProtocol::Pancakeswap.to_string().as_str(), filter.clone(), None) // ! Filter ?
-                .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::BalancerV2.to_string().as_str(), filter.clone(), Some(balancer))
-                .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::Curve.to_string().as_str(), filter.clone(), Some(curve));
-        }
+        // let protocol_stream = prebuild(network.clone(), config.clone()).await;
+        let psb = shd::obp::prebuild(network.clone(), config.clone()).await;
+
         match psb.build().await {
             Ok(mut stream) => {
                 // The stream created emits BlockUpdate messages which consist of:
@@ -330,21 +318,17 @@ async fn main() {
     let networks: Vec<Network> = shd::utils::misc::read(&path);
     let network = networks.clone().into_iter().filter(|x| x.enabled).find(|x| x.name == config.network).expect("Network not found or not enabled");
     log::info!("Tycho Stream for '{}' network", network.name.clone());
-
     shd::data::redis::set(keys::stream::status(network.name.clone()).as_str(), SyncState::Launching as u128).await;
     shd::data::redis::set(keys::stream::stream2(network.name.clone()).as_str(), SyncState::Launching as u128).await;
     shd::data::redis::set(keys::stream::latest(network.name.clone().to_string()).as_str(), 0).await;
     shd::data::redis::ping().await;
-
     // Shared state
     let stss: SharedTychoStreamState = Arc::new(RwLock::new(TychoStreamState {
         protosims: HashMap::new(),  // Protosims cannot be stored in Redis so we always used shared memory state to access/update them
         components: HashMap::new(), // 📕 Read/write via Redis only
         initialised: false,
     }));
-
     let readable = Arc::clone(&stss);
-
     // Start the server, only reading from the shared state
     let dupn = network.clone();
     let dupc = config.clone();
@@ -355,23 +339,16 @@ async fn main() {
         }
     });
     // Get tokens and launch the stream
-    match shd::core::client::tokens(&network, &config).await {
-        Some(tokens) => {
-            // Start the stream, writing to the shared state
-            let writeable = Arc::clone(&stss);
-            tokio::spawn(async move {
-                loop {
-                    let config = config.clone();
-                    let network = network.clone();
-                    stream_protocol(network.clone(), Arc::clone(&writeable), tokens.clone(), config.clone()).await;
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                }
-            });
+    // Start the stream, writing to the shared state
+    let writeable = Arc::clone(&stss);
+    tokio::spawn(async move {
+        loop {
+            let config = config.clone();
+            let network = network.clone();
+            stream_protocol(network.clone(), Arc::clone(&writeable), config.clone()).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
-        None => {
-            log::error!("Failed to get tokens. Exiting.");
-        }
-    }
+    });
     futures::future::pending::<()>().await;
     log::info!("Stream program terminated");
 }

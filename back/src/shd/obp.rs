@@ -29,7 +29,10 @@ use tycho_simulation::protocol::models::ProtocolComponent;
 // Assume these imports point to your existing types.
 use tycho_client::stream::StreamError;
 
-use super::types::SharedTychoStreamState; // adjust module path as needed
+use crate::shd;
+use crate::shd::types::TychoSupportedProtocol;
+
+use super::types::{EnvConfig, Network, SharedTychoStreamState}; // adjust module path as needed
 
 /// Enum representing the events that can be sent to the client.
 #[derive(Debug)]
@@ -63,6 +66,38 @@ pub struct OBP {
     pub state: SharedTychoStreamState,
     /// The spawned task handle is stored to ensure the task remains running.
     _handle: JoinHandle<()>,
+}
+
+pub async fn prebuild(network: Network, config: EnvConfig) -> ProtocolStreamBuilder {
+    let (_, _, chain) = shd::types::chain(network.name.clone()).expect("Invalid chain");
+    let u4 = uniswap_v4_pool_with_hook_filter;
+    let balancer = balancer_pool_filter;
+    let curve = curve_pool_filter;
+    let filter = ComponentFilter::with_tvl_range(1.0, 500.0); // ! Important. 250 ETH minimum
+    let tokens = shd::core::client::tokens(&network, &config).await.unwrap();
+    let mut hmt = HashMap::new();
+    tokens.iter().for_each(|t| {
+        hmt.insert(t.address.clone(), t.clone());
+    });
+    log::info!("Prebuild. Got {} tokens", hmt.len());
+    let mut psb = ProtocolStreamBuilder::new(&network.tycho, chain)
+        .exchange::<UniswapV2State>(TychoSupportedProtocol::UniswapV2.to_string().as_str(), filter.clone(), None)
+        .exchange::<UniswapV3State>(TychoSupportedProtocol::UniswapV3.to_string().as_str(), filter.clone(), None)
+        .exchange::<UniswapV4State>(TychoSupportedProtocol::UniswapV4.to_string().as_str(), filter.clone(), Some(u4))
+        .auth_key(Some(config.tycho_api_key.clone()))
+        .skip_state_decode_failures(true)
+        .set_tokens(hmt.clone()) // ALL Tokens
+        .await;
+
+    if network.name.as_str() == "ethereum" {
+        log::info!("Prebuild. Adding mainnet-specific exchanges");
+        psb = psb
+            .exchange::<UniswapV2State>(TychoSupportedProtocol::Sushiswap.to_string().as_str(), filter.clone(), None)
+            .exchange::<UniswapV2State>(TychoSupportedProtocol::Pancakeswap.to_string().as_str(), filter.clone(), None)
+            .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::BalancerV2.to_string().as_str(), filter.clone(), Some(balancer))
+            .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::Curve.to_string().as_str(), filter.clone(), Some(curve));
+    }
+    psb
 }
 
 impl OBP {
