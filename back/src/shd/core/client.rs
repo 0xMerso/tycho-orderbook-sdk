@@ -21,10 +21,13 @@ use crate::shd::types::IERC20;
 
 /**
  * Get the balances of the component in the specified protocol system.
+ * let ps = "uniswap_v3".to_string();
+ * let res = shd::core::client::get_component_balances(network.clone(), config.clone(), "0x391e8501b626c623d39474afca6f9e46c2686649".to_string(), ps).await;
+ * dbg!(res);
  */
-pub async fn get_component_balances(network: Network, config: EnvConfig, cp: String, protosys: String) -> Option<HashMap<String, u128>> {
-    log::info!("Getting component balances on {}", network.name);
-    let client = match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(&config.tycho_api_key)) {
+pub async fn cpbs(network: Network, cp: String, protosys: String) -> Option<HashMap<String, u128>> {
+    // log::info!("Getting component balances on {}", network.name);
+    let client = match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some("sampletoken")) {
         Ok(client) => client,
         Err(e) => {
             log::error!("Failed to create client: {:?}", e.to_string());
@@ -49,11 +52,10 @@ pub async fn get_component_balances(network: Network, config: EnvConfig, cp: Str
             let mut result = HashMap::new();
             for cb in component_balances.iter() {
                 for c in cb.iter() {
-                    // result.push(u128::from_str_radix(c.1.to_string().trim_start_matches("0x"), 16).unwrap());
-                    result.insert(c.0.clone().to_string(), u128::from_str_radix(c.1.to_string().trim_start_matches("0x"), 16).unwrap());
+                    result.insert(c.0.clone().to_string().to_lowercase(), u128::from_str_radix(c.1.to_string().trim_start_matches("0x"), 16).unwrap());
                 }
             }
-            log::info!("Successfully retrieved {} component balances on {}", component_balances.len(), network.name);
+            // log::info!("Successfully retrieved {} component balances on {}", component_balances.len(), network.name);
             Some(result)
         }
         Err(e) => {
@@ -63,7 +65,7 @@ pub async fn get_component_balances(network: Network, config: EnvConfig, cp: Str
     }
 }
 
-pub async fn get_all_tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>> {
+pub async fn tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>> {
     log::info!("Getting all tokens on {}", network.name);
     match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(&config.tycho_api_key)) {
         Ok(client) => {
@@ -101,7 +103,7 @@ pub async fn get_all_tokens(network: &Network, config: &EnvConfig) -> Option<Vec
 /**
  * Get the balance of the owner for the specified tokens.
  */
-pub async fn get_erc20_balances(provider: &RootProvider<Http<Client>>, owner: String, tokens: Vec<String>) -> Result<Vec<u128>, String> {
+pub async fn erc20b(provider: &RootProvider<Http<Client>>, owner: String, tokens: Vec<String>) -> Result<Vec<u128>, String> {
     let mut balances = vec![];
     let client = Arc::new(provider);
     for t in tokens.iter() {
