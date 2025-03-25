@@ -84,7 +84,8 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
             .exchange::<UniswapV4State>(TychoSupportedProtocol::UniswapV4.to_string().as_str(), filter.clone(), Some(u4)) // ! Filter ?
             .auth_key(Some(config.tycho_api_key.clone()))
             .skip_state_decode_failures(true)
-            .set_tokens(hmt.clone()) // ALL Tokens
+            .set_tokens(hmt.clone())
+            // block_time - timeout - auth_key - skip_state_decode_failures - set_tokens
             .await;
 
         if network.name.as_str() == "ethereum" {
@@ -94,13 +95,6 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                 .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::BalancerV2.to_string().as_str(), filter.clone(), Some(balancer))
                 .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::Curve.to_string().as_str(), filter.clone(), Some(curve));
         }
-
-        // ? To study:
-        // block_time
-        // timeout
-        // auth_key
-        // skip_state_decode_failures
-
         match psb.build().await {
             Ok(mut stream) => {
                 // The stream created emits BlockUpdate messages which consist of:
@@ -122,21 +116,12 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
 
                             shd::data::redis::set(keys::stream::latest(network.name.clone()).as_str(), msg.block_number).await;
 
-                            // ===== Is it first sync ? =====
-                            let mut initialised = false;
-                            match shd::data::redis::get::<u128>(keys::stream::status(network.name.clone()).as_str()).await {
-                                Some(state) => {
-                                    if state == SyncState::Running as u128 {
-                                        initialised = true;
-                                    } else {
-                                        initialised = false; // Cleaner
-                                        shd::data::redis::set(keys::stream::status(network.name.clone()).as_str(), SyncState::Syncing as u128).await;
-                                    }
-                                }
-                                None => {
-                                    log::info!("No SyncState found on {} network in Redis. Anormal !", network.name.clone());
-                                    // shd::data::redis::set(keys::stream::status(network.name.clone()).as_str(), SyncState::Error as u128).await;
-                                }
+                            let mtx = shdstate.read().await;
+                            let initialised = mtx.initialised;
+                            drop(mtx);
+                            if initialised == false {
+                                log::info!("Stream not initialised yet. Waiting for the first message to complete. Setting Redis SyncState");
+                                shd::data::redis::set(keys::stream::status(network.name.clone()).as_str(), SyncState::Syncing as u128).await;
                             }
 
                             // ===== Test Mode Targets (WETH/USDC) =====
@@ -159,6 +144,7 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                 let mut mtx = shdstate.write().await;
                                 mtx.protosims = msg.states.clone();
                                 mtx.components = msg.new_pairs.clone();
+                                mtx.initialised = true;
                                 log::info!("Shared state updated and dropped");
                                 drop(mtx);
                                 let mut components = vec![];
@@ -199,7 +185,7 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                                     let srz = SrzUniswapV2State::from((state.clone(), comp.id.to_string()));
                                                     shd::data::redis::set(key2.as_str(), srz.clone()).await;
                                                 } else {
-                                                    log::info!("Downcast to 'UniswapV2State' failed on proto '{}'", comp.protocol_type_name);
+                                                    log::error!("Downcast to 'UniswapV2State' failed on proto '{}'", comp.protocol_type_name);
                                                 }
                                             }
                                             AmmType::UniswapV3 => {
@@ -220,7 +206,7 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                                     // log::info!(" - (srz state) tick_spacing: {} ", srz.ticks.tick_spacing);
                                                     // log::info!(" - (srz state) ticks len   : {}", srz.ticks.ticks.len());
                                                 } else {
-                                                    log::info!("Downcast to 'UniswapV3State' failed on proto '{}'", comp.protocol_type_name);
+                                                    log::error!("Downcast to 'UniswapV3State' failed on proto '{}'", comp.protocol_type_name);
                                                 }
                                             }
                                             AmmType::UniswapV4 => {
@@ -238,7 +224,7 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                                     // log::info!(" - (srz state) tick_spacing: {} ", srz.ticks.tick_spacing);
                                                     // log::info!(" - (srz state) ticks len   : {} ", srz.ticks.ticks.len());
                                                 } else {
-                                                    log::info!("Downcast to 'UniswapV4State' failed on proto '{}'", comp.protocol_type_name);
+                                                    log::error!("Downcast to 'UniswapV4State' failed on proto '{}'", comp.protocol_type_name);
                                                 }
                                             }
                                             AmmType::Balancer | AmmType::Curve => {
@@ -256,12 +242,13 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                                     // log::info!(" - (srz state) balances  : {:?} ", srz.balances);
                                                     shd::data::redis::set(key2.as_str(), srz.clone()).await;
                                                 } else {
-                                                    log::info!("Downcast to 'EVMPoolState<PreCachedDB>' failed on proto '{}'", comp.protocol_type_name);
+                                                    log::error!("Downcast to 'EVMPoolState<PreCachedDB>' failed on proto '{}'", comp.protocol_type_name);
                                                 }
                                             }
                                         }
                                     }
                                 }
+
                                 // ===== Storing ALL components =====
                                 let key = keys::stream::components(network.name.clone());
                                 shd::data::redis::set(key.as_str(), components.clone()).await;
@@ -353,6 +340,7 @@ async fn main() {
     let stss: SharedTychoStreamState = Arc::new(RwLock::new(TychoStreamState {
         protosims: HashMap::new(),  // Protosims cannot be stored in Redis so we always used shared memory state to access/update them
         components: HashMap::new(), // 📕 Read/write via Redis only
+        initialised: false,
     }));
 
     let readable = Arc::clone(&stss);
