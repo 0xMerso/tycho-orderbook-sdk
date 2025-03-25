@@ -1,5 +1,4 @@
 use crate::shd::{
-    core::amms::get_pool_balances,
     data::fmt::{SrzEVMPoolState, SrzProtocolComponent, SrzToken, SrzUniswapV2State, SrzUniswapV3State, SrzUniswapV4State},
     maths::{self},
     types::OrderbookRequestBody,
@@ -143,8 +142,8 @@ pub async fn build(network: Network, datapools: Vec<ProtoTychoState>, tokens: Ve
         let t0 = Token::from(srzt0.clone());
         let t1 = Token::from(srzt1.clone());
         let provider = ProviderBuilder::new().with_chain(alloy_chains::NamedChain::Mainnet).on_http(network.rpc.clone().parse().unwrap());
-        let cpbs = get_pool_balances(network.clone(), &provider, pdata.component.clone()).await;
-        let (poolb0, poolb1) = (cpbs[0], cpbs[1]);
+        // let cpbs = get_pool_balances(network.clone(), &provider, pdata.component.clone()).await;
+        let (poolb0, poolb1) = (0., 0.); //(cpbs[0], cpbs[1]);
         log::info!("Pool cpbs: {}-{} => {} and {}", t0.symbol, t1.symbol, poolb0, poolb1);
         // let (base, quote) = if query.z0to1 { (t0, t1) } else { (t1, t0) };
         let (base, quote) = (t0, t1); // !
