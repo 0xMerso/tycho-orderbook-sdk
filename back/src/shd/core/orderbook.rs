@@ -9,7 +9,7 @@ use crate::shd::{
 use std::{collections::HashMap, time::Instant};
 
 /// @notice Reading 'state' from Redis DB while using TychoStreamState state and functions to compute/simulate might create a inconsistency
-pub async fn build(network: Network, balances: HashMap<String, HashMap<String, u128>>, ptss: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, query: OrderbookRequestBody, t0_worth_eth: f64, t1_worth_eth: f64) -> PairSimulatedOrderbook {
+pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, query: OrderbookRequestBody, t0_worth_eth: f64, t1_worth_eth: f64) -> PairSimulatedOrderbook {
     log::info!("Got {} pools to compute for pair: '{}'", ptss.len(), query.tag);
     let mut pools = Vec::new();
     let mut prices0to1 = vec![];

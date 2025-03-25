@@ -245,9 +245,7 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
             let srzt0 = srzt0.unwrap();
             let srzt1 = srzt1.unwrap();
             let tokens = vec![srzt0.clone(), srzt1.clone()];
-            let mtx = shtss.read().await;
-            let balances = mtx.balances.clone();
-            drop(mtx);
+
             let (t0_to_eth_path, t0_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
             let (t1_to_eth_path, t1_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
             // log::info!("Path from {} to network.ETH is {:?}", srzt0.symbol, t0_to_eth_path);
@@ -296,7 +294,7 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                 log::info!(" - One unit of base token ({}) quoted to ETH = {}", srzt0.symbol, utk0_ethworth);
                 log::info!(" - One unit of quote token ({}) quoted to ETH = {}", srzt1.symbol, utk1_ethworth);
                 // let ptss = vec![ptss[0].clone()];
-                let result = shd::core::orderbook::build(network.clone(), balances.clone(), ptss.clone(), tokens.clone(), params.clone(), utk0_ethworth, utk1_ethworth).await;
+                let result = shd::core::orderbook::build(network.clone(), ptss.clone(), tokens.clone(), params.clone(), utk0_ethworth, utk1_ethworth).await;
                 if !single {
                     let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
                     crate::shd::utils::misc::save1(result.clone(), path.as_str());
@@ -321,7 +319,6 @@ pub async fn start(n: Network, shared: SharedTychoStreamState, config: EnvConfig
     log::info!("Testing SharedTychoStreamState read = {:?} with {:?}", rstate.protosims.keys(), rstate.protosims.values());
     log::info!(" => rstate.states.keys and rstate.states.values => {:?} with {:?}", rstate.protosims.keys(), rstate.protosims.values());
     log::info!(" => rstate.components.keys and rstate.components.values => {:?} with {:?}", rstate.components.keys(), rstate.components.values());
-    log::info!(" => rstate.balances.keys and rstate.balances.values => {:?} with {:?}", rstate.balances.keys(), rstate.balances.values());
     drop(rstate);
 
     // Add /api prefix

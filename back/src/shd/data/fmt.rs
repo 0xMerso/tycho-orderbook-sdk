@@ -283,7 +283,7 @@ impl From<(EVMPoolState<PreCachedDB>, String)> for SrzEVMPoolState {
             id,
             tokens: state.tokens.iter().map(|t| t.to_string().to_lowercase()).collect(),
             block: state.block.number,
-            balances: state.balances.iter().map(|(k, v)| (k.to_string().to_lowercase(), *v)).collect(),
+            balances: state.balances.iter().map(|(k, v)| (k.to_string().to_lowercase(), *v)).collect(), // Unsure about that
         }
     }
 }

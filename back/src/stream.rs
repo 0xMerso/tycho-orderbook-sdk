@@ -161,13 +161,7 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                 mtx.components = msg.new_pairs.clone();
                                 log::info!("Shared state updated and dropped");
                                 drop(mtx);
-
-                                // let mut cbstates = vec![]; // Curve & Balancer
-                                // let mut u2states = vec![];
-                                // let mut u3states = vec![];
-                                // let mut u4states = vec![];
                                 let mut components = vec![];
-
                                 log::info!("--------- States on network: {} --------- ", network.name);
                                 for m in targets.clone() {
                                     if let Some(proto) = msg.states.get(&m.to_string()) {
@@ -176,15 +170,12 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                             log::info!("Component {} has no address. Skipping.", comp.id);
                                             continue;
                                         }
-
                                         'outer: for tk in comp.tokens.clone() {
                                             if tk.address.to_string().contains("0x0000000000000000000000000000000000000000") {
                                                 break 'outer;
                                             }
                                         }
-
-                                        // log::info!("Component: {} | Proto {} | Has {} tokens", comp.id, comp.protocol_type_name, comp.tokens.len());
-                                        // --- Debug ---
+                                        // --- Debug Attributes ---
                                         // let stattribute = comp.static_attributes.clone();
                                         // for (k, v) in stattribute.iter() {
                                         //     let fee = match k == "key_lp_fee" || k == "fee" {
@@ -215,12 +206,10 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                                 if let Some(state) = proto.as_any().downcast_ref::<UniswapV3State>() {
                                                     // log::info!(" - (comp) fee: {:?}", state.fee());
                                                     // log::info!(" - (comp) spot_sprice: {:?}", state.spot_price(base, quote));
-
                                                     let key1 = keys::stream::component(network.name.clone(), comp.id.to_string().to_lowercase());
                                                     let pc = SrzProtocolComponent::from(comp.clone());
                                                     components.push(pc.clone());
                                                     shd::data::redis::set(key1.as_str(), pc.clone()).await;
-
                                                     let key2 = keys::stream::state(network.name.clone(), comp.id.to_string().to_lowercase());
                                                     let srz = SrzUniswapV3State::from((state.clone(), comp.id.to_string()));
                                                     shd::data::redis::set(key2.as_str(), srz.clone()).await;
@@ -240,7 +229,6 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                                     let pc = SrzProtocolComponent::from(comp.clone());
                                                     components.push(pc.clone());
                                                     shd::data::redis::set(key1.as_str(), pc.clone()).await;
-
                                                     let key2 = keys::stream::state(network.name.clone(), comp.id.to_string().to_lowercase());
                                                     let srz = SrzUniswapV4State::from((state.clone(), comp.id.to_string()));
                                                     shd::data::redis::set(key2.as_str(), srz.clone()).await;
@@ -259,9 +247,7 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                                     let pc = SrzProtocolComponent::from(comp.clone());
                                                     components.push(pc.clone());
                                                     shd::data::redis::set(key1.as_str(), pc.clone()).await;
-
                                                     let key2 = keys::stream::state(network.name.clone(), comp.id.to_string().to_lowercase());
-                                                    // ! To update FROM
                                                     let srz = SrzEVMPoolState::from((state.clone(), comp.id.to_string()));
                                                     // log::info!(" - spot_sprice: {:?}", state.spot_price(base, quote));
                                                     // log::info!(" - (srz state) id        : {} ", srz.id);
@@ -302,7 +288,6 @@ async fn stream_protocol(network: Network, shdstate: SharedTychoStreamState, tok
                                     log::info!("Received {} new pairs, and {} pairs to be removed. Updating Redis ...", msg.new_pairs.len(), msg.removed_pairs.len());
                                     match api::_components(network.clone()).await {
                                         Some(mut components) => {
-                                            // log::info!("Got {} components monitored on {}", components.len(), network.name);
                                             for x in msg.new_pairs.iter() {
                                                 let pc = SrzProtocolComponent::from(x.1.clone());
                                                 if let Some(pos) = components.iter().position(|current| current.id.to_string().to_lowercase() == x.0.to_string().to_lowercase()) {
@@ -368,7 +353,6 @@ async fn main() {
     let stss: SharedTychoStreamState = Arc::new(RwLock::new(TychoStreamState {
         protosims: HashMap::new(),  // Protosims cannot be stored in Redis so we always used shared memory state to access/update them
         components: HashMap::new(), // 📕 Read/write via Redis only
-        balances: HashMap::new(),   // Read/write via shared memory state only
     }));
 
     let readable = Arc::clone(&stss);

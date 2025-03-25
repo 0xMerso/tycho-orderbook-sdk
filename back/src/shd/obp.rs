@@ -3,11 +3,11 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::{interval, Duration};
 
-/// Wrapped Orderbook Provider (WOP) is a wrapper around a stream provider.
+/// Wrapped Orderbook Provider (OBP) is a wrapper around a stream provider.
 /// When instantiated via `new()`, it spawns a task that pings a given endpoint
 /// every second with a payload. The resulting status messages are sent over an
 /// asynchronous channel so consumers can log the streamed data.
-pub struct WOP {
+pub struct OBP {
     pub endpoint: String,
     // The spawned task handle is kept to ensure the task remains running.
     _handle: JoinHandle<()>,
@@ -15,8 +15,8 @@ pub struct WOP {
     pub stream: mpsc::Receiver<String>,
 }
 
-impl WOP {
-    /// Creates a new `WOP` instance.
+impl OBP {
+    /// Creates a new `OBP` instance.
     ///
     /// # Arguments
     ///
@@ -25,7 +25,7 @@ impl WOP {
     /// # Example
     ///
     /// ```rust,no_run
-    /// let provider = WOP::new("http://127.0.0.1:4444/ping".to_string());
+    /// let provider = OBP::new("http://127.0.0.1:4444/ping".to_string());
     /// ```
     pub fn new(endpoint: String) -> Self {
         let client = Client::new();

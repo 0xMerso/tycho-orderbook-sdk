@@ -214,7 +214,6 @@ pub struct TychoStreamState {
     // Maps a network name to its new ProtocolComponent.
     // pub components: HashMap<String, ProtocolComponent>,
     pub components: HashMap<String, ProtocolComponent>,
-    pub balances: HashMap<String, HashMap<String, u128>>, // FuLL Lowercase
 }
 
 pub type ChainCore = tycho_core::dto::Chain;
