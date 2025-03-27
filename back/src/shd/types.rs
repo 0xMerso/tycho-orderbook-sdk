@@ -248,7 +248,7 @@ pub fn chain_timing(name: String) -> u64 {
 // ================================================================ API ================================================================
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
-pub struct OrderbookRequestBody {
+pub struct OrderbookRequestParams {
     pub tag: String, // Pair uniq identifier: token0-token1
     pub sps: Option<SinglePointSimulation>,
 }
@@ -324,7 +324,7 @@ pub struct MidPriceData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct PairSimulatedOrderbook {
+pub struct Orderbook {
     pub token0: SrzToken,
     pub token1: SrzToken,
     pub prices0to1: Vec<f64>,

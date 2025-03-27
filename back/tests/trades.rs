@@ -1,6 +1,6 @@
 use std::fs;
 use tap2::shd;
-use tap2::shd::types::PairSimulatedOrderbook;
+use tap2::shd::types::Orderbook;
 
 #[test]
 fn test_simulations() {
@@ -12,7 +12,7 @@ fn test_simulations() {
         let path = file.path();
         if path.extension().and_then(|s| s.to_str()) == Some("json") {
             let data_str = fs::read_to_string(&path).expect("Failed to read JSON file");
-            let data: PairSimulatedOrderbook = serde_json::from_str(&data_str).expect("Failed to parse JSON");
+            let data: Orderbook = serde_json::from_str(&data_str).expect("Failed to parse JSON");
             assert!(!data.trades0to1.is_empty(), "trades0to1 should not be empty in {:?}", path);
             assert!(!data.trades1to0.is_empty(), "trades1to0 should not be empty in {:?}", path);
             assert_eq!(data.trades0to1.len(), data.trades1to0.len(), "trades0to1 and trades1to0 should have the same length in {:?}", path);
