@@ -1,8 +1,7 @@
 use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 use tap2::shd::data::fmt::SrzToken;
-use tap2::shd::obp::{OBPConfig, OBPEvent, OrderbookBuilder};
-use tap2::shd::types::{EnvConfig, Orderbook, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState};
+use tap2::shd::types::{EnvConfig, OBPConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState};
 use tokio::sync::RwLock;
 
 use tap2::shd;

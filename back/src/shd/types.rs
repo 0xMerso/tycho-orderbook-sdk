@@ -455,3 +455,53 @@ pub struct IncrementationSegment {
 pub struct PairSimuIncrementConfig {
     pub segments: Vec<IncrementationSegment>,
 }
+
+/// ====================================================================================================================================================================================================
+/// SDK Tycho-Orderbook
+use tokio::sync::mpsc;
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+use tycho_simulation::evm::decoder::StreamDecodeError;
+use tycho_simulation::evm::stream::ProtocolStreamBuilder;
+
+#[derive(Debug)]
+pub enum OBPEvent {
+    Initialised(u64),
+    NewHeader(u64, Vec<String>), // Contains updated components ids
+    Error(StreamDecodeError),
+}
+
+#[derive(Clone)]
+pub struct OBPConfig {
+    pub tracked: HashMap<String, Option<Orderbook>>,
+    // The capacity of the channel used to send OBPEvents.
+    pub capacity: usize,
+}
+
+impl Default for OBPConfig {
+    fn default() -> Self {
+        OBPConfig { tracked: HashMap::new(), capacity: 100 }
+    }
+}
+
+/// -- Tycho -- Orderbook Provider (OBP) that wraps a ProtocolStreamBuilder stream.
+/// It forwards block updates as events to the client while sharing an internal state.
+pub struct OrderbookProvider {
+    /// The spawned task handle is stored to ensure the task remains running.
+    pub _handle: JoinHandle<()>,
+    /// Tokens given by Tycho
+    pub tokens: Vec<SrzToken>,
+    /// The network used
+    pub network: Network,
+    /// Tracked orderbooks
+    pub tracked: HashMap<String, Option<Orderbook>>,
+    /// Receiver side of the channel where OBPEvents are sent.
+    pub stream: Mutex<mpsc::Receiver<OBPEvent>>, // mpsc::Receiver<OBPEvent>,
+    /// The shared state, accessible both to the internal task and the client.
+    pub state: SharedTychoStreamState,
+}
+pub struct OrderbookBuilder {
+    pub network: Network,
+    pub psb: ProtocolStreamBuilder,
+    pub tokens: Vec<SrzToken>,
+}
