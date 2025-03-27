@@ -7990,6 +7990,7 @@ dependencies = [
  "num-traits",
  "primitive-types 0.10.1",
  "rand 0.8.5",
+ "rayon",
  "redis",
  "reqwest 0.12.12",
  "serde",

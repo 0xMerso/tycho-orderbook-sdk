@@ -189,11 +189,13 @@ pub fn optimize_fast(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, 
     trades
 }
 
+use rayon::prelude::*; // Ensure Rayon is in your dependencies.
+
 /**
  * Executes the optimizer for a given token pair and a set of pools.
  */
 pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
-    let mut trades = Vec::new();
+    // let mut trades = Vec::new();
     let start = aggb / TEN_MILLIONS; // No longer needed: / 10f64.powi(from.decimals as i32);
     log::info!("Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}", from.symbol, aggb, start, output_u_ethworth);
     let steps = shd::maths::steps::exponential(
@@ -203,25 +205,49 @@ pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from:
         shd::r#static::maths::simu::END_MULTIPLIER * shd::r#static::maths::simu::MIN_EXP_DELTA_PCT,
     );
     let steps = steps.iter().map(|x| x * start).collect::<Vec<f64>>();
-    for (x, amount) in steps.iter().enumerate() {
-        let tmstp = Instant::now();
-        let result = shd::maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
-        let elapsed = tmstp.elapsed().as_millis();
-        let gas_cost = result.gas_costs_usd.iter().sum::<f64>();
-        log::info!(
-            " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {} ms",
-            x,
-            result.amount,
-            from.symbol,
-            result.output,
-            to.symbol,
-            result.average_sell_price,
-            gas_cost,
-            result.distribution,
-            elapsed
-        );
-        trades.push(result);
-    }
+
+    let trades: Vec<TradeResult> = steps
+        .par_iter()
+        .enumerate()
+        .map(|(x, amount)| {
+            let tmstp = Instant::now();
+            let result = shd::maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
+            let elapsed = tmstp.elapsed().as_millis();
+            let gas_cost = result.gas_costs_usd.iter().sum::<f64>();
+            log::info!(
+                " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {} ms",
+                x,
+                result.amount,
+                from.symbol,
+                result.output,
+                to.symbol,
+                result.average_sell_price,
+                gas_cost,
+                result.distribution,
+                elapsed
+            );
+            result
+        })
+        .collect();
+    // for (x, amount) in steps.iter().enumerate() {
+    //     let tmstp = Instant::now();
+    //     let result = shd::maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
+    //     let elapsed = tmstp.elapsed().as_millis();
+    //     let gas_cost = result.gas_costs_usd.iter().sum::<f64>();
+    //     log::info!(
+    //         " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {} ms",
+    //         x,
+    //         result.amount,
+    //         from.symbol,
+    //         result.output,
+    //         to.symbol,
+    //         result.average_sell_price,
+    //         gas_cost,
+    //         result.distribution,
+    //         elapsed
+    //     );
+    //     trades.push(result);
+    // }
     trades
 }
 
