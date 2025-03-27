@@ -11,6 +11,7 @@ fn test_simulations() {
         let file = file.expect("Failed to read file entry");
         let path = file.path();
         if path.extension().and_then(|s| s.to_str()) == Some("json") {
+            log::info!("Reading file {:?}", path);
             let data_str = fs::read_to_string(&path).expect("Failed to read JSON file");
             let data: Orderbook = serde_json::from_str(&data_str).expect("Failed to parse JSON");
             assert!(!data.trades0to1.is_empty(), "trades0to1 should not be empty in {:?}", path);

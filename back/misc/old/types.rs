@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use utoipa::ToSchema;
 
+/// IERC20 Solidity
 alloy::sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -17,6 +18,7 @@ alloy::sol!(
     "src/shd/utils/abis/IERC20.json"
 );
 
+/// Balancer2Vault Solidity
 alloy::sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -71,7 +73,38 @@ pub struct Network {
     pub permit2: String,
 }
 
-/// Tycho protocol, used to configure ProtocolStreamBuilder
+/// Liquidity pool data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PoolData {
+    pub liquidity: u128,
+    pub sqrt_price_x96: u128,
+    pub tick: u128,
+    pub ticks: Vec<TickData>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TickData {
+    pub tick: i32,
+    pub net_liquidity: u128,
+    pub price0to1: f64,
+    pub price1to0: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderBookSimu {
+    pub pool: String,
+    pub simulations: Vec<BestSwap>,
+    pub spot_sprice: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BestSwap {
+    pub formatted_in: String,
+    pub formatted_out: String,
+    pub forward_price: f64,
+    pub reverse_price: f64,
+}
+
 pub enum TychoSupportedProtocol {
     Pancakeswap,
     Sushiswap,
@@ -111,7 +144,6 @@ impl TychoSupportedProtocol {
     }
 }
 
-/// Tycho Protocol type name, used to add exchanges
 pub enum AmmType {
     Pancakeswap,
     Sushiswap,
@@ -151,7 +183,6 @@ impl From<&str> for AmmType {
     }
 }
 
-/// Used to safely progress with Redis database
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum SyncState {
     Down = 1,
@@ -173,18 +204,132 @@ impl Display for SyncState {
     }
 }
 
-// =================================================================================== EXECUTION =======================================================================================================
+// ======== Shared Data per tasks ========
 
-/// Execution context, used to simulate a trade
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ExecutionContext {
-    pub router: String,
-    pub sender: String,
-    pub fork: bool,
-    pub request: ExecutionRequest,
+use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
+
+use super::{
+    core::orderbook::OrderbookQuoteFn,
+    data::fmt::{SrzProtocolComponent, SrzToken},
+};
+
+pub type SharedTychoStreamState = Arc<RwLock<TychoStreamState>>;
+
+pub struct TychoStreamState {
+    pub protosims: HashMap<String, Box<dyn ProtocolSim>>,
+    pub components: HashMap<String, ProtocolComponent>,
+    // Indicates whether the ProtocolStreamBuilder has been initialised (true if first stream has been received and saved)
+    pub initialised: bool,
 }
 
-/// Execution request, used to simulate a trade
+pub type ChainCore = tycho_core::dto::Chain;
+pub type ChainSimCore = tycho_simulation::tycho_core::dto::Chain;
+pub type ChainSimu = tycho_simulation::evm::tycho_models::Chain;
+
+pub fn chain(name: String) -> Option<(ChainCore, ChainSimCore, ChainSimu)> {
+    match name.as_str() {
+        "ethereum" => Some((ChainCore::Ethereum, ChainSimCore::Ethereum, ChainSimu::Ethereum)),
+        "arbitrum" => Some((ChainCore::Arbitrum, ChainSimCore::Arbitrum, ChainSimu::Arbitrum)),
+        "base" => Some((ChainCore::Base, ChainSimCore::Base, ChainSimu::Base)),
+        _ => {
+            log::error!("Unknown chain: {}", name);
+            None
+        }
+    }
+}
+
+/// Overwriting - Returns the default block time and timeout values for the given blockchain network.
+pub fn chain_timing(name: String) -> u64 {
+    match name.as_str() {
+        "ethereum" => 600,
+        "starknet" => 30,
+        "zksync" => 1,
+        "arbitrum" => 1,
+        "base" => 10,
+        _ => {
+            log::error!("Unknown chain: {}", name);
+            600
+        }
+    }
+}
+
+// ================================================================ API ================================================================
+
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct OrderbookRequestParams {
+    pub tag: String, // Pair uniq identifier: token0-token1
+    pub sps: Option<SinglePointSimulation>,
+}
+
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct SinglePointSimulation {
+    pub input: String, // 0to1 if input = token0
+    pub amount: f64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PairResponse {
+    pub components: String,   // Must have same size
+    pub states: Option<bool>, // Must have same size
+}
+
+#[derive(Clone, Debug)]
+pub struct ProtoTychoState {
+    pub component: SrzProtocolComponent,
+    pub protosim: Box<dyn ProtocolSim>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TradeResult {
+    #[schema(example = "1.0")]
+    pub amount: f64, // e.g. 100 (meaning 100 ETH of input)
+    #[schema(example = "2000.0")]
+    pub output: f64, // in token_out human–readable units
+    #[schema(example = "[0.42, 0.37, 0.21]")]
+    pub distribution: Vec<f64>, // percentage distribution per pool (0–100)
+    #[schema(example = "[42000, 37000, 77000]")]
+    pub gas_costs: Vec<u128>,
+    #[schema(example = "[0.42, 0.37, 0.77]")]
+    pub gas_costs_usd: Vec<f64>,
+    // #[schema(example = "[1.77, 2.42, 2.37]")]
+    // pub gas_costs_output: Vec<f64>,
+    #[schema(example = "0.0005")]
+    pub average_sell_price: f64, // output per unit input (human–readable)
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MidPriceData {
+    pub best_ask: f64,
+    pub best_bid: f64,
+    pub mid: f64,
+    pub spread: f64,
+    pub spread_pct: f64,
+    // pub inverse_price0t1: f64,
+    // pub inverse_price1t0: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct Orderbook {
+    pub token0: SrzToken,
+    pub token1: SrzToken,
+    pub prices0to1: Vec<f64>,
+    pub prices1to0: Vec<f64>,
+    pub trades0to1: Vec<TradeResult>,
+    pub trades1to0: Vec<TradeResult>,
+    pub aggt0lqdty: Vec<f64>,
+    pub aggt1lqdty: Vec<f64>,
+    pub pools: Vec<SrzProtocolComponent>,
+    pub eth_usd: f64,
+    // pub best0to1: TradeResult, // Bid of Ask, it's a pov
+    // pub best1to0: TradeResult, // Bid of Ask, it's a pov
+    pub mpd0to1: MidPriceData,
+    pub mpd1to0: MidPriceData,
+    pub t0_worth_eth: f64, // One unit, multi-hop spot_price, needed to value the TVL and other stuff
+    pub t1_worth_eth: f64, // One unit, multi-hop spot_price, needed to value the TVL and other stuff
+}
+
+// =================================================================================== EXECUTION =======================================================================================================
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ExecutionRequest {
     pub sender: String,
@@ -197,14 +342,23 @@ pub struct ExecutionRequest {
     pub components: Vec<SrzProtocolComponent>,
 }
 
-/// Result of the execution
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ExecutionContext {
+    pub router: String,
+    pub sender: String,
+    pub fork: bool,
+    pub request: ExecutionRequest,
+}
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ExecutionPayload {
+    // pub hash: String,
+    // pub success: bool,
+    // pub reason: bool,
     pub approve: SrzTransactionRequest,
     pub swap: SrzTransactionRequest,
 }
 
-/// Transaction request, serialized for the client (srz = serialized)
 #[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SrzTransactionRequest {
     pub from: String,                   // Option<Address>,
@@ -221,6 +375,7 @@ pub struct SrzTransactionRequest {
 }
 
 // Convert Alloy TransactionRequest to a client friendly format
+
 impl From<TransactionRequest> for SrzTransactionRequest {
     fn from(tr: TransactionRequest) -> Self {
         let to = tr.to.unwrap_or_default();
@@ -286,174 +441,21 @@ pub struct PairSimuIncrementConfig {
     pub segments: Vec<IncrementationSegment>,
 }
 
-/// ================================================================ SDK ================================================================
-/// + shared-task data
-/// + API specific structs
+/// ====================================================================================================================================================================================================
+/// SDK Tycho-Orderbook
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tycho_simulation::evm::decoder::StreamDecodeError;
 use tycho_simulation::evm::stream::ProtocolStreamBuilder;
 
-/// Due to library conflicts, we need to redefine the Chain type depending the use case, hence the following aliases.
-pub type ChainCore = tycho_core::dto::Chain;
-pub type ChainSimCore = tycho_simulation::tycho_core::dto::Chain;
-pub type ChainSimu = tycho_simulation::evm::tycho_models::Chain;
-
-/// Return the chains types for a given network name
-pub fn chain(name: String) -> Option<(ChainCore, ChainSimCore, ChainSimu)> {
-    match name.as_str() {
-        "ethereum" => Some((ChainCore::Ethereum, ChainSimCore::Ethereum, ChainSimu::Ethereum)),
-        "arbitrum" => Some((ChainCore::Arbitrum, ChainSimCore::Arbitrum, ChainSimu::Arbitrum)),
-        "base" => Some((ChainCore::Base, ChainSimCore::Base, ChainSimu::Base)),
-        _ => {
-            log::error!("Unknown chain: {}", name);
-            None
-        }
-    }
-}
-
-/// Overwriting - Returns the default block time and timeout values for the given blockchain network.
-pub fn chain_timing(name: String) -> u64 {
-    match name.as_str() {
-        "ethereum" => 600,
-        "starknet" => 30,
-        "zksync" => 1,
-        "arbitrum" => 1,
-        "base" => 10,
-        _ => {
-            log::error!("Unknown chain: {}", name);
-            600
-        }
-    }
-}
-
-use super::{
-    core::orderbook::OrderbookQuoteFn,
-    data::fmt::{SrzProtocolComponent, SrzToken},
-};
-use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
-pub type SharedTychoStreamState = Arc<RwLock<TychoStreamState>>;
-
-/// Tycho Stream Data, stored in a Mutex/Arc for shared access between the SDK stream and the client or API.
-pub struct TychoStreamState {
-    // ProtocolSim instances, indexed by their unique identifier. Impossible to store elsewhere than memory
-    pub protosims: HashMap<String, Box<dyn ProtocolSim>>,
-    // Components instances, indexed by their unique identifier. Serialised and stored in Redis
-    pub components: HashMap<String, ProtocolComponent>,
-    // Indicates whether the ProtocolStreamBuilder has been initialised (true if first stream has been received and saved)
-    pub initialised: bool,
-}
-
-/// One component of the Tycho protocol, with his simulation instance
-#[derive(Clone, Debug)]
-pub struct ProtoTychoState {
-    pub component: SrzProtocolComponent,
-    pub protosim: Box<dyn ProtocolSim>,
-}
-
-/// Orderbook request params used to build a orderbook for a given pair
-#[derive(Clone, Debug, Deserialize, ToSchema)]
-pub struct OrderbookRequestParams {
-    /// Pair uniq identifier: token0-token1
-    pub tag: String,
-    /// Optional single point simulation, used to simulate 1 trade only
-    pub sps: Option<SinglePointSimulation>,
-}
-
-/// Orderbook query, but for one point (= 1 trade = 1 amount in)
-#[derive(Clone, Debug, Deserialize, ToSchema)]
-pub struct SinglePointSimulation {
-    // Address of the input token
-    pub input: String,
-    // Divided by input decimals
-    pub amount: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct TradeResult {
-    // e.g. 100 (meaning 100 ETH of input)
-    #[schema(example = "1.0")]
-    pub amount: f64,
-
-    // In token_out human–readable units
-    #[schema(example = "2000.0")]
-    pub output: f64,
-
-    // Percentage distribution per pool (0–100)
-    #[schema(example = "[0.42, 0.37, 0.21]")]
-    pub distribution: Vec<f64>,
-
-    // Gas units used
-    #[schema(example = "[42000, 37000, 77000]")]
-    pub gas_costs: Vec<u128>,
-
-    // Gas costs in USD depending the pool
-    #[schema(example = "[0.42, 0.37, 0.77]")]
-    pub gas_costs_usd: Vec<f64>,
-
-    // output per unit input (human–readable)
-    #[schema(example = "0.0005")]
-    pub average_sell_price: f64,
-}
-
-/// Orderbook data used to compute spread, and other metrics
-#[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MidPriceData {
-    pub best_ask: f64,
-    pub best_bid: f64,
-    pub mid: f64,
-    pub spread: f64,
-    pub spread_pct: f64,
-}
-
-/// FuLL orderbook data response. Key struct of the SDK
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct Orderbook {
-    /// Token0. Input and output token
-    pub token0: SrzToken,
-    /// Token1. Output then output token
-    pub token1: SrzToken,
-    /// Prices from token0 to token1. Always divided by decimals
-    pub prices0to1: Vec<f64>,
-    /// Prices from token1 to token0. Always divided by decimals
-    pub prices1to0: Vec<f64>,
-    /// Array of resulat for the optimal single hop route
-    pub trades0to1: Vec<TradeResult>,
-    /// Array of resulat for the optimal single hop route
-    pub trades1to0: Vec<TradeResult>,
-    /// Cumulated liquidity for token0, always divided by decimals, combining all pools/components
-    pub aggt0lqdty: Vec<f64>,
-    /// Cumulated liquidity for token0, always divided by decimals, combining all pools/components
-    pub aggt1lqdty: Vec<f64>,
-    /// All components used to build the orderbook (= pools that include both token0 and token1)
-    pub pools: Vec<SrzProtocolComponent>,
-    /// Current value of ETH in USD
-    pub eth_usd: f64,
-    /// Mid price data for token0 to token1
-    pub mpd0to1: MidPriceData,
-    /// Mid price data for token1 to token0
-    pub mpd1to0: MidPriceData,
-    /// One unit, multi-hop spot_price, needed to value the TVL and other stuff
-    pub t0_worth_eth: f64,
-    /// One unit, multi-hop spot_price, needed to value the TVL and other stuff
-    pub t1_worth_eth: f64,
-}
-
-/// Client side structs
-
-/// Orderbook Provider Event
 #[derive(Debug)]
 pub enum OBPEvent {
-    /// Event when the stream is initialised = connected to Tycho
     Initialised(u64),
-    /// Emited when a new header is received, with components ID that have changed
-    NewHeader(u64, Vec<String>),
-    /// Stream Error
+    NewHeader(u64, Vec<String>), // Contains updated components ids
     Error(StreamDecodeError),
 }
 
-/// Orderbook Provider Configuration
 #[derive(Clone)]
 pub struct OBPConfig {
     // The capacity of the channel used to send OBPEvents.
@@ -466,13 +468,11 @@ impl Default for OBPConfig {
     }
 }
 
-/// Struct used to build the orderbook functions in order to customize the orderbook construction
-/// If None, default simple and naive optimization is used, including gas costs.
 pub struct OrderbookFunctions {
     pub optimize: OrderbookQuoteFn,
 }
 
-/// SDK prderbook provider (OBP) that wraps a ProtocolStreamBuilder stream
+/// -- Tycho -- Orderbook Provider (OBP) that wraps a ProtocolStreamBuilder stream.
 pub struct OrderbookProvider {
     /// The spawned task handle is stored to ensure the task remains running.
     pub _handle: JoinHandle<()>,
@@ -485,17 +485,8 @@ pub struct OrderbookProvider {
     /// The shared state, accessible both to the internal task and the client.
     pub state: SharedTychoStreamState,
 }
-
-/// Orderbook builder, used to create the OBP
 pub struct OrderbookBuilder {
     pub network: Network,
     pub psb: ProtocolStreamBuilder,
     pub tokens: Vec<SrzToken>,
-}
-
-/// Aggregated liquidit for a array of components
-pub struct OnChainLiquidity {
-    pub tokens: Vec<String>,
-    pub total: Vec<u128>,
-    pub splits: Vec<(String, f64)>, // Component ID -> % of total
 }

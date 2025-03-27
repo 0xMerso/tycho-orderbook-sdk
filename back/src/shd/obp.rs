@@ -33,7 +33,7 @@ use super::data::fmt::SrzToken;
 use super::types::{EnvConfig, Network, SharedTychoStreamState};
 use super::types::{OBPConfig, OrderbookRequestParams};
 use super::types::{Orderbook, OrderbookBuilder};
-use super::types::{OrderbookSimuFunctions, ProtoTychoState};
+use super::types::{OrderbookFunctions, ProtoTychoState};
 
 impl OrderbookBuilder {
     /**
@@ -88,11 +88,13 @@ impl OrderbookBuilder {
 }
 
 impl OrderbookProvider {
-    /// Creates a new OBP instance using a ProtocolStreamBuilder with custom configuration.
+    /// Creates a new OBP instance using a ProtocolStreamBuilder (from Tycho) with custom configuration
     /// # Arguments
     /// * `psb` - A ProtocolStreamBuilder used to build the underlying stream.
     /// * `config` - An OBPConfig allowing customization of parameters (e.g. channel capacity).
     /// * `state` - A shared state structure that is both updated internally and exposed to the client.
+    /// # Returns
+    /// * A Result containing the OBP instance or a StreamError if the stream could not be built.
     pub async fn build(ob: OrderbookBuilder, config: OBPConfig, state: SharedTychoStreamState) -> Result<Self, StreamError> {
         // Build the protocol stream that yields Result<BlockUpdate, StreamDecodeError>.
         match ob.psb.build().await {
@@ -172,7 +174,6 @@ impl OrderbookProvider {
                     _handle: handle,
                     tokens: ob.tokens.clone(),
                     network: ob.network.clone(),
-                    tracked: config.tracked.clone(),
                 };
 
                 Ok(obp)
@@ -203,7 +204,7 @@ impl OrderbookProvider {
         output
     }
 
-    pub async fn get_orderbook(&self, params: OrderbookRequestParams, simufns: Option<OrderbookSimuFunctions>) -> Result<Orderbook, anyhow::Error> {
+    pub async fn get_orderbook(&self, params: OrderbookRequestParams, simufns: Option<OrderbookFunctions>) -> Result<Orderbook, anyhow::Error> {
         let single = params.sps.is_some();
         let mtx = self.state.read().await;
         let comp = mtx.components.clone();

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 use tap2::shd::data::fmt::SrzToken;
-use tap2::shd::types::{EnvConfig, OBPConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookRequestParams, OrderbookSimuFunctions, SharedTychoStreamState, TychoStreamState};
+use tap2::shd::types::{EnvConfig, OBPConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookFunctions, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState};
 use tokio::sync::RwLock;
 
 use tap2::shd;
@@ -41,7 +41,7 @@ async fn main() {
     // --- --- --- --- ---
     // Create the OBP provider from the protocol stream builder and shared state.
     let builder = OrderbookBuilder::new(network.clone(), env.clone(), Some(tokens.clone())).await;
-    let config = OBPConfig { tracked: tracked.clone(), capacity: 100 };
+    let config = OBPConfig { capacity: 100 };
     let mut _obp = builder.build(config.clone(), xstate).await.expect("Failed to build OBP. Retry or check logs");
     let obp = Arc::new(_obp);
     let state = Arc::clone(&obp.state);
@@ -61,7 +61,7 @@ async fn main() {
                     // First
                     for (k, v) in tracked.clone().iter() {
                         if v.is_none() {
-                            let simufns = OrderbookSimuFunctions {
+                            let simufns = OrderbookFunctions {
                                 optimize: shd::core::orderbook::optimize_fast,
                             };
                             log::info!("OBP Event: Orderbook {} isn't build yet, building it ...", k.clone());
@@ -94,7 +94,7 @@ async fn main() {
                             }
                             if refresh {
                                 log::info!(" ⚖️ Orderbook {}-{} has changed, need to update it", current.token0.symbol, current.token1.symbol);
-                                let simufns = OrderbookSimuFunctions {
+                                let simufns = OrderbookFunctions {
                                     optimize: shd::core::orderbook::optimize_fast,
                                 };
                                 if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {

@@ -8,12 +8,6 @@ use crate::shd::{
     types::{IncrementationSegment, PairSimuIncrementConfig},
 };
 
-pub struct OnChainLiquidity {
-    pub tokens: Vec<String>,
-    pub total: Vec<u128>,
-    pub splits: Vec<(String, f64)>, // Component ID -> % of total
-}
-
 /**
  * Sum the total liquidity of a pair of tokens.
  * @dev components Every similar components (= matching a pair)
@@ -75,7 +69,7 @@ pub fn gsteps(segments: Vec<IncrementationSegment>) -> Vec<f64> {
 // IncrementationSegment { start: 101., end: 1000., step: 50. },     // Step is 800 millionths
 // IncrementationSegment { start: 1001., end: 10_000., step: 250. }, // Step is 4000 millionths
 
-pub fn gsegments(tb_one_mn: f64) -> Vec<IncrementationSegment> {
+pub fn generate_segments(tb_one_mn: f64) -> Vec<IncrementationSegment> {
     let mut segments = vec![];
     let s1 = IncrementationSegment {
         start: tb_one_mn * 1.,
@@ -127,31 +121,12 @@ pub fn steps_to_bg(steps: Vec<f64>, decimals: u32) -> Vec<BigUint> {
 }
 
 /// Generates `n_points` along an exponential curve between `start` and `end`.
-///
-/// When `start` is not zero, the interpolation is defined by:
-///   y = start * ((end / start) ^ t)
-/// so that y(0) = start and y(1) = end.
-///
-/// If `start` is zero, an "ease‑in" interpolation is used:
-///   y = end * (exp(lambda * t) - 1) / (exp(lambda) - 1)
-/// with lambda fixed to 2.0 by default.
-///
 /// # Arguments
 /// * `n_points` - Number of points to generate.
 /// * `start` - The starting value of the curve.
 /// * `end` - The ending value of the curve.
-///
 /// # Returns
 /// A vector of f64 values representing the points along the exponential curve.
-///
-/// # Examples
-///
-/// ```
-/// let points = exponential(100, 1.0, 1000.0);
-/// assert_eq!(points.len(), 100);
-/// assert!((points[0] - 1.0).abs() < f64::EPSILON);
-/// assert!((points[99] - 1000.0).abs() < 1e-6);
-/// ```
 pub fn exponential(n_points: usize, start: f64, end: f64, min_delta: f64) -> Vec<f64> {
     let lambda = 2.0; // parameter for the ease-in when start == 0
     let mut result = Vec::new();
@@ -194,39 +169,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_exponential_points_nonzero_start() {
-        println!("--- test_exponential_points_nonzero_start ---");
-        // Idea here to generate points between 1 millionth and between 10-25% of that millionth => 100_000 to 250_000
-        let n_points = 25;
-        let start = 1.0;
-        let end = 100000.0; // BPD
-        let points = exponential(n_points, start, end, f64::MAX);
-        assert_eq!(points.len(), n_points);
-        // Check that the first point equals the start value.
-        assert!((points.first().unwrap() - start).abs() < f64::EPSILON);
-        // Check that the last point equals the end value.
-        assert!((points.last().unwrap() - end).abs() < 1e-6);
-        for p in points {
-            println!("Generated point: {}", p);
-        }
-    }
-
-    #[test]
-    fn test_exponential_points_zero_start() {
-        println!("--- test_exponential_points_zero_start ---");
-        let n_points = 25;
-        let start = 0.0;
-        let end = 100000.0; // BPD
-        let points = exponential(n_points, start, end, f64::MAX);
-        assert_eq!(points.len(), n_points);
-        assert!((points.first().unwrap() - 0.0).abs() < f64::EPSILON);
-        assert!((points.last().unwrap() - end).abs() < 1e-6);
-        for p in points {
-            println!("Generated point: {}", p);
-        }
-    }
-
-    #[test]
     fn test_steps_strictly_increasing() {
         let segments = vec![
             IncrementationSegment { start: 1.0, end: 10.0, step: 1.0 },
@@ -267,22 +209,5 @@ mod tests {
         let factor = 10u128.pow(decimals);
         let expected: Vec<BigUint> = steps.iter().map(|&s| BigUint::from((s * (factor as f64)).round() as u128)).collect();
         assert_eq!(result_biguint, expected);
-    }
-
-    #[test]
-    fn test_custom() {
-        let segments = vec![
-            IncrementationSegment { start: 1., end: 100., step: 1. },
-            IncrementationSegment { start: 101., end: 1000., step: 50. },
-            IncrementationSegment { start: 1001., end: 10_000., step: 250. },
-        ];
-        let config = PairSimuIncrementConfig { segments };
-        let (steps0to1, steps1to0) = _generate(config);
-        // for t in steps0to1.iter() {
-        //     println!("t0: Generated step: {}", t);
-        // }
-        // for t in steps1to0.iter() {
-        //     println!("t1: Generated step: {}", t);
-        // }
     }
 }
