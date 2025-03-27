@@ -80,7 +80,7 @@ path = "src/stream.rs"
 
 
 [[bin]]
-name = "obpc" # Orderbook Provider Client
-path = "src/obpc.rs"
+name = "quickstart" # Orderbook Provider Client
+path = "src/quickstart.rs"
 
 # ======================================================================================================================================================================================================
