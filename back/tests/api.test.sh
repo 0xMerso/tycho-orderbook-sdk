@@ -86,7 +86,7 @@ try "GET /components" "$API_URL/components"
 # try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'"}'
 # try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'"}'
 # try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'"}'
-# try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'"}'
+try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'"}'
 
 try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
 # try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
