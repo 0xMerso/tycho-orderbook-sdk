@@ -4,7 +4,7 @@ use serde_json::json;
 use tap2::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
-    types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookRequestParams, OrderbookSimuFunctions, ProtoTychoState, SharedTychoStreamState, SyncState},
+    types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookRequestParams, ProtoTychoState, SharedTychoStreamState, SyncState},
 };
 
 use utoipa::OpenApi;

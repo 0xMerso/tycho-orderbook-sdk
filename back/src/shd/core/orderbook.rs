@@ -3,7 +3,7 @@ use tycho_simulation::{models::Token, protocol::state::ProtocolSim};
 use crate::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
-    r#static::maths::{simu, TEN_MILLIONS},
+    r#static::maths::TEN_MILLIONS,
     types::{MidPriceData, Network, Orderbook, OrderbookRequestParams, OrderbookSimuFunctions, ProtoTychoState, TradeResult},
 };
 use std::{collections::HashMap, time::Instant};

@@ -6,8 +6,6 @@ use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
-use tycho_simulation::evm::decoder::StreamDecodeError;
 use tycho_simulation::models::Token;
 use tycho_simulation::tycho_client::stream::StreamError;
 
