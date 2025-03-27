@@ -64,7 +64,6 @@ pub async fn cpbs(network: Network, cp: String, protosys: String) -> Option<Hash
 }
 
 pub async fn tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>> {
-    log::info!("Getting all tokens on {}", network.name);
     match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(&config.tycho_api_key)) {
         Ok(client) => {
             let time = std::time::SystemTime::now();

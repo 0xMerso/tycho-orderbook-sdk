@@ -4,13 +4,13 @@ use crate::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
     r#static::maths::TEN_MILLIONS,
-    types::{MidPriceData, Network, OrderbookRequestBody, PairSimulatedOrderbook, ProtoTychoState, TradeResult},
+    types::{MidPriceData, Network, Orderbook, OrderbookRequestParams, ProtoTychoState, TradeResult},
 };
 use std::{collections::HashMap, time::Instant};
 
 /// @notice Reading 'state' from Redis DB while using TychoStreamState state and functions to compute/simulate might create a inconsistency
-pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, query: OrderbookRequestBody, t0_worth_eth: f64, t1_worth_eth: f64) -> PairSimulatedOrderbook {
-    log::info!("Got {} pools to compute for pair: '{}'", ptss.len(), query.tag);
+pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, query: OrderbookRequestParams, t0_worth_eth: f64, t1_worth_eth: f64) -> Orderbook {
+    log::info!("Building orderbook ... Got {} pools to compute for pair: '{}'", ptss.len(), query.tag);
     let mut pools = Vec::new();
     let mut prices0to1 = vec![];
     let mut prices1to0 = vec![];
@@ -63,7 +63,7 @@ pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<Srz
     pso.prices1to0 = prices1to0.clone();
     pso.aggt0lqdty = aggt0lqdty.clone();
     pso.aggt1lqdty = aggt1lqdty.clone();
-    log::info!("Optimization done. Returning Simulated Orderbook for pair (base-quote) => '{}-{}'", base.symbol, quote.symbol);
+    log::info!("Optimization done. Returning Simulated Orderbook for pair (base-quote) => '{}-{}'\n", base.symbol, quote.symbol);
     pso
 }
 
@@ -73,7 +73,7 @@ pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<Srz
  * The optimizer uses a simple gradient-based approach to move a fixed fraction of the allocation from the pool with the lowest marginal return to the one with the highest.
  * If the query specifies a specific token to sell with a specific amount, the optimizer will only run for that token and amount.
  */
-pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, body: OrderbookRequestBody, balances: HashMap<String, f64>, t0_worth_eth: f64, t1_worth_eth: f64) -> PairSimulatedOrderbook {
+pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, body: OrderbookRequestParams, balances: HashMap<String, f64>, t0_worth_eth: f64, t1_worth_eth: f64) -> Orderbook {
     let eth_usd = shd::core::gas::eth_usd().await;
     let gas_price = shd::core::gas::gas_price(network.rpc).await;
     let t0 = tokens[0].clone();
@@ -102,7 +102,7 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
     let mpd0to1 = mid_price_data(best0to1.clone(), best1to0.clone());
     let mpd1to0 = mid_price_data(best1to0.clone(), best0to1.clone());
 
-    let mut result = PairSimulatedOrderbook {
+    let mut result = Orderbook {
         token0: tokens[0].clone(),
         token1: tokens[1].clone(),
         pools: pools.clone(),
@@ -218,4 +218,9 @@ pub fn mid_price_data(trade0t1: TradeResult, trade1to0: TradeResult) -> MidPrice
     // log::info!(" - mid_price_data: spread: {}", spread);
     // log::info!(" - mid_price_data: spread_pct: {}", spread_pct);
     MidPriceData { best_ask, best_bid, mid, spread, spread_pct }
+}
+
+/// Check if a component has the desired tokens
+pub fn matchcp(cptks: Vec<SrzToken>, tokens: Vec<SrzToken>) -> bool {
+    tokens.iter().all(|token| cptks.iter().any(|cptk| cptk.address.eq_ignore_ascii_case(&token.address)))
 }

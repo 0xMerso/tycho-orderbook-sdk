@@ -72,17 +72,19 @@ pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) ->
 
 /**
  * Quote a path of tokens, using components and protosim Tycho functions
- * Used to calculate the price of a path of tokens
+ * Used to calculate the price of a path of tokens, mostly to ETH
  */
 pub fn quote(ptss: Vec<ProtoTychoState>, atks: Vec<SrzToken>, path: Vec<String>) -> Option<f64> {
     // If ETH, return 1. Else, if the path is empty, return None.
     if path.len() == 1 {
+        log::info!(" - Path is just ETH. Returning quote of 1.0");
         return Some(1.0);
     } else if path.len() < 2 {
+        log::info!("🔺 Path is too short: {:?}", path);
         return None;
     }
     let mut cumulative_price = 1.0;
-    // For each consecutive pair in the path...
+    // For each consecutive pair in the path ...
     for window in path.windows(2) {
         let token_in = window[0].to_lowercase();
         let token_out = window[1].to_lowercase();
@@ -110,9 +112,10 @@ pub fn quote(ptss: Vec<ProtoTychoState>, atks: Vec<SrzToken>, path: Vec<String>)
             }
         }
         if !found {
-            log::info!("🔺 No conversion state found for {} -> {}", token_in, token_out);
+            log::info!("🔺 Quote error: no conversion path found for {} -> {}", token_in, token_out);
             return None;
         }
     }
+    log::info!(" - One unit of token ({:?} to {:?}) quoted to ETH = {}", path.first(), path.last(), cumulative_price);
     Some(cumulative_price)
 }

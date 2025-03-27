@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 
@@ -9,7 +8,6 @@ use std::{
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::shd::data::fmt::SrzToken;
 use crate::shd::types::EnvConfig;
 
 pub mod log {
@@ -134,20 +132,9 @@ pub fn save1<T: Serialize>(output: T, file: &str) {
     file.flush().expect("Failed to flush file");
 }
 
-// Load Balances
-
-#[derive(Serialize, Deserialize, Debug)]
-struct NestedMap {
-    inner: HashMap<String, HashMap<String, u128>>,
-}
-
+/// Load balances from file. For testing purposes
 pub fn balances() -> HashMap<String, HashMap<String, u128>> {
     let data = fs::read_to_string("misc/data-back/ethereum.stream-balances.json").expect("Failed to read file");
     let parsed: HashMap<String, HashMap<String, u128>> = serde_json::from_str(&data).expect("JSON parsing failed");
     parsed
-}
-
-// Check if a component has the desired tokens
-pub fn matchcp(cptks: Vec<SrzToken>, tokens: Vec<SrzToken>) -> bool {
-    tokens.iter().all(|token| cptks.iter().any(|cptk| cptk.address.eq_ignore_ascii_case(&token.address)))
 }

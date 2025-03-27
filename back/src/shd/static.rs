@@ -21,6 +21,7 @@ pub mod maths {
 pub mod filter {
     pub static REMOVE_TVL_THRESHOLD: f64 = 1.; // 50 iteration maximum to optimize allocation
     pub static ADD_TVL_THRESHOLD: f64 = 500.; // 50 iteration maximum to optimize allocation
+    pub static NULL_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 }
 
 pub mod execution {

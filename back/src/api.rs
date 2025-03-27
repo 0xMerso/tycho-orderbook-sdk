@@ -1,15 +1,10 @@
-use axum::{
-    extract::Json as AxumExJson,
-    response::IntoResponse,
-    routing::get,
-    Extension, Json as AxumJson, Router,
-};
+use axum::{extract::Json as AxumExJson, response::IntoResponse, routing::get, Extension, Json as AxumJson, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tap2::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
-    types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, OrderbookRequestBody, PairSimulatedOrderbook, ProtoTychoState, SharedTychoStreamState, SyncState},
+    types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookRequestParams, ProtoTychoState, SharedTychoStreamState, SyncState},
 };
 
 use utoipa::OpenApi;
@@ -35,7 +30,7 @@ use utoipa_swagger_ui::SwaggerUi;
         execute
     ),
     components(
-        schemas(APIVersion, Network, Status, SrzToken, SrzProtocolComponent, PairSimulatedOrderbook, ExecutionPayload, ExecutionRequest)
+        schemas(APIVersion, Network, Status, SrzToken, SrzProtocolComponent, Orderbook, ExecutionPayload, ExecutionRequest)
     ),
     tags(
         (name = "API", description = "Endpoints")
@@ -204,7 +199,7 @@ async fn components(Extension(network): Extension<Network>) -> impl IntoResponse
 )]
 async fn execute(Extension(network): Extension<Network>, Extension(config): Extension<EnvConfig>, AxumExJson(execution): AxumExJson<ExecutionRequest>) -> impl IntoResponse {
     log::info!("👾 API: Querying execute endpoint: {:?}", execution);
-    
+
     match shd::core::execute::swap(network.clone(), execution.clone(), config.clone()).await {
         Ok(result) => AxumJson(json!({ "execute": result })),
         Err(e) => AxumJson(json!({ "execute": e.to_string() })),
@@ -217,43 +212,42 @@ async fn execute(Extension(network): Extension<Network>, Extension(config): Exte
     path = "/orderbook",
     summary = "Orderbook for a given pair of tokens",
     description = "Aggregate liquidity across AMMs, simulates an orderbook (bids/asks). Depending on the number of components (pool having t0 AND t1) and simulation input config, the orderbook can be more or less accurate, and the simulation can take up to severals minutes",
-    request_body = OrderbookRequestBody,
+    request_body = OrderbookRequestParams,
     responses(
-        (status = 200, description = "Contains trade simulations, results and components", body = PairSimulatedOrderbook)
+        (status = 200, description = "Contains trade simulations, results and components", body = Orderbook)
     ),
     tag = (
         "API"
     )
 )]
-async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extension(network): Extension<Network>, AxumExJson(params): AxumExJson<OrderbookRequestBody>) -> impl IntoResponse {
+async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extension(network): Extension<Network>, AxumExJson(params): AxumExJson<OrderbookRequestParams>) -> impl IntoResponse {
     let single = params.sps.is_some();
-    log::info!("👾 API: OrderbookRequestBody: {:?} | Single point: {}", params, single);
+    log::info!("👾 API: OrderbookRequestParams: {:?} | Single point: {}", params, single);
     match (_tokens(network.clone()).await, _components(network.clone()).await) {
         (Some(atks), Some(acps)) => {
             let target = params.tag.clone();
-            let tokens = target.split("-").map(|x| x.to_string().to_lowercase()).collect::<Vec<String>>();
-            let srzt0 = atks.iter().find(|x| x.address.to_lowercase() == tokens[0].clone());
-            let srzt1 = atks.iter().find(|x| x.address.to_lowercase() == tokens[1].clone());
+            let targets = target.split("-").map(|x| x.to_string().to_lowercase()).collect::<Vec<String>>();
+            let srzt0 = atks.iter().find(|x| x.address.to_lowercase() == targets[0].clone());
+            let srzt1 = atks.iter().find(|x| x.address.to_lowercase() == targets[1].clone());
             if srzt0.is_none() {
-                log::error!("Couldn't find tokens[0]: {}", tokens[0]);
+                log::error!("Couldn't find tokens[0]: {}", targets[0]);
                 return AxumJson(json!({ "orderbook": "Couldn't find tokens for pair tag given" }));
             } else if srzt1.is_none() {
-                log::error!("Couldn't find  tokens[1]: {}", tokens[1]);
+                log::error!("Couldn't find  tokens[1]: {}", targets[1]);
                 return AxumJson(json!({ "orderbook": "Couldn't find tokens for pair tag given" }));
             }
             let srzt0 = srzt0.unwrap();
             let srzt1 = srzt1.unwrap();
-            let tokens = vec![srzt0.clone(), srzt1.clone()];
-
+            let targets = vec![srzt0.clone(), srzt1.clone()];
             let (t0_to_eth_path, t0_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
             let (t1_to_eth_path, t1_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
             // log::info!("Path from {} to network.ETH is {:?}", srzt0.symbol, t0_to_eth_path);
-            if tokens.len() == 2 {
+            if targets.len() == 2 {
                 let mut ptss: Vec<ProtoTychoState> = vec![];
                 let mut to_eth_ptss: Vec<ProtoTychoState> = vec![];
                 for cp in acps.clone() {
                     let cptks = cp.tokens.clone();
-                    if shd::utils::misc::matchcp(cptks.clone(), tokens.clone()) {
+                    if shd::core::orderbook::matchcp(cptks.clone(), targets.clone()) {
                         let mtx = shtss.read().await;
                         match mtx.protosims.get(&cp.id.to_lowercase()) {
                             Some(protosim) => {
@@ -288,20 +282,27 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                     return AxumJson(json!({ "orderbook": "backend error: ProtoTychoState vector is empty" }));
                 }
                 // Token 0
-                let utk0_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t0_to_eth_path.clone()).unwrap_or_default();
-                let utk1_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t1_to_eth_path.clone()).unwrap_or_default();
-                log::info!(" - One unit of base token ({}) quoted to ETH = {}", srzt0.symbol, utk0_ethworth);
-                log::info!(" - One unit of quote token ({}) quoted to ETH = {}", srzt1.symbol, utk1_ethworth);
-                // let ptss = vec![ptss[0].clone()];
-                let result = shd::core::orderbook::build(network.clone(), ptss.clone(), tokens.clone(), params.clone(), utk0_ethworth, utk1_ethworth).await;
-                if !single {
-                    let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
-                    crate::shd::utils::misc::save1(result.clone(), path.as_str());
+                let utk0_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t0_to_eth_path.clone());
+                let utk1_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t1_to_eth_path.clone());
+                match (utk0_ethworth, utk1_ethworth) {
+                    (Some(utk0_ethworth), Some(utk1_ethworth)) => {
+                        let result = shd::core::orderbook::build(network.clone(), ptss.clone(), targets.clone(), params.clone(), utk0_ethworth, utk1_ethworth).await;
+                        if !single {
+                            let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
+                            crate::shd::utils::misc::save1(result.clone(), path.as_str());
+                        }
+                        AxumJson(json!({ "orderbook": result.clone() }))
+                    }
+                    _ => {
+                        let msg = format!("Couldn't find the quote path from {} to ETH", srzt0.symbol);
+                        log::error!("{}", msg);
+                        AxumJson(json!({ "orderbook": msg }))
+                    }
                 }
-                AxumJson(json!({ "orderbook": result.clone() }))
             } else {
-                log::error!("Query param Tag must contain only 2 tokens separated by a dash '-'");
-                AxumJson(json!({ "orderbook": "Query param Tag must contain only 2 tokens separated by a dash '-'." }))
+                let msg = format!("Couldn't find the pair of tokens for tag {} - Query param Tag must contain only 2 tokens separated by a dash '-'", target);
+                log::error!("{}", msg);
+                AxumJson(json!({ "orderbook": msg }))
             }
         }
         _ => {
