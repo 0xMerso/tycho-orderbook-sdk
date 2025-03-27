@@ -3,13 +3,13 @@ use tycho_simulation::{models::Token, protocol::state::ProtocolSim};
 use crate::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
-    r#static::maths::TEN_MILLIONS,
-    types::{MidPriceData, Network, Orderbook, OrderbookRequestParams, ProtoTychoState, TradeResult},
+    r#static::maths::{simu, TEN_MILLIONS},
+    types::{MidPriceData, Network, Orderbook, OrderbookRequestParams, OrderbookSimuFunctions, ProtoTychoState, TradeResult},
 };
 use std::{collections::HashMap, time::Instant};
 
 /// @notice Reading 'state' from Redis DB while using TychoStreamState state and functions to compute/simulate might create a inconsistency
-pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, query: OrderbookRequestParams, t0_worth_eth: f64, t1_worth_eth: f64) -> Orderbook {
+pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, query: OrderbookRequestParams, simufns: Option<OrderbookSimuFunctions>, t0_worth_eth: f64, t1_worth_eth: f64) -> Orderbook {
     log::info!("Building orderbook ... Got {} pools to compute for pair: '{}'", ptss.len(), query.tag);
     let mut pools = Vec::new();
     let mut prices0to1 = vec![];
@@ -58,7 +58,7 @@ pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<Srz
     let avgp0to1 = prices0to1.iter().sum::<f64>() / prices0to1.len() as f64;
     let avgp1to0 = prices1to0.iter().sum::<f64>() / prices1to0.len() as f64; // Ponderation by TVL ?
     log::info!("Average price 0to1: {} | Average price 1to0: {}", avgp0to1, avgp1to0);
-    let mut pso = simulate(network.clone(), pools.clone(), tokens, query.clone(), aggregated.clone(), t0_worth_eth, t1_worth_eth).await;
+    let mut pso = simulate(network.clone(), pools.clone(), tokens, query.clone(), simufns, aggregated.clone(), t0_worth_eth, t1_worth_eth).await;
     pso.prices0to1 = prices0to1.clone();
     pso.prices1to0 = prices1to0.clone();
     pso.aggt0lqdty = aggt0lqdty.clone();
@@ -73,7 +73,16 @@ pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<Srz
  * The optimizer uses a simple gradient-based approach to move a fixed fraction of the allocation from the pool with the lowest marginal return to the one with the highest.
  * If the query specifies a specific token to sell with a specific amount, the optimizer will only run for that token and amount.
  */
-pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, body: OrderbookRequestParams, balances: HashMap<String, f64>, t0_worth_eth: f64, t1_worth_eth: f64) -> Orderbook {
+pub async fn simulate(
+    network: Network,
+    pcsdata: Vec<ProtoTychoState>,
+    tokens: Vec<SrzToken>,
+    body: OrderbookRequestParams,
+    simufns: Option<OrderbookSimuFunctions>,
+    balances: HashMap<String, f64>,
+    t0_worth_eth: f64,
+    t1_worth_eth: f64,
+) -> Orderbook {
     let eth_usd = shd::core::gas::eth_usd().await;
     let gas_price = shd::core::gas::gas_price(network.rpc).await;
     let t0 = tokens[0].clone();
@@ -130,15 +139,54 @@ pub async fn simulate(network: Network, pcsdata: Vec<ProtoTychoState>, tokens: V
             }
         }
         None => {
+            let fn_opti = match simufns {
+                Some(fns) => fns.optimize,
+                None => optimize,
+            };
             // FuLL Orderbook optimization
-            let trades0to1 = optimize(&pcsdata, eth_usd, gas_price, &t0, &t1, *aggbt0, t1_worth_eth);
+            let trades0to1 = (fn_opti)(&pcsdata, eth_usd, gas_price, &t0, &t1, *aggbt0, t1_worth_eth);
             result.trades0to1 = trades0to1;
             log::info!(" 🔄  Switching to 1to0");
-            let trades1to0 = optimize(&pcsdata, eth_usd, gas_price, &t1, &t0, *aggbt1, t0_worth_eth);
+            let trades1to0 = (fn_opti)(&pcsdata, eth_usd, gas_price, &t1, &t0, *aggbt1, t0_worth_eth);
             result.trades1to0 = trades1to0;
         }
     }
     result
+}
+
+pub type OrderbookBuildFn = fn(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult>;
+
+pub fn optimize_fast(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
+    let mut trades = Vec::new();
+    let start = aggb / TEN_MILLIONS; // No longer needed: / 10f64.powi(from.decimals as i32);
+    log::info!("Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}", from.symbol, aggb, start, output_u_ethworth);
+    let steps = shd::maths::steps::exponential(
+        shd::r#static::maths::simu::COUNT_FAST,
+        shd::r#static::maths::simu::START_MULTIPLIER,
+        shd::r#static::maths::simu::END_MULTIPLIER,
+        shd::r#static::maths::simu::END_MULTIPLIER * shd::r#static::maths::simu::MIN_EXP_DELTA_PCT,
+    );
+    let steps = steps.iter().map(|x| x * start).collect::<Vec<f64>>();
+    for (x, amount) in steps.iter().enumerate() {
+        let tmstp = Instant::now();
+        let result = shd::maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
+        let elapsed = tmstp.elapsed().as_millis();
+        let gas_cost = result.gas_costs_usd.iter().sum::<f64>();
+        log::info!(
+            " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {} ms",
+            x,
+            result.amount,
+            from.symbol,
+            result.output,
+            to.symbol,
+            result.average_sell_price,
+            gas_cost,
+            result.distribution,
+            elapsed
+        );
+        trades.push(result);
+    }
+    trades
 }
 
 /**

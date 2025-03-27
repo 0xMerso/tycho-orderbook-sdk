@@ -10,6 +10,7 @@ pub mod maths {
     pub mod simu {
         // Config for incrementing amountIn
         pub static COUNT: usize = 25;
+        pub static COUNT_FAST: usize = 10;
         pub static START_MULTIPLIER: f64 = 1.;
         pub static END_MULTIPLIER: f64 = 2_500_000.; // 25% of TEN_MILLIONS
 

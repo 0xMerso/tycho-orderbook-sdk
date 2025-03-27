@@ -5,22 +5,22 @@ use crate::shd::{
 };
 use num_bigint::BigUint;
 use num_traits::{ToPrimitive, Zero};
-use tycho_simulation::{models::Token, protocol::state::ProtocolSim};
+use tycho_simulation::models::Token;
 
 /// A gradient-based optimizer that takes into account gas cost for activating an extra pool.
 /// Only “activate” an additional pool if the net benefit (output after gas cost) exceeds a fixed activation penalty.
 pub fn gradient(
     amount: f64, // human–readable amount (e.g. 100 meaning 100 ETH)
     pools: &Vec<ProtoTychoState>,
-    token_in: SrzToken,
-    token_out: SrzToken,
-    eth_usd: f64,           // ETH price in USD
-    gas_price: u128,        // Gas price in wei (or converted to wei)
-    output_u_ethworth: f64, // How much is one unit of token_out worth in ETH (e.g. 1.0 for ETH, 0.0005 for USDC)
+    tkinput: SrzToken,
+    tkoutput: SrzToken,
+    eth_usd: f64,       // ETH price in USD
+    gas_price: u128,    // Gas price in wei (or converted to wei)
+    out_eth_worth: f64, // How much is one unit of tkoutput worth in ETH (e.g. 1.0 for ETH, 0.0005 for USDC)
 ) -> TradeResult {
-    let token_in = Token::from(token_in.clone());
-    let token_out = Token::from(token_out.clone());
-    let amountpow = amount * 10f64.powi(token_in.decimals as i32).round();
+    let tkinput = Token::from(tkinput.clone());
+    let tkoutput = Token::from(tkoutput.clone());
+    let amountpow = amount * 10f64.powi(tkinput.decimals as i32).round();
     let amountpow = BigUint::from(amountpow as u128);
     let num_pools = pools.len();
 
@@ -35,12 +35,12 @@ pub fn gradient(
     let mut best_index = 0;
     let mut best_net_output = 0.0;
     for (i, pool) in pools.iter().enumerate() {
-        if let Ok(result) = pool.protosim.get_amount_out(amountpow.clone(), &token_in, &token_out) {
+        if let Ok(result) = pool.protosim.get_amount_out(amountpow.clone(), &tkinput, &tkoutput) {
             let gross_output = result.amount.to_f64().unwrap_or(0.0);
             // Compute gas cost in ETH: (gas * gas_price) / 1e18, then convert to output token units:
             let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or(0);
             let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18;
-            let gas_cost_in_output = gas_cost_eth / output_u_ethworth; // output token penalty
+            let gas_cost_in_output = gas_cost_eth / out_eth_worth; // output token penalty
             let net_output = gross_output - gas_cost_in_output;
             if net_output > best_net_output {
                 best_net_output = net_output;
@@ -61,11 +61,11 @@ pub fn gradient(
         for (i, pool) in pools.iter().enumerate() {
             let current_alloc = allocations[i].clone();
             // Evaluate net output at current allocation:
-            let base = if let Ok(result) = pool.protosim.get_amount_out(current_alloc.clone(), &token_in, &token_out) {
+            let base = if let Ok(result) = pool.protosim.get_amount_out(current_alloc.clone(), &tkinput, &tkoutput) {
                 let gross = result.amount.to_f64().unwrap_or(0.0);
                 let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or(0);
                 let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18;
-                let gas_cost_out = gas_cost_eth / output_u_ethworth;
+                let gas_cost_out = gas_cost_eth / out_eth_worth;
                 gross - gas_cost_out
             } else {
                 0.0
@@ -73,11 +73,11 @@ pub fn gradient(
 
             // Evaluate net output at (current_alloc + epsilon)
             let perturbed_alloc = &current_alloc + &epsilon;
-            let perturbed = if let Ok(result) = pool.protosim.get_amount_out(perturbed_alloc.clone(), &token_in, &token_out) {
+            let perturbed = if let Ok(result) = pool.protosim.get_amount_out(perturbed_alloc.clone(), &tkinput, &tkoutput) {
                 let gross = result.amount.to_f64().unwrap_or(0.0);
                 let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or(0);
                 let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18;
-                let gas_cost_out = gas_cost_eth / output_u_ethworth;
+                let gas_cost_out = gas_cost_eth / out_eth_worth;
                 gross - gas_cost_out
             } else {
                 0.0
@@ -86,10 +86,10 @@ pub fn gradient(
             let marginal = perturbed - base;
 
             let activation_penalty = if current_alloc.is_zero() {
-                if let Ok(result) = pool.protosim.get_amount_out(amountpow.clone(), &token_in, &token_out) {
+                if let Ok(result) = pool.protosim.get_amount_out(amountpow.clone(), &tkinput, &tkoutput) {
                     let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or(0);
                     let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18f64;
-                    gas_cost_eth / output_u_ethworth
+                    gas_cost_eth / out_eth_worth
                 } else {
                     0.0
                 }
@@ -123,25 +123,25 @@ pub fn gradient(
     // ------- Compute total net output (raw) and distribution -------
     let mut total_net_output: f64 = 0.0;
     let mut distribution: Vec<f64> = Vec::with_capacity(num_pools);
-    let mut gas_quantity: Vec<u128> = Vec::with_capacity(num_pools);
+    let mut gas_costs_unit: Vec<u128> = Vec::with_capacity(num_pools);
     let mut gas_costs_usd: Vec<f64> = Vec::with_capacity(num_pools);
     let mut gas_costs_output: Vec<f64> = Vec::with_capacity(num_pools);
     for (i, pool) in pools.iter().enumerate() {
         let alloc = allocations[i].clone();
         if !alloc.is_zero() {
-            if let Ok(result) = pool.protosim.get_amount_out(alloc.clone(), &token_in, &token_out) {
+            if let Ok(result) = pool.protosim.get_amount_out(alloc.clone(), &tkinput, &tkoutput) {
                 // Get the gross output as f64.
                 let gross_output = result.amount.to_f64().unwrap_or(0.0);
                 // Parse gas (as u128).
                 let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or_default();
-                gas_quantity.push(gas_units);
+                gas_costs_unit.push(gas_units);
                 // Compute gas cost in ETH: (gas_units * gas_price) / 1e18.
                 let gas_cost_eth = (gas_units * gas_price) as f64 / 1e18f64;
                 // Compute gas cost in USD if needed.
                 let gas_cost_usd_val = gas_cost_eth * eth_usd;
                 gas_costs_usd.push(gas_cost_usd_val);
                 // Convert gas cost in ETH to output token units:
-                let gas_cost_out = gas_cost_eth / output_u_ethworth;
+                let gas_cost_out = gas_cost_eth / out_eth_worth;
                 gas_costs_output.push(gas_cost_out);
                 // Compute net output = gross output minus gas cost in output tokens.
                 let net_output = (gross_output - gas_cost_out).max(0.0); // <--- Ensure non-negative.
@@ -153,37 +153,36 @@ pub fn gradient(
                 distribution.push((percent * 100.).round() / 100.);
             } else {
                 distribution.push(0.);
-                gas_quantity.push(0);
+                gas_costs_unit.push(0);
                 gas_costs_usd.push(0.);
                 gas_costs_output.push(0.);
             }
         } else {
             // If the allocation is zero.
             distribution.push(0.);
-            gas_quantity.push(0);
+            gas_costs_unit.push(0);
             gas_costs_usd.push(0.);
             gas_costs_output.push(0.);
         }
     }
 
     // Convert final amounts to human–readable values using token multipliers.
-    let token_in_multiplier = 10f64.powi(token_in.decimals as i32);
-    let token_out_multiplier = 10f64.powi(token_out.decimals as i32);
+    let tkinput_multiplier = 10f64.powi(tkinput.decimals as i32);
+    let tkoutput_multiplier = 10f64.powi(tkoutput.decimals as i32);
     // Here, total_net_output is the sum (in output token units) of each pool's net output (gross output minus gas cost)
     // We convert that to a human–readable output:
-    let output = total_net_output / token_out_multiplier;
+    let output = total_net_output / tkoutput_multiplier;
     // Also, compute the effective ratio (unit price) as the net output per unit of input.
     // Note that amountpow is the total input (in smallest units), so we first convert it to f64:
     let input_f = amountpow.to_f64().unwrap_or(1.0);
-    let average_sell_price = ((total_net_output * token_in_multiplier) / input_f) / token_out_multiplier;
+    let average_sell_price = ((total_net_output * tkinput_multiplier) / input_f) / tkoutput_multiplier;
 
     TradeResult {
         amount,
         output,
         distribution,
-        gas_costs: gas_quantity,
+        gas_costs: gas_costs_unit,
         gas_costs_usd,
-        // gas_costs_output,
         average_sell_price,
     }
 }

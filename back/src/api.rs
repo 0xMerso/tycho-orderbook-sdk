@@ -4,7 +4,7 @@ use serde_json::json;
 use tap2::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
-    types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookRequestParams, ProtoTychoState, SharedTychoStreamState, SyncState},
+    types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookRequestParams, OrderbookSimuFunctions, ProtoTychoState, SharedTychoStreamState, SyncState},
 };
 
 use utoipa::OpenApi;
@@ -286,7 +286,7 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                 let utk1_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t1_to_eth_path.clone());
                 match (utk0_ethworth, utk1_ethworth) {
                     (Some(utk0_ethworth), Some(utk1_ethworth)) => {
-                        let result = shd::core::orderbook::build(network.clone(), ptss.clone(), targets.clone(), params.clone(), utk0_ethworth, utk1_ethworth).await;
+                        let result = shd::core::orderbook::build(network.clone(), ptss.clone(), targets.clone(), params.clone(), None, utk0_ethworth, utk1_ethworth).await;
                         if !single {
                             let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
                             crate::shd::utils::misc::save1(result.clone(), path.as_str());
@@ -319,6 +319,7 @@ pub async fn start(n: Network, shared: SharedTychoStreamState, config: EnvConfig
     log::info!("Testing SharedTychoStreamState read = {:?} with {:?}", rstate.protosims.keys(), rstate.protosims.values());
     log::info!(" => rstate.states.keys and rstate.states.values => {:?} with {:?}", rstate.protosims.keys(), rstate.protosims.values());
     log::info!(" => rstate.components.keys and rstate.components.values => {:?} with {:?}", rstate.components.keys(), rstate.components.values());
+    log::info!(" => rstate.initialised => {:?} ", rstate.initialised);
     drop(rstate);
 
     // Add /api prefix

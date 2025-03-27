@@ -203,7 +203,10 @@ impl Display for SyncState {
 
 use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
 
-use super::data::fmt::{SrzProtocolComponent, SrzToken};
+use super::{
+    core::orderbook::OrderbookBuildFn,
+    data::fmt::{SrzProtocolComponent, SrzToken},
+};
 
 pub type SharedTychoStreamState = Arc<RwLock<TychoStreamState>>;
 
@@ -271,33 +274,10 @@ pub struct ProtoTychoState {
     pub protosim: Box<dyn ProtocolSim>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PairLiquidityBook {
-    pub from: SrzToken,
-    pub to: SrzToken,
-    pub orderbooks: Vec<LiquidityPoolBook>,
-}
-
-/// Whatever the protocol is, it must comply with this struct
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct LiquidityPoolBook {
-    pub address: String,  // Proto/PooL address
-    pub protocol: String, // Component Protocol name
-    // pub z0to1: bool,        // Zero to One as Uniswap expresses it
-    pub concentrated: bool, // Concentrated liquidity
-    pub fee: f64,           // Fee according to ProtoSim
-    pub price: f64,         // Price Spot (0 to 1 if z0to1 is true)
-    pub reserves: Vec<f64>, // reserves[0], reserves[1]
-    pub tick: i32,          // Current tick
-    pub spacing: u64,       // Tick spacing
-    pub bids: Vec<LiquidityTickAmounts>,
-    pub asks: Vec<LiquidityTickAmounts>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TradeResult {
     #[schema(example = "1.0")]
-    pub amount: f64, // e.g. 100 (meaning 100 ETH)
+    pub amount: f64, // e.g. 100 (meaning 100 ETH of input)
     #[schema(example = "2000.0")]
     pub output: f64, // in token_out human–readable units
     #[schema(example = "[0.42, 0.37, 0.21]")]
@@ -484,8 +464,11 @@ impl Default for OBPConfig {
     }
 }
 
+pub struct OrderbookSimuFunctions {
+    pub optimize: OrderbookBuildFn,
+}
+
 /// -- Tycho -- Orderbook Provider (OBP) that wraps a ProtocolStreamBuilder stream.
-/// It forwards block updates as events to the client while sharing an internal state.
 pub struct OrderbookProvider {
     /// The spawned task handle is stored to ensure the task remains running.
     pub _handle: JoinHandle<()>,

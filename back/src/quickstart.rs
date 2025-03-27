@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
 use tap2::shd::data::fmt::SrzToken;
-use tap2::shd::types::{EnvConfig, OBPConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState};
+use tap2::shd::types::{EnvConfig, OBPConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookRequestParams, OrderbookSimuFunctions, SharedTychoStreamState, TychoStreamState};
 use tokio::sync::RwLock;
 
 use tap2::shd;
@@ -36,7 +36,7 @@ async fn main() {
     let wbtc = SrzToken::from(hmt.get(&Bytes::from_str(network.wbtc.as_str()).unwrap()).unwrap_or_else(|| panic!("WBTC not found on {}", network.name)).clone());
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
     // tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), usdc.address.clone().to_lowercase()), None);
-    // tracked.insert(format!("{}-{}", usdc.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
+    tracked.insert(format!("{}-{}", usdc.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
     tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
     // --- --- --- --- ---
     // Create the OBP provider from the protocol stream builder and shared state.
@@ -45,6 +45,7 @@ async fn main() {
     let mut _obp = builder.build(config.clone(), xstate).await.expect("Failed to build OBP. Retry or check logs");
     let obp = Arc::new(_obp);
     let state = Arc::clone(&obp.state);
+
     log::info!("OBP Client started. Waiting for updates");
     loop {
         // Loop indefinitely over the stream, printing received events.
@@ -60,8 +61,11 @@ async fn main() {
                     // First
                     for (k, v) in tracked.clone().iter() {
                         if v.is_none() {
+                            let simufns = OrderbookSimuFunctions {
+                                optimize: shd::core::orderbook::optimize_fast,
+                            };
                             log::info!("OBP Event: Orderbook {} isn't build yet, building it ...", k.clone());
-                            match obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }).await {
+                            match obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
                                 Ok(orderbook) => {
                                     log::info!("OBP Event: Orderbook received");
                                     tracked.insert(k.clone(), Some(orderbook.clone()));
@@ -89,8 +93,11 @@ async fn main() {
                                 }
                             }
                             if refresh {
-                                log::info!("Orderbook {}-{} has changed, need to update it", current.token0.symbol, current.token1.symbol);
-                                if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }).await {
+                                log::info!(" ⚖️ Orderbook {}-{} has changed, need to update it", current.token0.symbol, current.token1.symbol);
+                                let simufns = OrderbookSimuFunctions {
+                                    optimize: shd::core::orderbook::optimize_fast,
+                                };
+                                if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
                                     log::info!("OBP Event: Orderbook updated");
                                     tracked.insert(k.clone(), Some(newob));
                                 } else {

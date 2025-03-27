@@ -1,3 +1,26 @@
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PairLiquidityBook {
+    pub from: SrzToken,
+    pub to: SrzToken,
+    pub orderbooks: Vec<LiquidityPoolBook>,
+}
+
+/// Whatever the protocol is, it must comply with this struct
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct LiquidityPoolBook {
+    pub address: String,  // Proto/PooL address
+    pub protocol: String, // Component Protocol name
+    // pub z0to1: bool,        // Zero to One as Uniswap expresses it
+    pub concentrated: bool, // Concentrated liquidity
+    pub fee: f64,           // Fee according to ProtoSim
+    pub price: f64,         // Price Spot (0 to 1 if z0to1 is true)
+    pub reserves: Vec<f64>, // reserves[0], reserves[1]
+    pub tick: i32,          // Current tick
+    pub spacing: u64,       // Tick spacing
+    pub bids: Vec<LiquidityTickAmounts>,
+    pub asks: Vec<LiquidityTickAmounts>,
+}
+
 use crate::shd::{
     data::fmt::{SrzEVMPoolState, SrzProtocolComponent, SrzToken, SrzUniswapV2State, SrzUniswapV3State, SrzUniswapV4State},
     maths::{self},
