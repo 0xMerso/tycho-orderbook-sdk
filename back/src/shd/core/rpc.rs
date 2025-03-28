@@ -23,9 +23,13 @@ use crate::shd::types::IERC20;
  * let res = shd::core::client::get_component_balances(network.clone(), config.clone(), "0x391e8501b626c623d39474afca6f9e46c2686649".to_string(), ps).await;
  * dbg!(res);
  */
-pub async fn get_component_balances(network: Network, cp: String, protosys: String) -> Option<HashMap<String, u128>> {
+pub async fn get_component_balances(network: Network, cp: String, protosys: String, api_token: Option<String>) -> Option<HashMap<String, u128>> {
     // log::info!("Getting component balances on {}", network.name);
-    let client = match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some("sampletoken")) {
+    let key: &str = match &api_token {
+        Some(t) => t.as_str(),
+        None => "sampletoken",
+    };
+    let client = match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(key)) {
         Ok(client) => client,
         Err(e) => {
             log::error!("Failed to create client: {:?}", e.to_string());

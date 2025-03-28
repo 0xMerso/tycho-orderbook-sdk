@@ -111,6 +111,7 @@ impl OrderbookProvider {
                     _handle: handle,
                     tokens: ob.tokens.clone(),
                     network: ob.network.clone(),
+                    api_token: ob.api_token.clone(),
                 };
 
                 Ok(obp)
@@ -194,9 +195,17 @@ impl OrderbookProvider {
         let unit_base_eth_worth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), base_to_eth_path.clone());
         let unit_quote_eth_worth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), quote_to_eth_path.clone());
         match (unit_base_eth_worth, unit_quote_eth_worth) {
-            (Some(unit_base_eth_worth), Some(unit_quote_eth_worth)) => {
-                Ok(shd::core::book::build(self.network.clone(), ptss.clone(), targets.clone(), params.clone(), simufns, unit_base_eth_worth, unit_quote_eth_worth).await)
-            }
+            (Some(unit_base_eth_worth), Some(unit_quote_eth_worth)) => Ok(shd::core::book::build(
+                self.network.clone(),
+                self.api_token.clone(),
+                ptss.clone(),
+                targets.clone(),
+                params.clone(),
+                simufns,
+                unit_base_eth_worth,
+                unit_quote_eth_worth,
+            )
+            .await),
             _ => Err(anyhow::anyhow!("Failed to quote the pair in ETH")),
         }
     }

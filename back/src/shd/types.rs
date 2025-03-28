@@ -487,6 +487,8 @@ pub struct OrderbookProvider {
     pub stream: Mutex<mpsc::Receiver<OBPEvent>>, // mpsc::Receiver<OBPEvent>,
     /// The shared state, accessible both to the internal task and the client.
     pub state: SharedTychoStreamState,
+    /// The API token used to facilitate the Tycho queries
+    pub api_token: Option<String>,
 }
 
 /// Orderbook builder, used to create the OBP
@@ -494,6 +496,7 @@ pub struct OrderbookBuilder {
     pub network: Network,
     pub psb: ProtocolStreamBuilder,
     pub tokens: Vec<SrzToken>,
+    pub api_token: Option<String>,
 }
 
 /// Aggregated liquidit for a array of components

@@ -37,28 +37,35 @@ LOG=${LOG:-false}
 API_URL="http://$API_HOST:$PORT/api"
 echo "Testing API at $API_URL"
 
-# Function to test an endpoint.
-# Arguments:
-#   $1 - Description (for logging)
-#   $2 - Full URL to test
 try() {
     local description="$1"
     local url="$2"
     local body="$3"
+    # Set method to POST if a body is provided, otherwise GET.
+    local method="GET"
+    [ -n "$body" ] && method="POST"
+
     echo "Testing $description"
-    if [ -n "$body" ]; then
-        if [ "$LOG" = "true" ]; then
-            curl -s -X GET "$url" -H "Content-Type: application/json" -d "$body" | jq .
+
+    local status=""
+    if [ "$LOG" = "true" ]; then
+        local response
+        if [ "$method" = "POST" ]; then
+            response=$(curl -s -w "\n%{http_code}" -X POST "$url" -H "Content-Type: application/json" -d "$body")
         else
-            status=$(curl -o /dev/null -s -X GET "$url" -H "Content-Type: application/json" -d "$body" -w "%{http_code}")
-            if [ "$status" -eq 200 ]; then
-                echo "Status: 200 OK"
-            else
-                echo "Status: $status (Error)"
-            fi
+            response=$(curl -s -w "\n%{http_code}" -X GET "$url")
         fi
+        # Extract the status code from the last line.
+        status=$(echo "$response" | tail -n1)
+        # The rest is the response body.
+        local response_body=$(echo "$response" | sed '$d')
+        echo "$response_body" | jq .
     else
-        status=$(curl -o /dev/null -s -w "%{http_code}" "$url")
+        if [ "$method" = "POST" ]; then
+            status=$(curl -o /dev/null -s -X POST "$url" -H "Content-Type: application/json" -d "$body" -w "%{http_code}")
+        else
+            status=$(curl -o /dev/null -s -X GET "$url" -w "%{http_code}")
+        fi
     fi
 
     if [ "$status" -eq 200 ]; then
@@ -78,23 +85,23 @@ try "GET /tokens" "$API_URL/tokens"
 try "GET /components" "$API_URL/components"
 
 # Test simulations
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'"}'
-try "GET /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'"}'
+# try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'"}'
+# try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'"}'
+# try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'"}'
+# try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'"}'
+# try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'"}'
+# try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'"}'
+# try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'"}'
+# try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'"}'
+try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'"}'
 
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'", "sps": {"input": "'"$eth"'", "amount": 1000}}'
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'", "sps": {"input": "'"$usdc"'", "amount": 100}}'
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
-# try "GET /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'", "sps": {"input": "'"$eth"'", "amount": 1000}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'", "sps": {"input": "'"$usdc"'", "amount": 100}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'

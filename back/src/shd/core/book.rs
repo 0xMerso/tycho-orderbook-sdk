@@ -1,4 +1,4 @@
-use tycho_simulation::{models::Token, protocol::state::ProtocolSim};
+use tycho_simulation::models::Token;
 
 use crate::shd::{
     self,
@@ -11,6 +11,7 @@ use std::{collections::HashMap, time::Instant};
 /// @notice Reading 'state' from Redis DB while using TychoStreamState state and functions to compute/simulate might create a inconsistency
 pub async fn build(
     network: Network,
+    api_token: Option<String>,
     ptss: Vec<ProtoTychoState>,
     tokens: Vec<SrzToken>,
     query: OrderbookRequestParams,
@@ -47,7 +48,7 @@ pub async fn build(
             price_base_to_quote,
             price_quote_to_base
         );
-        if let Some(cpbs) = shd::core::rpc::get_component_balances(network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone()).await {
+        if let Some(cpbs) = shd::core::rpc::get_component_balances(network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone(), api_token.clone()).await {
             let base_bal = cpbs.get(&srzt0.address.to_lowercase()).unwrap_or(&0u128);
             let base_bal = *base_bal as f64 / 10f64.powi(srzt0.decimals as i32);
             base_lqdty.push(base_bal);
@@ -62,14 +63,14 @@ pub async fn build(
     }
     let cps: Vec<SrzProtocolComponent> = pools.clone().iter().map(|p| p.component.clone()).collect();
     let aggregated = shd::maths::steps::deepth(cps.clone(), tokens.clone(), balances.clone());
-    let avgp0to1 = prices_base_to_quote.iter().sum::<f64>() / prices_base_to_quote.len() as f64;
-    let avgp1to0 = prices_quote_to_base.iter().sum::<f64>() / prices_quote_to_base.len() as f64; // Ponderation by TVL ?
-    log::info!("Average price 0to1: {} | Average price 1to0: {}", avgp0to1, avgp1to0);
+    let avg_price_base_to_quote = prices_base_to_quote.iter().sum::<f64>() / prices_base_to_quote.len() as f64;
+    let avg_price_quote_to_base = prices_quote_to_base.iter().sum::<f64>() / prices_quote_to_base.len() as f64; // Ponderation by TVL ?
+    log::info!("Average price 0to1: {} | Average price 1to0: {}", avg_price_base_to_quote, avg_price_quote_to_base);
     let mut pso = simulate(network.clone(), pools.clone(), tokens, query.clone(), simufns, aggregated.clone(), base_worth_eth, quote_worth_eth).await;
-    pso.prices_base_to_quote = prices_base_to_quote.clone();
-    pso.prices_quote_to_base = prices_quote_to_base.clone();
+    pso.prices_base_to_quote = prices_base_to_quote;
+    pso.prices_quote_to_base = prices_quote_to_base;
     pso.base_lqdty = base_lqdty.clone();
-    quote_lqdty = quote_lqdty.clone();
+    pso.quote_lqdty = quote_lqdty.clone();
     log::info!("Optimization done. Returning Simulated Orderbook for pair (base-quote) => '{}-{}'\n", base.symbol, quote.symbol);
     pso
 }

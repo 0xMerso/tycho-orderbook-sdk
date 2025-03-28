@@ -1,4 +1,9 @@
-use axum::{extract::Json as AxumExJson, response::IntoResponse, routing::get, Extension, Json as AxumJson, Router};
+use axum::{
+    extract::Json as AxumExJson,
+    response::IntoResponse,
+    routing::{get, post},
+    Extension, Json as AxumJson, Router,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tap2::shd::{
@@ -185,9 +190,9 @@ async fn components(Extension(network): Extension<Network>) -> impl IntoResponse
     }
 }
 
-// GET /execute => Execute a trade
+// POST /execute => Execute a trade
 #[utoipa::path(
-    get,
+    post,
     path = "/execute",
     summary = "Build transaction for a given orderbook point",
     request_body = ExecutionRequest,
@@ -206,9 +211,9 @@ async fn execute(Extension(network): Extension<Network>, Extension(config): Exte
     }
 }
 
-// GET /orderbook/{0xt0-0xt1} => Simulate the orderbook
+// POST /orderbook/{0xt0-0xt1} => Simulate the orderbook
 #[utoipa::path(
-    get,
+    post,
     path = "/orderbook",
     summary = "Orderbook for a given pair of tokens",
     description = "Aggregate liquidity across AMMs, simulates an orderbook (bids/asks). Depending on the number of components (pool having t0 AND t1) and simulation input config, the orderbook can be more or less accurate, and the simulation can take up to severals minutes",
@@ -285,7 +290,7 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                 let unit_quote_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), quote_to_eth_path.clone());
                 match (unit_base_ethworth, unit_quote_ethworth) {
                     (Some(unit_base_ethworth), Some(unit_quote_ethworth)) => {
-                        let result = shd::core::book::build(network.clone(), ptss.clone(), targets.clone(), params.clone(), None, unit_base_ethworth, unit_quote_ethworth).await;
+                        let result = shd::core::book::build(network.clone(), None, ptss.clone(), targets.clone(), params.clone(), None, unit_base_ethworth, unit_quote_ethworth).await;
                         if !single {
                             let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
                             crate::shd::utils::misc::save1(result.clone(), path.as_str());
@@ -336,8 +341,8 @@ pub async fn start(n: Network, shared: SharedTychoStreamState, config: EnvConfig
         .route("/status", get(status))
         .route("/tokens", get(tokens))
         .route("/components", get(components))
-        .route("/orderbook", get(orderbook))
-        .route("/execute", get(execute))
+        .route("/orderbook", post(orderbook))
+        .route("/execute", post(execute))
         // Swagger
         .layer(Extension(shared.clone())) // Shared state
         .layer(Extension(n.clone()))

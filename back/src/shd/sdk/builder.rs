@@ -68,11 +68,21 @@ impl OrderbookBuilder {
                 .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::BalancerV2.to_string().as_str(), filter.clone(), Some(balancer))
                 .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::Curve.to_string().as_str(), filter.clone(), Some(curve));
         }
-        OrderbookBuilder { network, psb, tokens: srzt }
+        OrderbookBuilder {
+            network,
+            psb,
+            tokens: srzt,
+            api_token: Some(config.tycho_api_key.clone()),
+        }
     }
 
-    pub async fn custom(network: Network, psb: ProtocolStreamBuilder, tokens: Vec<SrzToken>) -> Self {
-        OrderbookBuilder { network, psb, tokens }
+    pub async fn custom(network: Network, psb: ProtocolStreamBuilder, tokens: Vec<SrzToken>, api_token: String) -> Self {
+        OrderbookBuilder {
+            network,
+            psb,
+            tokens,
+            api_token: Some(api_token),
+        }
     }
 
     pub async fn build(self, config: OBPConfig, state: SharedTychoStreamState) -> Result<OrderbookProvider, StreamError> {
