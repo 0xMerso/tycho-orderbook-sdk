@@ -42,6 +42,11 @@ async fn stream(network: Network, shdstate: SharedTychoStreamState, config: EnvC
             hmt.insert(t.address.clone(), t.clone());
         });
         let srztokens = tokens.iter().map(|t| SrzToken::from(t.clone())).collect::<Vec<SrzToken>>();
+        // for t in srztokens.iter() {
+        //     if t.symbol.to_lowercase().contains("btc") {
+        //         log::info!("Token: {} at {}", t.symbol, t.address.to_lowercase());
+        //     }
+        // }
         let key = keys::stream::tokens(network.name.clone());
         shd::data::redis::set(key.as_str(), srztokens.clone()).await;
         log::info!("Connecting to >>> ProtocolStreamBuilder <<< at {} on {:?} ...\n", network.tycho, chain);

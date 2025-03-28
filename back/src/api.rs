@@ -232,8 +232,8 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
         (Some(atks), Some(acps)) => {
             let target = params.tag.clone();
             let targets = target.split("-").map(|x| x.to_string().to_lowercase()).collect::<Vec<String>>();
-            let srzt0 = atks.iter().find(|x| x.address.to_lowercase() == targets[0].clone());
-            let srzt1 = atks.iter().find(|x| x.address.to_lowercase() == targets[1].clone());
+            let srzt0 = atks.iter().find(|x| x.address.to_lowercase() == targets[0].clone().to_lowercase());
+            let srzt1 = atks.iter().find(|x| x.address.to_lowercase() == targets[1].clone().to_lowercase());
             if srzt0.is_none() {
                 log::error!("Couldn't find tokens[0]: {}", targets[0]);
                 return AxumJson(json!({ "orderbook": "Couldn't find tokens for pair tag given" }));
