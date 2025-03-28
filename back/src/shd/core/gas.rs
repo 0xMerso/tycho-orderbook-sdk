@@ -38,13 +38,17 @@ pub async fn gas_price(provider: String) -> u128 {
  * Used to retrieve eth usd price
  */
 pub async fn eth_usd() -> f64 {
-    match reqwest::get(COINGECKO_ETH_USD).await {
+    let price = match reqwest::get(COINGECKO_ETH_USD).await {
         Ok(response) => match response.json::<CoinGeckoResponse>().await {
             Ok(data) => data.ethereum.usd,
-            Err(_) => 0.0,
+            Err(_) => 2000.0,
         },
-        Err(_) => 0.0,
+        Err(_) => 2000.0,
+    };
+    if price == 0. {
+        log::error!("Failed to get ETH price from CoinGecko, returning 2000.");
     }
+    price
 }
 
 pub fn pricing(network: Network, ptss: Vec<ProtoTychoState>, atks: Vec<SrzToken>, input: String) -> Option<(f64, Vec<String>)> {

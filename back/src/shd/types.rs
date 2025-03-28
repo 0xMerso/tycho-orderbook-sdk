@@ -403,8 +403,8 @@ pub struct TradeResult {
 /// Orderbook data used to compute spread, and other metrics
 #[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MidPriceData {
-    pub best_ask: f64,
-    pub best_bid: f64,
+    pub ask: f64,
+    pub bid: f64,
     pub mid: f64,
     pub spread: f64,
     pub spread_pct: f64,
@@ -504,9 +504,9 @@ pub struct OrderbookBuilder {
     pub api_token: Option<String>,
 }
 
-/// Aggregated liquidit for a array of components
-pub struct OnChainLiquidity {
-    pub tokens: Vec<String>,
-    pub total: Vec<u128>,
-    pub splits: Vec<(String, f64)>, // Component ID -> % of total
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderbookDepth {
+    pub last_update_id: u64,
+    pub bids: Vec<(String, String)>,
+    pub asks: Vec<(String, String)>,
 }

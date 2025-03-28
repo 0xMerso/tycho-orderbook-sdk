@@ -10,7 +10,7 @@ use tycho_simulation::tycho_core::Bytes;
 
 #[tokio::main]
 async fn main() {
-    shd::utils::misc::log::new("obpc".to_string());
+    shd::utils::misc::log::new("quickstart".to_string());
     dotenv::from_filename(".env.prod").ok(); // Use .env.ex for testing
     let env = EnvConfig::new();
     log::info!("Launching OBP Client on {} | 🧪 Testing mode: {:?}", env.network, env.testing);
@@ -52,9 +52,9 @@ async fn main() {
             .clone(),
     );
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
-    tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), usdc.address.clone().to_lowercase()), None);
-    tracked.insert(format!("{}-{}", usdc.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
-    tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
+    // tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), usdc.address.clone().to_lowercase()), None);
+    tracked.insert(format!("{}-{}", wbtc.address.clone().to_lowercase(), usdc.address.clone().to_lowercase()), None);
+    // tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
     // --- --- --- --- ---
 
     // Create the OBP provider from the protocol stream builder and shared state.
@@ -74,13 +74,13 @@ async fn main() {
                     log::info!("Event: Initialised: : ✅ Initialised at block {}", block);
                 }
                 OBPEvent::NewHeader(block, updated) => {
-                    log::info!("Event: NewHeader: ⛏️ #{} with {} components updated", block, updated.len());
+                    log::info!("Event: NewHeader: #{} with {} components updated", block, updated.len());
 
                     // First
                     for (k, v) in tracked.clone().iter() {
                         if v.is_none() {
                             let simufns = OrderbookFunctions { optimize: shd::core::book::optifast };
-                            log::info!("OBP Event: Orderbook {} isn't build yet, building it ...", k.clone());
+                            log::info!("🧱 OBP Event: Orderbook {} isn't build yet, building it ...", k.clone());
                             match obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
                                 Ok(orderbook) => {
                                     log::info!("OBP Event: Orderbook received");
@@ -99,7 +99,7 @@ async fn main() {
                             for (x, cp) in cps.iter().enumerate() {
                                 if updated.contains(&cp.id.to_lowercase()) {
                                     log::info!(
-                                        "- Component #{x} {} {} for {}-{} orderbook has changed, need to update it",
+                                        "- 📍 Component #{x} {} {} for {}-{} orderbook has changed, need to update it",
                                         cp.id,
                                         cp.protocol_type_name,
                                         current.base.symbol,
@@ -113,7 +113,15 @@ async fn main() {
                                 let simufns = OrderbookFunctions { optimize: shd::core::book::optifast };
                                 if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
                                     log::info!("OBP Event: Orderbook updated");
-                                    tracked.insert(k.clone(), Some(newob));
+                                    tracked.insert(k.clone(), Some(newob.clone()));
+
+                                    let depth = newob.depth(None);
+                                    for d in depth.bids {
+                                        log::info!("bids: {:?}", d);
+                                    }
+                                    for d in depth.asks {
+                                        log::info!("asks: {:?}", d);
+                                    }
                                 } else {
                                     log::error!("OBP Event: Error updating orderbook");
                                 }

@@ -86,7 +86,7 @@ impl OrderbookBuilder {
     }
 
     pub async fn build(self, config: OBPConfig, state: SharedTychoStreamState) -> Result<OrderbookProvider, StreamError> {
-        log::info!("Building OBP ... (it might take a while, also depends on the API key)");
+        log::info!("Building OBP ... (it might take a while depending the API key)");
         OrderbookProvider::build(self, config, state).await
     }
 }

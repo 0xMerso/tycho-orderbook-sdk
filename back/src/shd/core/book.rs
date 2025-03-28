@@ -28,7 +28,7 @@ pub async fn build(
     let srzt1 = tokens[1].clone();
     let t0 = Token::from(srzt0.clone());
     let t1 = Token::from(srzt1.clone());
-    // ! Assume that the first token is the base and the second is the quote, so bid = buy base and ask = sell base. It's the responsibility of the caller to ensure this.
+    // ! Assume that the first token is the base and the second is the quote, so bid = 'buy base', and ask = 'sell base'. It's the responsibility of the caller to ensure this.
     let (base, quote) = (t0, t1);
     let mut base_lqdty = vec![];
     let mut quote_lqdty = vec![];
@@ -274,24 +274,18 @@ pub fn best(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &Sr
  * ! We assume that => trade_base_to_quote = ask and trade_quote_to_base = bid
  */
 pub fn midprice(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResult) -> MidPriceData {
-    let best_ask = trade_base_to_quote.average_sell_price;
-    let best_bid = 1. / trade_quote_to_base.average_sell_price;
-    let mid = (best_ask + best_bid) / 2.;
-    let spread = (best_ask - best_bid).abs();
+    let ask = trade_base_to_quote.average_sell_price; // buy quote
+    let bid = 1. / trade_quote_to_base.average_sell_price; // buy base
+    let mid = (ask + bid) / 2.;
+    let spread = (ask - bid).abs();
     let spread_pct = (spread / mid) * 100.;
-    // log::info!(" - midprice: best_ask: {}", best_ask);
-    // log::info!(" - midprice: best_bid: {}", best_bid);
+    // log::info!(" - midprice: ask: {}", ask);
+    // log::info!(" - midprice: bid: {}", bid);
     // log::info!(" - midprice: trade_quote_to_base.ratio: {}", trade_quote_to_base.ratio);
     // log::info!(" - midprice: mid: {}", mid);
     // log::info!(" - midprice: spread: {}", spread);
     // log::info!(" - midprice: spread_pct: {}", spread_pct);
-    MidPriceData {
-        best_ask,
-        best_bid,
-        mid,
-        spread,
-        spread_pct,
-    }
+    MidPriceData { ask, bid, mid, spread, spread_pct }
 }
 
 /// Check if a component has the desired tokens

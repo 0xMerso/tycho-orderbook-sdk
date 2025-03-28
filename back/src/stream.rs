@@ -52,7 +52,7 @@ async fn stream(network: Network, shdstate: SharedTychoStreamState, config: EnvC
                     match msg {
                         Ok(msg) => {
                             log::info!(
-                                "🔸 PSB: block # {} with {} state, {} new and {} removed",
+                                "🔸 Stream: block # {} with {} state, {} new and {} removed",
                                 msg.block_number,
                                 msg.states.len(),
                                 msg.new_pairs.len(),
