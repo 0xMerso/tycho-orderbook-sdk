@@ -25,8 +25,8 @@ async fn main() {
     log::info!("Tycho Stream for '{}' network", network.name.clone());
     // Create cross/shared state for the protocol stream
     let xstate: SharedTychoStreamState = Arc::new(RwLock::new(TychoStreamState {
-        protosims: HashMap::new(),  // Customize with your actual types
-        components: HashMap::new(), // Customize with your actual types
+        protosims: HashMap::new(),
+        components: HashMap::new(),
         initialised: false,
     }));
 
@@ -52,10 +52,11 @@ async fn main() {
             .clone(),
     );
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
-    // tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), usdc.address.clone().to_lowercase()), None);
+    tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), usdc.address.clone().to_lowercase()), None);
     tracked.insert(format!("{}-{}", usdc.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
     tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
     // --- --- --- --- ---
+
     // Create the OBP provider from the protocol stream builder and shared state.
     let builder = OrderbookBuilder::new(network.clone(), env.clone(), Some(tokens.clone())).await;
     let config = OBPConfig { capacity: 100 };
