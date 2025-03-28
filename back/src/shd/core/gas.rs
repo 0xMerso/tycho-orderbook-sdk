@@ -21,6 +21,14 @@ struct CryptoPrice {
 /**
  * Used to retrieve gas price
  */
+pub async fn get_latest_block(provider: String) -> u64 {
+    let provider = ProviderBuilder::new().on_http(provider.parse().unwrap());
+    provider.get_block_number().await.unwrap_or_default()
+}
+
+/**
+ * Used to retrieve gas price
+ */
 pub async fn gas_price(provider: String) -> u128 {
     let provider = ProviderBuilder::new().on_http(provider.parse().unwrap());
     provider.get_gas_price().await.unwrap_or_default()

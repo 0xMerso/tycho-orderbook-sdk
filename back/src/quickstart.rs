@@ -79,9 +79,7 @@ async fn main() {
                     // First
                     for (k, v) in tracked.clone().iter() {
                         if v.is_none() {
-                            let simufns = OrderbookFunctions {
-                                optimize: shd::core::book::optimize_fast,
-                            };
+                            let simufns = OrderbookFunctions { optimize: shd::core::book::optifast };
                             log::info!("OBP Event: Orderbook {} isn't build yet, building it ...", k.clone());
                             match obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
                                 Ok(orderbook) => {
@@ -112,9 +110,7 @@ async fn main() {
                             }
                             if refresh {
                                 log::info!(" ⚖️ Orderbook {}-{} has changed, need to update it", current.base.symbol, current.quote.symbol);
-                                let simufns = OrderbookFunctions {
-                                    optimize: shd::core::book::optimize_fast,
-                                };
+                                let simufns = OrderbookFunctions { optimize: shd::core::book::optifast };
                                 if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
                                     log::info!("OBP Event: Orderbook updated");
                                     tracked.insert(k.clone(), Some(newob));

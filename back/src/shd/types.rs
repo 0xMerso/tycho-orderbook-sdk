@@ -413,6 +413,10 @@ pub struct MidPriceData {
 /// FuLL orderbook data response. Key struct of the SDK
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Orderbook {
+    /// Block number of the orderbook, state at which the orderbook was built
+    pub block: u64,
+    /// When the orderbook started to be built (seconds since epoch)
+    pub timestamp: u64,
     /// Token0. Input and output token
     pub base: SrzToken,
     /// Token1. Output then output token
@@ -473,6 +477,7 @@ impl Default for OBPConfig {
 /// If None, default simple and naive optimization is used, including gas costs.
 pub struct OrderbookFunctions {
     pub optimize: OrderbookQuoteFn,
+    // pub generate_steps: OrderbookStepFn, // ToDo
 }
 
 /// SDK prderbook provider (OBP) that wraps a ProtocolStreamBuilder stream

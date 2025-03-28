@@ -3,10 +3,11 @@ use tycho_simulation::models::Token;
 use crate::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
-    r#static::maths::{simu, TEN_MILLIONS},
+    r#static::maths::{simu, BEST_BID_ASK_ETH_BPS, BPD, TEN_MILLIONS},
     types::{MidPriceData, Network, Orderbook, OrderbookFunctions, OrderbookRequestParams, ProtoTychoState, TradeResult},
 };
-use std::{collections::HashMap, time::Instant};
+use rayon::prelude::*;
+use std::{collections::HashMap, time::Instant}; // Ensure Rayon is in your dependencies.
 
 /// @notice Reading 'state' from Redis DB while using TychoStreamState state and functions to compute/simulate might create a inconsistency
 pub async fn build(
@@ -91,8 +92,10 @@ pub async fn simulate(
     base_worth_eth: f64,
     quote_worth_eth: f64,
 ) -> Orderbook {
+    let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs();
     let eth_usd = shd::core::gas::eth_usd().await;
-    let gas_price = shd::core::gas::gas_price(network.rpc).await;
+    let gas_price = shd::core::gas::gas_price(network.rpc.clone()).await;
+    let latest = shd::core::gas::get_latest_block(network.rpc.clone()).await;
     let base = tokens[0].clone();
     let quote = tokens[1].clone();
     let aggb_base = balances.iter().find(|x| x.0.to_lowercase() == base.address.to_lowercase()).unwrap().1;
@@ -110,7 +113,7 @@ pub async fn simulate(
     );
 
     let pools = pcsdata.iter().map(|x| x.component.clone()).collect::<Vec<SrzProtocolComponent>>();
-    let amount_eth = 1. / 1000.; // 1/100 of ETH = ~2$ (for 2000$ ETH)
+    let amount_eth = BEST_BID_ASK_ETH_BPS / BPD; // 1/100 of ETH = ~2$ (for 2000$ ETH)
     let amount_test_best_base_to_quote = amount_eth / base_worth_eth;
     let amount_test_best_quote_to_base = amount_eth / quote_worth_eth;
     let best_base_to_quote = best(&pcsdata, eth_usd, gas_price, &base, &quote, amount_test_best_base_to_quote, quote_worth_eth);
@@ -119,6 +122,8 @@ pub async fn simulate(
     let mpd_quote_to_base = midprice(best_quote_to_base.clone(), best_base_to_quote.clone());
 
     let mut result = Orderbook {
+        block: latest,
+        timestamp,
         base: tokens[0].clone(),
         quote: tokens[1].clone(),
         pools: pools.clone(),
@@ -161,7 +166,7 @@ pub async fn simulate(
 
 pub type OrderbookQuoteFn = fn(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult>;
 
-pub fn optimize_fast(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
+pub fn optifast(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
     let mut trades = Vec::new();
     let start = aggb / TEN_MILLIONS; // No longer needed: / 10f64.powi(from.decimals as i32);
     log::info!(
@@ -199,8 +204,6 @@ pub fn optimize_fast(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, 
     }
     trades
 }
-
-use rayon::prelude::*; // Ensure Rayon is in your dependencies.
 
 /**
  * Executes the optimizer for a given token pair and a set of pools.

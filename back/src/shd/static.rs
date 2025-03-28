@@ -6,6 +6,7 @@ pub mod maths {
     pub static ONE_PERCENT_IN_MN: f64 = 10_000.; // 1% in millionths
     pub static MAX_ITERATIONS: u32 = 50; // 50 iteration maximum to optimize allocation
     pub static FRACTION_REALLOC: u32 = 10; // 50 iteration maximum to optimize allocation
+    pub static BEST_BID_ASK_ETH_BPS: f64 = 10.; // 10/10_000 = 0.001 ETH = ~2$
 
     pub mod simu {
         // Config for incrementing amountIn
