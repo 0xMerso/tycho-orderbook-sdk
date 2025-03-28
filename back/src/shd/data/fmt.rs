@@ -111,7 +111,12 @@ impl SrzProtocolComponent {
 impl From<ProtocolComponent> for SrzProtocolComponent {
     fn from(pc: ProtocolComponent) -> Self {
         //  "key_lp_fee" || k == "fee"
-        let fee_value = pc.static_attributes.iter().find(|(k, _)| *k == "key_lp_fee" || *k == "fee").map(|(_, v)| v.to_string()).unwrap_or_default();
+        let fee_value = pc
+            .static_attributes
+            .iter()
+            .find(|(k, _)| *k == "key_lp_fee" || *k == "fee")
+            .map(|(_, v)| v.to_string())
+            .unwrap_or_default();
         SrzProtocolComponent {
             address: pc.id.to_string().to_lowercase(),
             id: pc.id.to_string().to_lowercase(),
@@ -123,7 +128,7 @@ impl From<ProtocolComponent> for SrzProtocolComponent {
             static_attributes: pc.static_attributes.into_iter().map(|(k, v)| (k, v.to_string())).collect(),
             creation_tx: pc.creation_tx.to_string(),
             // bck_created_at: pc.created_at, // Backup for reverse ::from
-            fee: crate::shd::core::amms::feebps(pc.protocol_type_name.to_string().clone(), pc.id.to_string().clone(), fee_value),
+            fee: crate::shd::core::rpc::feebps(pc.protocol_type_name.to_string().clone(), pc.id.to_string().clone(), fee_value),
         }
     }
 }

@@ -63,6 +63,7 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 alloy-primitives = "0.8.23"
 axum-macros = "0.5.0"
 rayon = "1.10.0"
+async-trait = "0.1.88"
 
 # utoipa-redoc = "6.0.0"
 # utoipa-rapidoc = "6.0.0"

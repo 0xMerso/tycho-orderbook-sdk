@@ -33,11 +33,15 @@ static ROUTER_ADDRESSES: LazyLock<HashMap<ChainSimu, tycho_simulation::tycho_cor
     HashMap::from([
         (
             ChainSimu::Ethereum,
-            "0x023eea66B260FA2E109B0764774837629cC41FeF".parse::<tycho_simulation::tycho_core::Bytes>().expect("Failed to create Ethereum router address"),
+            "0x023eea66B260FA2E109B0764774837629cC41FeF"
+                .parse::<tycho_simulation::tycho_core::Bytes>()
+                .expect("Failed to create Ethereum router address"),
         ),
         (
             ChainSimu::Base,
-            "0x94ebf984511b06bab48545495b754760bfaa566e".parse::<tycho_simulation::tycho_core::Bytes>().expect("Failed to create Base router address"),
+            "0x94ebf984511b06bab48545495b754760bfaa566e"
+                .parse::<tycho_simulation::tycho_core::Bytes>()
+                .expect("Failed to create Base router address"),
         ),
     ])
 });
@@ -183,7 +187,7 @@ pub async fn swap(network: Network, request: ExecutionRequest, config: EnvConfig
         }
     };
     let provider = ProviderBuilder::new().with_chain(nchain).on_http(network.rpc.parse().expect("Failed to parse RPC_URL"));
-    match super::client::erc20b(&provider, request.sender.clone(), vec![request.input.address.clone()]).await {
+    match super::rpc::erc20b(&provider, request.sender.clone(), vec![request.input.address.clone()]).await {
         Ok(balances) => {
             log::info!("Building swap calldata and transactions ...");
             if let Some(solution) = prepare(network.clone(), chain, &provider, request.clone(), config.clone(), balances).await {

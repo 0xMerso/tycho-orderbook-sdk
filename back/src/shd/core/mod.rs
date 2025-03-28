@@ -1,5 +1,4 @@
-pub mod amms;
-pub mod client;
-pub mod execute;
+pub mod book;
+pub mod exec;
 pub mod gas;
-pub mod orderbook;
+pub mod rpc;

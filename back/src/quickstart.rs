@@ -16,7 +16,12 @@ async fn main() {
     log::info!("Launching OBP Client on {} | 🧪 Testing mode: {:?}", env.network, env.testing);
     let path = "src/shd/config/networks.json".to_string();
     let networks: Vec<Network> = shd::utils::misc::read(&path);
-    let network = networks.clone().into_iter().filter(|x| x.enabled).find(|x| x.name == env.network).expect("Network not found or not enabled");
+    let network = networks
+        .clone()
+        .into_iter()
+        .filter(|x| x.enabled)
+        .find(|x| x.name == env.network)
+        .expect("Network not found or not enabled");
     log::info!("Tycho Stream for '{}' network", network.name.clone());
     // Create cross/shared state for the protocol stream
     let xstate: SharedTychoStreamState = Arc::new(RwLock::new(TychoStreamState {
@@ -26,14 +31,26 @@ async fn main() {
     }));
 
     // --- Testing|Demo ---
-    let tokens = shd::core::client::tokens(&network, &env).await.unwrap();
+    let tokens = shd::core::rpc::tokens(&network, &env).await.unwrap();
     let mut hmt = HashMap::new();
     tokens.iter().for_each(|t| {
         hmt.insert(t.address.clone(), t.clone());
     });
-    let weth = SrzToken::from(hmt.get(&Bytes::from_str(network.eth.as_str()).unwrap()).unwrap_or_else(|| panic!("WETH not found on {}", network.name)).clone());
-    let usdc = SrzToken::from(hmt.get(&Bytes::from_str(network.usdc.as_str()).unwrap()).unwrap_or_else(|| panic!("USDC not found on {}", network.name)).clone());
-    let wbtc = SrzToken::from(hmt.get(&Bytes::from_str(network.wbtc.as_str()).unwrap()).unwrap_or_else(|| panic!("WBTC not found on {}", network.name)).clone());
+    let weth = SrzToken::from(
+        hmt.get(&Bytes::from_str(network.eth.as_str()).unwrap())
+            .unwrap_or_else(|| panic!("WETH not found on {}", network.name))
+            .clone(),
+    );
+    let usdc = SrzToken::from(
+        hmt.get(&Bytes::from_str(network.usdc.as_str()).unwrap())
+            .unwrap_or_else(|| panic!("USDC not found on {}", network.name))
+            .clone(),
+    );
+    let wbtc = SrzToken::from(
+        hmt.get(&Bytes::from_str(network.wbtc.as_str()).unwrap())
+            .unwrap_or_else(|| panic!("WBTC not found on {}", network.name))
+            .clone(),
+    );
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
     // tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), usdc.address.clone().to_lowercase()), None);
     tracked.insert(format!("{}-{}", usdc.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
@@ -62,7 +79,7 @@ async fn main() {
                     for (k, v) in tracked.clone().iter() {
                         if v.is_none() {
                             let simufns = OrderbookFunctions {
-                                optimize: shd::core::orderbook::optimize_fast,
+                                optimize: shd::core::book::optimize_fast,
                             };
                             log::info!("OBP Event: Orderbook {} isn't build yet, building it ...", k.clone());
                             match obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
@@ -86,16 +103,16 @@ async fn main() {
                                         "- Component #{x} {} {} for {}-{} orderbook has changed, need to update it",
                                         cp.id,
                                         cp.protocol_type_name,
-                                        current.token0.symbol,
-                                        current.token1.symbol
+                                        current.base.symbol,
+                                        current.quote.symbol
                                     );
                                     refresh = true;
                                 }
                             }
                             if refresh {
-                                log::info!(" ⚖️ Orderbook {}-{} has changed, need to update it", current.token0.symbol, current.token1.symbol);
+                                log::info!(" ⚖️ Orderbook {}-{} has changed, need to update it", current.base.symbol, current.quote.symbol);
                                 let simufns = OrderbookFunctions {
-                                    optimize: shd::core::orderbook::optimize_fast,
+                                    optimize: shd::core::book::optimize_fast,
                                 };
                                 if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
                                     log::info!("OBP Event: Orderbook updated");
@@ -104,7 +121,7 @@ async fn main() {
                                     log::error!("OBP Event: Error updating orderbook");
                                 }
                             } else {
-                                log::info!("Orderbook {}-{} hasn't changed, no need to update it", current.token0.symbol, current.token1.symbol);
+                                log::info!("Orderbook {}-{} hasn't changed, no need to update it", current.base.symbol, current.quote.symbol);
                             }
                         }
                     }

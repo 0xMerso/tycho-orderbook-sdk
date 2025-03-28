@@ -35,6 +35,8 @@ use super::types::{OBPConfig, OrderbookRequestParams};
 use super::types::{Orderbook, OrderbookBuilder};
 use super::types::{OrderbookFunctions, ProtoTychoState};
 
+/// OrderbookBuilder is a struct that allows the creation of an OrderbookProvider instance, using a default or custom ProtocolStreamBuilder from Tycho.
+
 impl OrderbookBuilder {
     /**
      * Default logic to create a ProtocolStreamBuilder, used to build a OrderbookProvider
@@ -48,7 +50,7 @@ impl OrderbookBuilder {
         let filter = ComponentFilter::with_tvl_range(REMOVE_TVL_THRESHOLD, ADD_TVL_THRESHOLD);
         let tokens = match tokens {
             Some(t) => t,
-            None => shd::core::client::tokens(&network, &config).await.unwrap(),
+            None => shd::core::rpc::tokens(&network, &config).await.unwrap(),
         };
         let mut hmt = HashMap::new();
         let mut srzt = vec![];
@@ -87,6 +89,8 @@ impl OrderbookBuilder {
     }
 }
 
+/// OrderbookProvider is a struct that manages the protocol stream and shared state, and provides methods to interact with the stream, build orderbooks, and more.
+///
 impl OrderbookProvider {
     /// Creates a new OBP instance using a ProtocolStreamBuilder (from Tycho) with custom configuration
     /// # Arguments
@@ -120,7 +124,13 @@ impl OrderbookProvider {
                         drop(mtx);
                         match update {
                             Ok(msg) => {
-                                log::info!("🔸 OBP: TychoStream: b#{} with {} states, pairs: +{} -{}", msg.block_number, msg.states.len(), msg.new_pairs.len(), msg.removed_pairs.len());
+                                log::info!(
+                                    "🔸 OBP: TychoStream: b#{} with {} states, pairs: +{} -{}",
+                                    msg.block_number,
+                                    msg.states.len(),
+                                    msg.new_pairs.len(),
+                                    msg.removed_pairs.len()
+                                );
                                 if !initialised {
                                     log::info!("First stream (initialised was false). Writing the entire streamed data into the shared struct.");
                                     let mut targets = vec![];
@@ -196,7 +206,7 @@ impl OrderbookProvider {
         }
         for (_k, v) in comp.iter() {
             let tokens: Vec<SrzToken> = v.tokens.clone().iter().map(|x| SrzToken::from(x.clone())).collect();
-            if shd::core::orderbook::matchcp(tokens, targets.clone()) {
+            if shd::core::book::matchcp(tokens, targets.clone()) {
                 output.push(SrzProtocolComponent::from(v.clone()));
             }
         }
@@ -214,17 +224,25 @@ impl OrderbookProvider {
             return Err(anyhow::anyhow!("Invalid pair"));
         }
         let atks = self.tokens.clone();
-        let srzt0 = atks.iter().find(|x| x.address.to_lowercase() == targets[0].clone()).ok_or_else(|| anyhow::anyhow!("Token {} not found", targets[0])).unwrap();
-        let srzt1 = atks.iter().find(|x| x.address.to_lowercase() == targets[1].clone()).ok_or_else(|| anyhow::anyhow!("Token {} not found", targets[0])).unwrap();
+        let srzt0 = atks
+            .iter()
+            .find(|x| x.address.to_lowercase() == targets[0].clone())
+            .ok_or_else(|| anyhow::anyhow!("Token {} not found", targets[0]))
+            .unwrap();
+        let srzt1 = atks
+            .iter()
+            .find(|x| x.address.to_lowercase() == targets[1].clone())
+            .ok_or_else(|| anyhow::anyhow!("Token {} not found", targets[0]))
+            .unwrap();
         let targets = vec![srzt0.clone(), srzt1.clone()];
         log::info!("Building orderbook for pair {}-{} | Single point: {}", targets[0].symbol.clone(), targets[1].symbol.clone(), single);
-        let (t0_to_eth_path, t0_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
-        let (t1_to_eth_path, t1_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
+        let (base_to_eth_path, base_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
+        let (quote_to_eth_path, quote_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
 
         let mut to_eth_ptss: Vec<ProtoTychoState> = vec![];
         let mut ptss: Vec<ProtoTychoState> = vec![];
         for cp in acps.clone() {
-            if t0_to_eth_comps.contains(&cp.id.to_lowercase()) || t1_to_eth_comps.contains(&cp.id.to_lowercase()) {
+            if base_to_eth_comps.contains(&cp.id.to_lowercase()) || quote_to_eth_comps.contains(&cp.id.to_lowercase()) {
                 if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
                     to_eth_ptss.push(ProtoTychoState {
                         component: cp.clone(),
@@ -232,7 +250,7 @@ impl OrderbookProvider {
                     });
                 }
             }
-            if shd::core::orderbook::matchcp(cp.tokens.clone(), targets.clone()) {
+            if shd::core::book::matchcp(cp.tokens.clone(), targets.clone()) {
                 if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
                     ptss.push(ProtoTychoState {
                         component: cp.clone(),
@@ -246,12 +264,11 @@ impl OrderbookProvider {
             return Err(anyhow::anyhow!("No components found for the given pair"));
         }
         log::info!("Found {} components for the pair. Evaluation t0/t1 ETH value ...", ptss.len());
-        let utk0_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t0_to_eth_path.clone());
-        let utk1_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t1_to_eth_path.clone());
-        match (utk0_ethworth, utk1_ethworth) {
-            (Some(utk0_ethworth), Some(utk1_ethworth)) => {
-                let book = shd::core::orderbook::build(self.network.clone(), ptss.clone(), targets.clone(), params.clone(), simufns, utk0_ethworth, utk1_ethworth).await;
-                Ok(book)
+        let unit_base_eth_worth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), base_to_eth_path.clone());
+        let unit_quote_eth_worth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), quote_to_eth_path.clone());
+        match (unit_base_eth_worth, unit_quote_eth_worth) {
+            (Some(unit_base_eth_worth), Some(unit_quote_eth_worth)) => {
+                Ok(shd::core::book::build(self.network.clone(), ptss.clone(), targets.clone(), params.clone(), simufns, unit_base_eth_worth, unit_quote_eth_worth).await)
             }
             _ => Err(anyhow::anyhow!("Failed to quote the pair in ETH")),
         }
@@ -298,7 +315,4 @@ impl OrderbookProvider {
         }
         OrderbookRequestParams { tag, sps: None }
     }
-    pub async fn depth(&self) {} // with Option
-
-    // ToDo: traits/interfaces
 }

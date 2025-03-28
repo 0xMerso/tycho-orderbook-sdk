@@ -329,7 +329,7 @@ pub fn chain_timing(name: String) -> u64 {
 }
 
 use super::{
-    core::orderbook::OrderbookQuoteFn,
+    core::book::OrderbookQuoteFn,
     data::fmt::{SrzProtocolComponent, SrzToken},
 };
 use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
@@ -355,7 +355,10 @@ pub struct ProtoTychoState {
 /// Orderbook request params used to build a orderbook for a given pair
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct OrderbookRequestParams {
-    /// Pair uniq identifier: token0-token1
+    /// Pair uniq identifier: token0-token1 => base-quote
+    /// Example: ETH/USDC
+    /// - Bid = buy orders for the base asset (ETH) priced in USDC
+    /// - Ask = sell orders for the base asset (ETH) priced in USDC.
     pub tag: String,
     /// Optional single point simulation, used to simulate 1 trade only
     pub sps: Option<SinglePointSimulation>,
@@ -411,33 +414,33 @@ pub struct MidPriceData {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Orderbook {
     /// Token0. Input and output token
-    pub token0: SrzToken,
+    pub base: SrzToken,
     /// Token1. Output then output token
-    pub token1: SrzToken,
+    pub quote: SrzToken,
     /// Prices from token0 to token1. Always divided by decimals
-    pub prices0to1: Vec<f64>,
+    pub prices_base_to_quote: Vec<f64>,
     /// Prices from token1 to token0. Always divided by decimals
-    pub prices1to0: Vec<f64>,
+    pub prices_quote_to_base: Vec<f64>,
     /// Array of resulat for the optimal single hop route
-    pub trades0to1: Vec<TradeResult>,
+    pub bids: Vec<TradeResult>,
     /// Array of resulat for the optimal single hop route
-    pub trades1to0: Vec<TradeResult>,
+    pub asks: Vec<TradeResult>,
     /// Cumulated liquidity for token0, always divided by decimals, combining all pools/components
-    pub aggt0lqdty: Vec<f64>,
+    pub base_lqdty: Vec<f64>,
     /// Cumulated liquidity for token0, always divided by decimals, combining all pools/components
-    pub aggt1lqdty: Vec<f64>,
+    pub quote_lqdty: Vec<f64>,
     /// All components used to build the orderbook (= pools that include both token0 and token1)
     pub pools: Vec<SrzProtocolComponent>,
     /// Current value of ETH in USD
     pub eth_usd: f64,
     /// Mid price data for token0 to token1
-    pub mpd0to1: MidPriceData,
+    pub mpd_base_to_quote: MidPriceData,
     /// Mid price data for token1 to token0
-    pub mpd1to0: MidPriceData,
+    pub mpd_quote_to_base: MidPriceData,
     /// One unit, multi-hop spot_price, needed to value the TVL and other stuff
-    pub t0_worth_eth: f64,
+    pub base_worth_eth: f64,
     /// One unit, multi-hop spot_price, needed to value the TVL and other stuff
-    pub t1_worth_eth: f64,
+    pub quote_worth_eth: f64,
 }
 
 /// Client side structs

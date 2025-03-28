@@ -9,58 +9,67 @@ use crate::shd::{
 use std::{collections::HashMap, time::Instant};
 
 /// @notice Reading 'state' from Redis DB while using TychoStreamState state and functions to compute/simulate might create a inconsistency
-pub async fn build(network: Network, ptss: Vec<ProtoTychoState>, tokens: Vec<SrzToken>, query: OrderbookRequestParams, simufns: Option<OrderbookFunctions>, t0_worth_eth: f64, t1_worth_eth: f64) -> Orderbook {
+pub async fn build(
+    network: Network,
+    ptss: Vec<ProtoTychoState>,
+    tokens: Vec<SrzToken>,
+    query: OrderbookRequestParams,
+    simufns: Option<OrderbookFunctions>,
+    base_worth_eth: f64,
+    quote_worth_eth: f64,
+) -> Orderbook {
     log::info!("Building orderbook ... Got {} pools to compute for pair: '{}'", ptss.len(), query.tag);
     let mut pools = Vec::new();
-    let mut prices0to1 = vec![];
-    let mut prices1to0 = vec![];
+    let mut prices_base_to_quote = vec![];
+    let mut prices_quote_to_base = vec![];
     let srzt0 = tokens[0].clone();
     let srzt1 = tokens[1].clone();
     let t0 = Token::from(srzt0.clone());
     let t1 = Token::from(srzt1.clone());
+    // ! Assume that the first token is the base and the second is the quote, so bid = buy base and ask = sell base. It's the responsibility of the caller to ensure this.
     let (base, quote) = (t0, t1);
-    let mut aggt0lqdty = vec![];
-    let mut aggt1lqdty = vec![];
+    let mut base_lqdty = vec![];
+    let mut quote_lqdty = vec![];
     let mut balances = HashMap::new();
     for pdata in ptss.clone() {
         pools.push(pdata.clone());
         let proto = pdata.protosim.clone();
-        let price0to1 = proto.spot_price(&base, &quote).unwrap_or_default();
-        let price1to0 = proto.spot_price(&quote, &base).unwrap_or_default();
-        prices0to1.push(price0to1);
-        prices1to0.push(price1to0);
+        let price_base_to_quote = proto.spot_price(&base, &quote).unwrap_or_default();
+        let price_quote_to_base = proto.spot_price(&quote, &base).unwrap_or_default();
+        prices_base_to_quote.push(price_base_to_quote);
+        prices_quote_to_base.push(price_quote_to_base);
         log::info!(
-            "- Pool: {} | {} | Spot price for {}-{} => price0to1 = {} and price1to0 = {}",
+            "- Pool: {} | {} | Spot price for {}-{} => price_base_to_quote = {} and price_quote_to_base = {}",
             pdata.component.id,
             pdata.component.protocol_type_name,
             base.symbol,
             quote.symbol,
-            price0to1,
-            price1to0
+            price_base_to_quote,
+            price_quote_to_base
         );
-        if let Some(cpbs) = shd::core::client::cpbs(network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone()).await {
-            let t0b = cpbs.get(&srzt0.address.to_lowercase()).unwrap_or(&0u128);
-            let t0b = *t0b as f64 / 10f64.powi(srzt0.decimals as i32);
-            aggt0lqdty.push(t0b);
-            let t1b = cpbs.get(&srzt1.address.to_lowercase()).unwrap_or(&0u128);
-            let t1b = *t1b as f64 / 10f64.powi(srzt1.decimals as i32);
-            aggt1lqdty.push(t1b);
+        if let Some(cpbs) = shd::core::rpc::get_component_balances(network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone()).await {
+            let base_bal = cpbs.get(&srzt0.address.to_lowercase()).unwrap_or(&0u128);
+            let base_bal = *base_bal as f64 / 10f64.powi(srzt0.decimals as i32);
+            base_lqdty.push(base_bal);
+            let quote_bal = cpbs.get(&srzt1.address.to_lowercase()).unwrap_or(&0u128);
+            let quote_bal = *quote_bal as f64 / 10f64.powi(srzt1.decimals as i32);
+            quote_lqdty.push(quote_bal);
             let mut tmpb = HashMap::new();
-            tmpb.insert(srzt0.address.clone(), t0b);
-            tmpb.insert(srzt1.address.clone(), t1b);
+            tmpb.insert(srzt0.address.clone(), base_bal);
+            tmpb.insert(srzt1.address.clone(), quote_bal);
             balances.insert(pdata.component.id.clone().to_lowercase(), tmpb);
         }
     }
     let cps: Vec<SrzProtocolComponent> = pools.clone().iter().map(|p| p.component.clone()).collect();
     let aggregated = shd::maths::steps::deepth(cps.clone(), tokens.clone(), balances.clone());
-    let avgp0to1 = prices0to1.iter().sum::<f64>() / prices0to1.len() as f64;
-    let avgp1to0 = prices1to0.iter().sum::<f64>() / prices1to0.len() as f64; // Ponderation by TVL ?
+    let avgp0to1 = prices_base_to_quote.iter().sum::<f64>() / prices_base_to_quote.len() as f64;
+    let avgp1to0 = prices_quote_to_base.iter().sum::<f64>() / prices_quote_to_base.len() as f64; // Ponderation by TVL ?
     log::info!("Average price 0to1: {} | Average price 1to0: {}", avgp0to1, avgp1to0);
-    let mut pso = simulate(network.clone(), pools.clone(), tokens, query.clone(), simufns, aggregated.clone(), t0_worth_eth, t1_worth_eth).await;
-    pso.prices0to1 = prices0to1.clone();
-    pso.prices1to0 = prices1to0.clone();
-    pso.aggt0lqdty = aggt0lqdty.clone();
-    pso.aggt1lqdty = aggt1lqdty.clone();
+    let mut pso = simulate(network.clone(), pools.clone(), tokens, query.clone(), simufns, aggregated.clone(), base_worth_eth, quote_worth_eth).await;
+    pso.prices_base_to_quote = prices_base_to_quote.clone();
+    pso.prices_quote_to_base = prices_quote_to_base.clone();
+    pso.base_lqdty = base_lqdty.clone();
+    quote_lqdty = quote_lqdty.clone();
     log::info!("Optimization done. Returning Simulated Orderbook for pair (base-quote) => '{}-{}'\n", base.symbol, quote.symbol);
     pso
 }
@@ -78,62 +87,59 @@ pub async fn simulate(
     body: OrderbookRequestParams,
     simufns: Option<OrderbookFunctions>,
     balances: HashMap<String, f64>,
-    t0_worth_eth: f64,
-    t1_worth_eth: f64,
+    base_worth_eth: f64,
+    quote_worth_eth: f64,
 ) -> Orderbook {
     let eth_usd = shd::core::gas::eth_usd().await;
     let gas_price = shd::core::gas::gas_price(network.rpc).await;
-    let t0 = tokens[0].clone();
-    let t1 = tokens[1].clone();
-    let aggbt0 = balances.iter().find(|x| x.0.to_lowercase() == t0.address.to_lowercase()).unwrap().1;
-    let aggbt1 = balances.iter().find(|x| x.0.to_lowercase() == t1.address.to_lowercase()).unwrap().1;
+    let base = tokens[0].clone();
+    let quote = tokens[1].clone();
+    let aggb_base = balances.iter().find(|x| x.0.to_lowercase() == base.address.to_lowercase()).unwrap().1;
+    let aggb_quote = balances.iter().find(|x| x.0.to_lowercase() == quote.address.to_lowercase()).unwrap().1;
 
     log::info!(
         "🔎 Optimisation | Network: {} | ETH is worth {} in USD | Got {} pools to optimize for pair: {}-{} with aggbs {:.4} and {:.4}",
         network.name,
         eth_usd,
         pcsdata.len(),
-        t0.symbol,
-        t1.symbol,
-        aggbt0,
-        aggbt1
+        base.symbol,
+        quote.symbol,
+        aggb_base,
+        aggb_quote
     );
-    let pools = pcsdata.iter().map(|x| x.component.clone()).collect::<Vec<SrzProtocolComponent>>();
 
-    // Best bid/ask. Need to remove gas consideration here ? I don't think so
+    let pools = pcsdata.iter().map(|x| x.component.clone()).collect::<Vec<SrzProtocolComponent>>();
     let amount_eth = 1. / 1000.; // 1/100 of ETH = ~2$ (for 2000$ ETH)
-    let amount_test_best0to1 = amount_eth / t0_worth_eth;
-    let amount_test_best1to0 = amount_eth / t1_worth_eth;
-    let best0to1 = best(&pcsdata, eth_usd, gas_price, &t0, &t1, amount_test_best0to1, t1_worth_eth);
-    let best1to0 = best(&pcsdata, eth_usd, gas_price, &t1, &t0, amount_test_best1to0, t0_worth_eth);
-    let mpd0to1 = midprice(best0to1.clone(), best1to0.clone());
-    let mpd1to0 = midprice(best1to0.clone(), best0to1.clone());
+    let amount_test_best_base_to_quote = amount_eth / base_worth_eth;
+    let amount_test_best_quote_to_base = amount_eth / quote_worth_eth;
+    let best_base_to_quote = best(&pcsdata, eth_usd, gas_price, &base, &quote, amount_test_best_base_to_quote, quote_worth_eth);
+    let best_quote_to_base = best(&pcsdata, eth_usd, gas_price, &quote, &base, amount_test_best_quote_to_base, base_worth_eth);
+    let mpd_base_to_quote = midprice(best_base_to_quote.clone(), best_quote_to_base.clone());
+    let mpd_quote_to_base = midprice(best_quote_to_base.clone(), best_base_to_quote.clone());
 
     let mut result = Orderbook {
-        token0: tokens[0].clone(),
-        token1: tokens[1].clone(),
+        base: tokens[0].clone(),
+        quote: tokens[1].clone(),
         pools: pools.clone(),
-        trades0to1: vec![], // Set depending query params
-        trades1to0: vec![], // Set depending query params
-        prices0to1: vec![], // Set later
-        prices1to0: vec![], // Set later
-        aggt0lqdty: vec![], // Set later
-        aggt1lqdty: vec![], // Set later
+        bids: vec![],                 // Set depending query params
+        asks: vec![],                 // Set depending query params
+        prices_base_to_quote: vec![], // Set later
+        prices_quote_to_base: vec![], // Set later
+        base_lqdty: vec![],           // Set later
+        quote_lqdty: vec![],          // Set later
         eth_usd,
-        // best0to1: best0to1.clone(),
-        // best1to0: best1to0.clone(),
-        mpd0to1: mpd0to1.clone(),
-        mpd1to0: mpd1to0.clone(),
-        t0_worth_eth,
-        t1_worth_eth,
+        mpd_base_to_quote: mpd_base_to_quote.clone(),
+        mpd_quote_to_base: mpd_quote_to_base.clone(),
+        base_worth_eth,
+        quote_worth_eth,
     };
     match body.sps {
         Some(spsq) => {
             log::info!(" 🎯 Partial Optimisation: input: {} and amount: {}", spsq.input, spsq.amount);
-            if spsq.input.to_lowercase() == t0.address.to_lowercase() {
-                result.trades0to1 = vec![shd::maths::opti::gradient(spsq.amount, &pcsdata, t0.clone(), t1.clone(), eth_usd, gas_price, t1_worth_eth)];
-            } else if spsq.input.to_lowercase() == t1.address.to_lowercase() {
-                result.trades1to0 = vec![shd::maths::opti::gradient(spsq.amount, &pcsdata, t1.clone(), t0.clone(), eth_usd, gas_price, t0_worth_eth)];
+            if spsq.input.to_lowercase() == base.address.to_lowercase() {
+                result.bids = vec![shd::maths::opti::gradient(spsq.amount, &pcsdata, base.clone(), quote.clone(), eth_usd, gas_price, quote_worth_eth)];
+            } else if spsq.input.to_lowercase() == quote.address.to_lowercase() {
+                result.asks = vec![shd::maths::opti::gradient(spsq.amount, &pcsdata, quote.clone(), base.clone(), eth_usd, gas_price, base_worth_eth)];
             }
         }
         None => {
@@ -142,11 +148,11 @@ pub async fn simulate(
                 None => optimize,
             };
             // FuLL Orderbook optimization
-            let trades0to1 = (fn_opti)(&pcsdata, eth_usd, gas_price, &t0, &t1, *aggbt0, t1_worth_eth);
-            result.trades0to1 = trades0to1;
+            let bids = (fn_opti)(&pcsdata, eth_usd, gas_price, &base, &quote, *aggb_base, quote_worth_eth);
+            result.bids = bids;
             log::info!(" 🔄  Switching to 1to0");
-            let trades1to0 = (fn_opti)(&pcsdata, eth_usd, gas_price, &t1, &t0, *aggbt1, t0_worth_eth);
-            result.trades1to0 = trades1to0;
+            let asks = (fn_opti)(&pcsdata, eth_usd, gas_price, &quote, &base, *aggb_quote, base_worth_eth);
+            result.asks = asks;
         }
     }
     result
@@ -157,7 +163,13 @@ pub type OrderbookQuoteFn = fn(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_pri
 pub fn optimize_fast(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
     let mut trades = Vec::new();
     let start = aggb / TEN_MILLIONS; // No longer needed: / 10f64.powi(from.decimals as i32);
-    log::info!("Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}", from.symbol, aggb, start, output_u_ethworth);
+    log::info!(
+        "Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}",
+        from.symbol,
+        aggb,
+        start,
+        output_u_ethworth
+    );
     let steps = shd::maths::steps::exponential(
         shd::r#static::maths::simu::COUNT_FAST,
         shd::r#static::maths::simu::START_MULTIPLIER,
@@ -194,7 +206,13 @@ use rayon::prelude::*; // Ensure Rayon is in your dependencies.
  */
 pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
     let start = aggb / TEN_MILLIONS;
-    log::info!("Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}", from.symbol, aggb, start, output_u_ethworth);
+    log::info!(
+        "Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}",
+        from.symbol,
+        aggb,
+        start,
+        output_u_ethworth
+    );
     let steps = shd::maths::steps::exponential(simu::COUNT, simu::START_MULTIPLIER, simu::END_MULTIPLIER, simu::END_MULTIPLIER * simu::MIN_EXP_DELTA_PCT);
     let steps = steps.iter().map(|x| x * start).collect::<Vec<f64>>();
     let trades: Vec<TradeResult> = steps
@@ -249,21 +267,27 @@ pub fn best(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &Sr
 
 /**
  * Computes the mid price for a given token pair using the best bid and ask
- * ! We assume that => trade0t1 = ask and trade1to0 = bid
+ * ! We assume that => trade_base_to_quote = ask and trade_quote_to_base = bid
  */
-pub fn midprice(trade0t1: TradeResult, trade1to0: TradeResult) -> MidPriceData {
-    let best_ask = trade0t1.average_sell_price;
-    let best_bid = 1. / trade1to0.average_sell_price;
+pub fn midprice(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResult) -> MidPriceData {
+    let best_ask = trade_base_to_quote.average_sell_price;
+    let best_bid = 1. / trade_quote_to_base.average_sell_price;
     let mid = (best_ask + best_bid) / 2.;
     let spread = (best_ask - best_bid).abs();
     let spread_pct = (spread / mid) * 100.;
     // log::info!(" - midprice: best_ask: {}", best_ask);
     // log::info!(" - midprice: best_bid: {}", best_bid);
-    // log::info!(" - midprice: trade1to0.ratio: {}", trade1to0.ratio);
+    // log::info!(" - midprice: trade_quote_to_base.ratio: {}", trade_quote_to_base.ratio);
     // log::info!(" - midprice: mid: {}", mid);
     // log::info!(" - midprice: spread: {}", spread);
     // log::info!(" - midprice: spread_pct: {}", spread_pct);
-    MidPriceData { best_ask, best_bid, mid, spread, spread_pct }
+    MidPriceData {
+        best_ask,
+        best_bid,
+        mid,
+        spread,
+        spread_pct,
+    }
 }
 
 /// Check if a component has the desired tokens

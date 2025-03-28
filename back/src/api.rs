@@ -200,7 +200,7 @@ async fn components(Extension(network): Extension<Network>) -> impl IntoResponse
 async fn execute(Extension(network): Extension<Network>, Extension(config): Extension<EnvConfig>, AxumExJson(execution): AxumExJson<ExecutionRequest>) -> impl IntoResponse {
     log::info!("👾 API: Querying execute endpoint: {:?}", execution);
 
-    match shd::core::execute::swap(network.clone(), execution.clone(), config.clone()).await {
+    match shd::core::exec::swap(network.clone(), execution.clone(), config.clone()).await {
         Ok(result) => AxumJson(json!({ "execute": result })),
         Err(e) => AxumJson(json!({ "execute": e.to_string() })),
     }
@@ -239,15 +239,15 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
             let srzt0 = srzt0.unwrap();
             let srzt1 = srzt1.unwrap();
             let targets = vec![srzt0.clone(), srzt1.clone()];
-            let (t0_to_eth_path, t0_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
-            let (t1_to_eth_path, t1_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
-            // log::info!("Path from {} to network.ETH is {:?}", srzt0.symbol, t0_to_eth_path);
+            let (base_to_eth_path, base_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
+            let (quote_to_eth_path, quote_to_eth_comps) = shd::maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), network.eth.to_lowercase()).unwrap_or_default();
+            // log::info!("Path from {} to network.ETH is {:?}", srzt0.symbol, base_to_eth_path);
             if targets.len() == 2 {
                 let mut ptss: Vec<ProtoTychoState> = vec![];
                 let mut to_eth_ptss: Vec<ProtoTychoState> = vec![];
                 for cp in acps.clone() {
                     let cptks = cp.tokens.clone();
-                    if shd::core::orderbook::matchcp(cptks.clone(), targets.clone()) {
+                    if shd::core::book::matchcp(cptks.clone(), targets.clone()) {
                         let mtx = shtss.read().await;
                         match mtx.protosims.get(&cp.id.to_lowercase()) {
                             Some(protosim) => {
@@ -262,7 +262,7 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                         }
                         drop(mtx);
                     }
-                    if t0_to_eth_comps.contains(&cp.id.to_lowercase()) || t1_to_eth_comps.contains(&cp.id.to_lowercase()) {
+                    if base_to_eth_comps.contains(&cp.id.to_lowercase()) || quote_to_eth_comps.contains(&cp.id.to_lowercase()) {
                         let mtx = shtss.read().await;
                         match mtx.protosims.get(&cp.id.to_lowercase()) {
                             Some(protosim) => {
@@ -281,12 +281,11 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                 if ptss.is_empty() {
                     return AxumJson(json!({ "orderbook": "backend error: ProtoTychoState vector is empty" }));
                 }
-                // Token 0
-                let utk0_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t0_to_eth_path.clone());
-                let utk1_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), t1_to_eth_path.clone());
-                match (utk0_ethworth, utk1_ethworth) {
-                    (Some(utk0_ethworth), Some(utk1_ethworth)) => {
-                        let result = shd::core::orderbook::build(network.clone(), ptss.clone(), targets.clone(), params.clone(), None, utk0_ethworth, utk1_ethworth).await;
+                let unit_base_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), base_to_eth_path.clone());
+                let unit_quote_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), quote_to_eth_path.clone());
+                match (unit_base_ethworth, unit_quote_ethworth) {
+                    (Some(unit_base_ethworth), Some(unit_quote_ethworth)) => {
+                        let result = shd::core::book::build(network.clone(), ptss.clone(), targets.clone(), params.clone(), None, unit_base_ethworth, unit_quote_ethworth).await;
                         if !single {
                             let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
                             crate::shd::utils::misc::save1(result.clone(), path.as_str());
@@ -300,7 +299,10 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                     }
                 }
             } else {
-                let msg = format!("Couldn't find the pair of tokens for tag {} - Query param Tag must contain only 2 tokens separated by a dash '-'", target);
+                let msg = format!(
+                    "Couldn't find the pair of tokens for tag {} - Query param Tag must contain only 2 tokens separated by a dash '-'",
+                    target
+                );
                 log::error!("{}", msg);
                 AxumJson(json!({ "orderbook": msg }))
             }
@@ -318,7 +320,11 @@ pub async fn start(n: Network, shared: SharedTychoStreamState, config: EnvConfig
     let rstate = shared.read().await;
     log::info!("Testing SharedTychoStreamState read = {:?} with {:?}", rstate.protosims.keys(), rstate.protosims.values());
     log::info!(" => rstate.states.keys and rstate.states.values => {:?} with {:?}", rstate.protosims.keys(), rstate.protosims.values());
-    log::info!(" => rstate.components.keys and rstate.components.values => {:?} with {:?}", rstate.components.keys(), rstate.components.values());
+    log::info!(
+        " => rstate.components.keys and rstate.components.values => {:?} with {:?}",
+        rstate.components.keys(),
+        rstate.components.values()
+    );
     log::info!(" => rstate.initialised => {:?} ", rstate.initialised);
     drop(rstate);
 

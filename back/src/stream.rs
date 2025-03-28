@@ -36,7 +36,7 @@ async fn stream(network: Network, shdstate: SharedTychoStreamState, config: EnvC
     log::info!(" 1️⃣  Launching ProtocolStreamBuilder task for {}", network.name);
     let (_, _, chain) = shd::types::chain(network.name.clone()).expect("Invalid chain");
     'retry: loop {
-        let tokens = shd::core::client::tokens(&network, &config).await.unwrap();
+        let tokens = shd::core::rpc::tokens(&network, &config).await.unwrap();
         let mut hmt = HashMap::new();
         tokens.iter().for_each(|t| {
             hmt.insert(t.address.clone(), t.clone());
@@ -51,7 +51,13 @@ async fn stream(network: Network, shdstate: SharedTychoStreamState, config: EnvC
                 while let Some(msg) = stream.next().await {
                     match msg {
                         Ok(msg) => {
-                            log::info!("🔸 PSB: block # {} with {} state, {} new and {} removed", msg.block_number, msg.states.len(), msg.new_pairs.len(), msg.removed_pairs.len());
+                            log::info!(
+                                "🔸 PSB: block # {} with {} state, {} new and {} removed",
+                                msg.block_number,
+                                msg.states.len(),
+                                msg.new_pairs.len(),
+                                msg.removed_pairs.len()
+                            );
                             shd::data::redis::set(keys::stream::latest(network.name.clone()).as_str(), msg.block_number).await;
                             let mtx = shdstate.read().await;
                             let initialised = mtx.initialised;
@@ -222,7 +228,12 @@ async fn main() {
     log::info!("Launching Stream on {} | 🧪 Testing mode: {:?}", config.network, config.testing);
     let path = "src/shd/config/networks.json".to_string();
     let networks: Vec<Network> = shd::utils::misc::read(&path);
-    let network = networks.clone().into_iter().filter(|x| x.enabled).find(|x| x.name == config.network).expect("Network not found or not enabled");
+    let network = networks
+        .clone()
+        .into_iter()
+        .filter(|x| x.enabled)
+        .find(|x| x.name == config.network)
+        .expect("Network not found or not enabled");
     log::info!("Tycho Stream for '{}' network", network.name.clone());
     shd::data::redis::set(keys::stream::status(network.name.clone()).as_str(), SyncState::Launching as u128).await;
     shd::data::redis::set(keys::stream::stream2(network.name.clone()).as_str(), SyncState::Launching as u128).await;

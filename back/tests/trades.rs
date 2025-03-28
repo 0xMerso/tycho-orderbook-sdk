@@ -14,14 +14,14 @@ fn test_simulations() {
             log::info!("Reading file {:?}", path);
             let data_str = fs::read_to_string(&path).expect("Failed to read JSON file");
             let data: Orderbook = serde_json::from_str(&data_str).expect("Failed to parse JSON");
-            assert!(!data.trades0to1.is_empty(), "trades0to1 should not be empty in {:?}", path);
-            assert!(!data.trades1to0.is_empty(), "trades1to0 should not be empty in {:?}", path);
-            assert_eq!(data.trades0to1.len(), data.trades1to0.len(), "trades0to1 and trades1to0 should have the same length in {:?}", path);
+            assert!(!data.bids.is_empty(), "bids should not be empty in {:?}", path);
+            assert!(!data.asks.is_empty(), "asks should not be empty in {:?}", path);
+            assert_eq!(data.bids.len(), data.asks.len(), "bids and tradeaskss1to0 should have the same length in {:?}", path);
 
             let poolnames = data.pools.iter().map(|x| x.protocol_type_name.clone()).collect::<Vec<String>>().join(", ");
             log::info!("Pools: {}", poolnames);
 
-            for trades in [&data.trades0to1, &data.trades1to0] {
+            for trades in [&data.bids, &data.asks] {
                 let mut last_input = 0.0;
                 let mut last_output = 0.0;
                 let mut last_ratio = f64::INFINITY;
