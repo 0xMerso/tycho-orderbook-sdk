@@ -3,4 +3,4 @@ authors = ["0xMerso"]
 language = "en"
 multilingual = false
 src = "src"
-title = "tap2"
+title = "Tycho Orderbook"

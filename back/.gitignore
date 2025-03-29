@@ -6,3 +6,4 @@ plot/
 **.env.prod 
 misc/logs
 dump.rdb
+front
