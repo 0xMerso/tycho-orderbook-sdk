@@ -1,20 +1,22 @@
 use std::cmp::min;
 
-use crate::shd::types::{Network, Orderbook, OrderbookDepth};
+use crate::shd::types::{ExchangeInfo, Network, Orderbook, OrderbookDepth};
 
 /// Implement conversion from Orderbook to a standard Orderbook format like Binance
 /// Binance: https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-endpoints
 
 /// ======================================================= Read =======================================================
-/// GET /api/v3/exchangeInfo --> not implemented (not needed)
-/// GET /api/v3/depth        --> implemented
+/// GET /api/v3/exchangeInfo --> implemented ✅
+/// GET /api/v3/depth        --> implemented ✅
+/// GET /api/v3/trades       --> not implementable
+/// GET /api/v3/avgPrice     --> not implementable
 
 impl Orderbook {
-    /// Get the orderbook depth
-    /// Because onchain liquidity is not splitted by orders like in a traditional orderbook, this function is approximate
-    /// It depends on the amounts (= points) used to simulate the orderbook
-    /// ! Price are in quote asset, while quantity are in base asset
-    /// Useful:
+    /// Onchain liquidity is not splitted by orders like in a traditional orderbook, the implementation is a bit different than the one from Binance or other exchanges
+
+    /// Get the orderbook depth (depends on the amounts (= points) used to simulate the orderbook)
+    /// Price are in quote asset, while quantity are in base asset
+    /// See https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-endpoints#terminology
     /// curl -X GET "https://api.binance.com/api/v3/depth?symbol=ETHUSDC&limit=10"
     /// curl -X GET "https://api.binance.com/api/v3/exchangeInfo?symbol=ETHUSDC" (base = ETH, quote = USDC)
     pub fn depth(&self, limit: Option<u64>) -> OrderbookDepth {
@@ -50,42 +52,27 @@ impl Orderbook {
             asks: asks_depth_str,
         }
     }
-    pub fn avgprice(&self) {
-        let best_bid = self.mpd_base_to_quote.clone();
+
+    /// Get the exchange info
+    pub fn exchange(&self) -> ExchangeInfo {
+        ExchangeInfo {
+            timezone: "UTC".to_string(),
+            base: self.base.clone(),
+            quote: self.quote.clone(),
+            components: self.pools.clone(),
+            order_types: vec!["MARKET".to_string()],
+        }
     }
-}
 
-/// GET /api/v3/trades       --> not possible to implement unless using an external RPC, out of scope ?
-/// GET /api/v3/avgPrice     --> implemented
+    /// ======================================================= Write =======================================================
 
-/// ======================================================= Write =======================================================
-/// POST /api/v3/order
-/// POST /api/v3/order/test
-/// GET /api/v3/order
-
-/// ======================================================= Helpers =======================================================
-/// Convert the base and quote to a tag format, used in Orderbook query params
-pub fn symtag(network: Network, base: &str, quote: &str) -> Option<String> {
-    let base = match base.to_lowercase().as_str() {
-        "eth" | "weth" => network.eth.clone(),
-        "usdc" => network.usdc.clone(),
-        "usdt" => network.usdt.clone(),
-        "btc" | "wbtc" => network.wbtc.clone(),
-        "dai" => network.dai.clone(),
-        _ => String::default(),
-    };
-    let quote = match quote.to_lowercase().as_str() {
-        "eth" | "weth" => network.eth.clone(),
-        "usdc" => network.usdc.clone(),
-        "usdt" => network.usdt.clone(),
-        "btc" | "wbtc" => network.wbtc.clone(),
-        "dai" => network.dai.clone(),
-        _ => String::default(),
-    };
-    let tag = format!("{}-{}", base.to_lowercase(), quote.to_lowercase());
-    if tag.is_empty() {
-        log::error!("Failed to convert base and quote to tag");
-        return None;
+    /// POST /api/v3/order
+    pub async fn execute_trade(&self) {
+        log::info!("execute_trade");
     }
-    Some(tag)
+
+    /// POST /api/v3/order/test
+    pub async fn simulate_trade(&self) {
+        log::info!("simulate_trade");
+    }
 }

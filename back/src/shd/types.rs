@@ -510,3 +510,12 @@ pub struct OrderbookDepth {
     pub bids: Vec<(String, String)>,
     pub asks: Vec<(String, String)>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExchangeInfo {
+    pub timezone: String,
+    pub base: SrzToken,
+    pub quote: SrzToken,
+    pub order_types: Vec<String>,
+    pub components: Vec<SrzProtocolComponent>,
+}

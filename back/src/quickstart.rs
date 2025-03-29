@@ -1,12 +1,9 @@
-use std::str::FromStr;
 use std::{collections::HashMap, sync::Arc};
-use tap2::shd::data::fmt::SrzToken;
 use tap2::shd::types::{EnvConfig, OBPConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookFunctions, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState};
 use tokio::sync::RwLock;
 
 use tap2::shd;
 use tap2::shd::types::Network;
-use tycho_simulation::tycho_core::Bytes;
 
 #[tokio::main]
 async fn main() {
@@ -30,31 +27,20 @@ async fn main() {
         initialised: false,
     }));
 
-    // --- Testing|Demo ---
     let tokens = shd::core::rpc::tokens(&network, &env).await.unwrap();
     let mut hmt = HashMap::new();
     tokens.iter().for_each(|t| {
         hmt.insert(t.address.clone(), t.clone());
     });
-    let weth = SrzToken::from(
-        hmt.get(&Bytes::from_str(network.eth.as_str()).unwrap())
-            .unwrap_or_else(|| panic!("WETH not found on {}", network.name))
-            .clone(),
-    );
-    let usdc = SrzToken::from(
-        hmt.get(&Bytes::from_str(network.usdc.as_str()).unwrap())
-            .unwrap_or_else(|| panic!("USDC not found on {}", network.name))
-            .clone(),
-    );
-    let wbtc = SrzToken::from(
-        hmt.get(&Bytes::from_str(network.wbtc.as_str()).unwrap())
-            .unwrap_or_else(|| panic!("WBTC not found on {}", network.name))
-            .clone(),
-    );
+
+    // --- Adjust as needed ---
+    let btcusdc = symtag(network.clone(), "BTC", "USDC").unwrap();
+    // let btc_eth = symtag(network.clone(), "BTC", "ETH").unwrap();
+    // let eth_usdc = symtag(network.clone(), "ETH", "USDC").unwrap();
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
-    // tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), usdc.address.clone().to_lowercase()), None);
-    tracked.insert(format!("{}-{}", wbtc.address.clone().to_lowercase(), usdc.address.clone().to_lowercase()), None);
-    // tracked.insert(format!("{}-{}", weth.address.clone().to_lowercase(), wbtc.address.clone().to_lowercase()), None);
+    tracked.insert(btcusdc, None);
+    // tracked.insert(btc_eth, None);
+    // tracked.insert(eth_usdc, None);
     // --- --- --- --- ---
 
     // Create the OBP provider from the protocol stream builder and shared state.
@@ -158,4 +144,33 @@ async fn main() {
             }
         }
     }
+}
+
+/// ======================================================= Helpers =======================================================
+
+/// Convert the base and quote to a tag format, used in Orderbook query params
+/// Only on ETH USDC BTC DAI WBTC, but feel free to add more.
+pub fn symtag(network: Network, base: &str, quote: &str) -> Option<String> {
+    let base = match base.to_lowercase().as_str() {
+        "eth" | "weth" => network.eth.clone(),
+        "usdc" => network.usdc.clone(),
+        "usdt" => network.usdt.clone(),
+        "btc" | "wbtc" => network.wbtc.clone(),
+        "dai" => network.dai.clone(),
+        _ => String::default(),
+    };
+    let quote = match quote.to_lowercase().as_str() {
+        "eth" | "weth" => network.eth.clone(),
+        "usdc" => network.usdc.clone(),
+        "usdt" => network.usdt.clone(),
+        "btc" | "wbtc" => network.wbtc.clone(),
+        "dai" => network.dai.clone(),
+        _ => String::default(),
+    };
+    let tag = format!("{}-{}", base.to_lowercase(), quote.to_lowercase());
+    if tag.is_empty() {
+        log::error!("Failed to convert base and quote to tag");
+        return None;
+    }
+    Some(tag)
 }
