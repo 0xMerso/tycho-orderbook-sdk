@@ -37,6 +37,9 @@ use utoipa_swagger_ui::SwaggerUi;
     components(
         schemas(Version, Network, Status, SrzToken, SrzProtocolComponent, Orderbook, ExecutionPayload, ExecutionRequest)
     ),
+    servers(
+        (url = "/api", description = "API base path")
+    ),
     tags(
         (name = "API", description = "Endpoints")
     )
@@ -65,7 +68,7 @@ pub fn wrap<T: serde::Serialize>(data: Option<T>, error: Option<String>) -> impl
             let response = Response {
                 success: true,
                 error: String::default(),
-                data: data,
+                data,
                 ts: current_timestamp(),
             };
             AxumJson(json!(response))
@@ -230,6 +233,9 @@ async fn execute(Extension(network): Extension<Network>, Extension(config): Exte
     }
 }
 
+/// Verify orderbook cache
+/// If the orderbook is not in the cache, the function will be computed
+/// If the orderbook is in the cache,
 pub async fn _verify_obcache(network: Network, tag: String) -> Option<String> {
     let key = shd::r#static::data::keys::stream::orderbooks(network.name.clone());
     match shd::data::redis::get::<Vec<String>>(key.as_str()).await {
@@ -241,6 +247,7 @@ pub async fn _verify_obcache(network: Network, tag: String) -> Option<String> {
                 let key = shd::r#static::data::keys::stream::orderbook(network.name.clone(), tag);
                 match shd::data::redis::get::<Orderbook>(key.as_str()).await {
                     Some(orderbook) => {
+                        let timestamp = current_timestamp();
                         log::info!("Orderbook found in cache, at block {} and timestamp: {}", orderbook.block, orderbook.timestamp);
                     }
                     _ => {
@@ -342,6 +349,10 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                             let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
                             crate::shd::utils::misc::save1(result.clone(), path.as_str());
                             // Save Redis cache
+                            let tag = format!("{}-{}", result.base.address.to_lowercase(), result.quote.address.to_lowercase());
+                            let key = shd::r#static::data::keys::stream::orderbook(network.name.clone(), tag);
+                            log::info!("Saving orderbook to Redis cache with key: {}", key);
+                            shd::data::redis::set(key.as_str(), result.clone()).await;
                         }
                         return wrap(Some(result), None);
                     }
@@ -413,7 +424,7 @@ pub async fn start(n: Network, shared: SharedTychoStreamState, config: EnvConfig
         }
     }
 }
-
+//
 // ================================== API Endpoints ==================================
 // A pool has an idea and can be an address "0x1234" or a bytes (uniswap v4) "0x96646936b91d6b9d7d0c47c496afbf3d6ec7b6f8000200000000000000000019"
 // A pair is "0xToken0-0xToken1" and can have multiple liquidity pool attached to it

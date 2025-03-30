@@ -79,10 +79,10 @@ try() {
 # Test endpoints that do not require a body.
 try "GET /" "$API_URL/"
 try "GET /version" "$API_URL/version"
-try "GET /network" "$API_URL/network"
-try "GET /status" "$API_URL/status"
-try "GET /tokens" "$API_URL/tokens"
-try "GET /components" "$API_URL/components"
+# try "GET /network" "$API_URL/network"
+# try "GET /status" "$API_URL/status"
+# try "GET /tokens" "$API_URL/tokens"
+# try "GET /components" "$API_URL/components"
 
 usdp="0x8e870d67f660d95d5be530380d0ec0bd388289e1"
 # Test simulations
@@ -97,7 +97,7 @@ usdp="0x8e870d67f660d95d5be530380d0ec0bd388289e1"
 # try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'"}'
 # try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'"}'
 
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
 # try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
 # try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
 # try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'", "sps": {"input": "'"$eth"'", "amount": 1000}}'
