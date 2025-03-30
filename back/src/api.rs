@@ -1,5 +1,6 @@
 use axum::{
     extract::Json as AxumExJson,
+    http::HeaderMap,
     response::IntoResponse,
     routing::{get, post},
     Extension, Json as AxumJson, Router,
@@ -217,9 +218,8 @@ async fn components(Extension(network): Extension<Network>) -> impl IntoResponse
     ),
     tag = ("API")
 )]
-async fn execute(Extension(network): Extension<Network>, Extension(config): Extension<EnvConfig>, AxumExJson(execution): AxumExJson<ExecutionRequest>) -> impl IntoResponse {
+async fn execute(headers: HeaderMap, Extension(network): Extension<Network>, Extension(config): Extension<EnvConfig>, AxumExJson(execution): AxumExJson<ExecutionRequest>) -> impl IntoResponse {
     log::info!("👾 API: Querying execute endpoint: {:?}", execution);
-
     match shd::core::exec::swap(network.clone(), execution.clone(), config.clone()).await {
         Ok(result) => wrap(Some(result), None),
         Err(e) => {
@@ -260,6 +260,29 @@ pub async fn _verify_obcache(network: Network, acps: Vec<SrzProtocolComponent>, 
     None
 }
 
+pub fn validation(headers: &HeaderMap) -> bool {
+    let pwd = "todo";
+    let key = "tycho-orderbook-ui-api-key";
+    return true;
+    match headers.get(key) {
+        Some(value) => {
+            if let Ok(api_key) = value.to_str() {
+                log::info!("Got API key: {}", api_key);
+                return true;
+                // if api_key.to_lowercase() == tmp_pwd {
+                //     return true;
+                // } else {
+                //     log::error!("Invalid API key: {}", api_key);
+                // }
+            }
+        }
+        None => {
+            log::error!("Header not found. Rejecting request");
+        }
+    }
+    false
+}
+
 // POST /orderbook/{0xt0-0xt1} => Simulate the orderbook
 #[utoipa::path(
     post,
@@ -274,9 +297,17 @@ pub async fn _verify_obcache(network: Network, acps: Vec<SrzProtocolComponent>, 
         "API"
     )
 )]
-async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extension(network): Extension<Network>, AxumExJson(params): AxumExJson<OrderbookRequestParams>) -> impl IntoResponse {
+async fn orderbook(
+    headers: HeaderMap,
+    Extension(shtss): Extension<SharedTychoStreamState>,
+    Extension(network): Extension<Network>,
+    AxumExJson(params): AxumExJson<OrderbookRequestParams>,
+) -> impl IntoResponse {
     let single = params.sps.is_some();
     log::info!("👾 API: OrderbookRequestParams: {:?} | Single point: {}", params, single);
+    if validation(&headers) == false {
+        return wrap(None, Some("Invalid orderbook API key for header: 'tycho-orderbook-ui-api-key'".to_string()));
+    }
     match (_tokens(network.clone()).await, _components(network.clone()).await) {
         (Some(atks), Some(acps)) => {
             let target = params.tag.clone();
@@ -427,16 +458,3 @@ pub async fn start(n: Network, shared: SharedTychoStreamState, config: EnvConfig
         }
     }
 }
-//
-// ================================== API Endpoints ==================================
-// A pool has an idea and can be an address "0x1234" or a bytes (uniswap v4) "0x96646936b91d6b9d7d0c47c496afbf3d6ec7b6f8000200000000000000000019"
-// A pair is "0xToken0-0xToken1" and can have multiple liquidity pool attached to it
-// - / => "Hello, Tycho!"
-// - /version => Get version of the API 📕
-// - /network => Get network object, its configuration 📕
-// - /status => Get network status + last block synced 📕
-// - /tokens => Get all tokens of the network 📕
-// - /pairs => Get all existing pairs in database (vector of strings of token0-token1) + optional FILTER on address 📕
-// - /component/:id => Get the component the given pool  📍
-// - /state/:id => Get the component the given pool 📍
-// - /components/:pair => Get ALL components for 1 pair 📍

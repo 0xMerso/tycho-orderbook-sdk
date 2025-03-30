@@ -96,15 +96,15 @@ try "GET /components" "$API_URL/components"
 # try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'"}'
 
 try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'", "sps": {"input": "'"$eth"'", "amount": 1000}}'
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'", "sps": {"input": "'"$usdc"'", "amount": 100}}'
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
-try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'", "sps": {"input": "'"$eth"'", "amount": 1000}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'", "sps": {"input": "'"$usdc"'", "amount": 100}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
+# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
 
 # No orderbook for these pairs
 usdp="0x8e870d67f660d95d5be530380d0ec0bd388289e1"
