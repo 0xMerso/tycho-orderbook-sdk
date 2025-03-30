@@ -121,7 +121,7 @@ async fn network(Extension(network): Extension<Network>) -> impl IntoResponse {
     summary = "API status and latest block synchronized",
     description = "API is 'running' when Redis and Stream are ready. Block updated at each new header after processing state updates",
     responses(
-        (status = 200, description = "Current API status and latest block synchronized, along with last block updated components", body = Response<Status>)
+        (status = 200, description = "Current API status and latest block synchronized, along with last block updated components", body = Status)
     ),
     tag = (
         "API"
