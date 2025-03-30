@@ -111,7 +111,7 @@ impl OrderbookProvider {
                     _handle: handle,
                     tokens: ob.tokens.clone(),
                     network: ob.network.clone(),
-                    api_token: ob.api_token.clone(),
+                    apikey: ob.api_token.clone(),
                 };
 
                 Ok(obp)
@@ -197,7 +197,7 @@ impl OrderbookProvider {
         match (unit_base_eth_worth, unit_quote_eth_worth) {
             (Some(unit_base_eth_worth), Some(unit_quote_eth_worth)) => Ok(shd::core::book::build(
                 self.network.clone(),
-                self.api_token.clone(),
+                self.apikey.clone(),
                 ptss.clone(),
                 targets.clone(),
                 params.clone(),

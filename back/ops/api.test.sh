@@ -33,7 +33,7 @@ else
 fi
 
 API_HOST=${API_HOST:-127.0.0.1}
-LOG=${LOG:-true}
+LOG=${LOG:-false}
 API_URL="http://$API_HOST:$PORT/api"
 echo "Testing API at $API_URL"
 
@@ -77,16 +77,14 @@ try() {
 }
 
 # Test endpoints that do not require a body.
-try "GET /" "$API_URL/"
+try "GET /" "$API_URL"
 try "GET /version" "$API_URL/version"
-# try "GET /network" "$API_URL/network"
-# try "GET /status" "$API_URL/status"
-# try "GET /tokens" "$API_URL/tokens"
-# try "GET /components" "$API_URL/components"
+try "GET /network" "$API_URL/network"
+try "GET /status" "$API_URL/status"
+try "GET /tokens" "$API_URL/tokens"
+try "GET /components" "$API_URL/components"
 
-usdp="0x8e870d67f660d95d5be530380d0ec0bd388289e1"
 # Test simulations
-# try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdp"'"}'
 # try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'"}'
 # try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'"}'
 # try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'"}'
@@ -97,13 +95,17 @@ usdp="0x8e870d67f660d95d5be530380d0ec0bd388289e1"
 # try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'"}'
 # try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'"}'
 
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'", "sps": {"input": "'"$eth"'", "amount": 1000}}'
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'", "sps": {"input": "'"$usdc"'", "amount": 100}}'
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
-# try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$wbtc"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$dai"'", "sps": {"input": "'"$eth"'", "amount": 1000}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdt"'", "sps": {"input": "'"$eth"'", "amount": 100}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$wbtc"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$dai"'", "sps": {"input": "'"$usdc"'", "amount": 100}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$usdc-$usdt"'", "sps": {"input": "'"$usdc"'", "amount": 1000}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$dai"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
+try "POST /orderbook (with sps)" "$API_URL/orderbook" '{"tag": "'"$wbtc-$usdt"'", "sps": {"input": "'"$wbtc"'", "amount": 1}}'
+
+# No orderbook for these pairs
+usdp="0x8e870d67f660d95d5be530380d0ec0bd388289e1"
+try "POST /orderbook (simple)" "$API_URL/orderbook" '{"tag": "'"$eth-$usdp"'"}'

@@ -138,3 +138,8 @@ pub fn balances() -> HashMap<String, HashMap<String, u128>> {
     let parsed: HashMap<String, HashMap<String, u128>> = serde_json::from_str(&data).expect("JSON parsing failed");
     parsed
 }
+
+/// Returns the current timestamp in seconds
+pub fn current_timestamp() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs()
+}

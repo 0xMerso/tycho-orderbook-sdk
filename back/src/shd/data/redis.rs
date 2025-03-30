@@ -167,7 +167,7 @@ pub async fn get<T: Serialize + DeserializeOwned>(key: &str) -> Option<T> {
                     }
                 }
                 Err(err) => {
-                    log::error!("📕 Failed to get value for key '{}': {}", key, err);
+                    // log::error!("📕 Failed to get value for key '{}': {}", key, err);
                     None
                 }
             }

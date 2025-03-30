@@ -63,7 +63,7 @@ pub async fn build(
         }
     }
     let cps: Vec<SrzProtocolComponent> = pools.clone().iter().map(|p| p.component.clone()).collect();
-    let aggregated = shd::maths::steps::deepth(cps.clone(), tokens.clone(), balances.clone());
+    let aggregated = shd::maths::steps::depth(cps.clone(), tokens.clone(), balances.clone());
     let avg_price_base_to_quote = prices_base_to_quote.iter().sum::<f64>() / prices_base_to_quote.len() as f64;
     let avg_price_quote_to_base = prices_quote_to_base.iter().sum::<f64>() / prices_quote_to_base.len() as f64; // Ponderation by TVL ?
     log::info!("Average price 0to1: {} | Average price 1to0: {}", avg_price_base_to_quote, avg_price_quote_to_base);

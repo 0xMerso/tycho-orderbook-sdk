@@ -70,11 +70,6 @@ pub mod data {
                 format!("stream:tokens:{}", network.to_lowercase())
             }
 
-            // Get ALL orderbooks tag already computed
-            pub fn orderbooks(network: String) -> String {
-                format!("stream:orderbooks:{}", network.to_lowercase())
-            }
-
             // Get one orderbook via tag
             pub fn orderbook(network: String, tag: String) -> String {
                 format!("stream:orderbook:{}:{}", network.to_lowercase(), tag.to_lowercase())

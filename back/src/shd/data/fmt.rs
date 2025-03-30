@@ -15,6 +15,8 @@ use tycho_simulation::protocol::models::ProtocolComponent;
 use tycho_simulation::tycho_core::Bytes;
 use utoipa::ToSchema;
 
+use crate::shd::utils::misc::current_timestamp;
+
 /// @notice Format of the data that will be read/stored in the database
 /// By default Tycho object are not srz
 
@@ -84,6 +86,10 @@ pub struct SrzProtocolComponent {
     // Extended attributes
     #[schema(example = "30")]
     pub fee: u128,
+
+    // Last updated at
+    #[schema(example = "1682000000")]
+    pub last_updated_at: u64,
 }
 
 // --- AMM fees ---
@@ -129,7 +135,7 @@ impl From<ProtocolComponent> for SrzProtocolComponent {
             creation_tx: pc.creation_tx.to_string(),
             // bck_created_at: pc.created_at, // Backup for reverse ::from
             fee: crate::shd::core::rpc::feebps(pc.protocol_type_name.to_string().clone(), pc.id.to_string().clone(), fee_value),
-            // Add: last_updated_at
+            last_updated_at: current_timestamp(),
         }
     }
 }

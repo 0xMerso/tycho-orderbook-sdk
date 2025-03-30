@@ -18,6 +18,7 @@ use tap2::shd::types::OrderbookBuilder;
 use tap2::shd::types::SharedTychoStreamState;
 use tap2::shd::types::SyncState;
 use tap2::shd::types::TychoStreamState;
+use tap2::shd::utils::misc::current_timestamp;
 use tokio::sync::RwLock;
 use tycho_simulation::evm::protocol::uniswap_v3::state::UniswapV3State;
 use tycho_simulation::evm::protocol::uniswap_v4::state::UniswapV4State;
@@ -99,31 +100,41 @@ async fn stream(network: Network, shdstate: SharedTychoStreamState, config: EnvC
                                 shd::data::redis::set(key.as_str(), components.clone()).await;
                                 let key = keys::stream::updated(network.name.clone());
                                 shd::data::redis::set::<Vec<String>>(key.as_str(), vec![]).await;
-                                let key = keys::stream::orderbooks(network.name.clone());
-                                shd::data::redis::set::<Vec<String>>(key.as_str(), vec![]).await;
                                 // ===== Set SyncState to up and running =====
                                 shd::data::redis::set(keys::stream::status(network.name.clone()).as_str(), SyncState::Running as u128).await;
                                 log::info!("✅ Proto Stream initialised successfully. SyncState set to 'Running' on {}", network.name.clone());
                             } else {
                                 // ===== Update Shared State =====
                                 // log::info!("Stream already initialised. Updating the mutex-shared state with new data, and updating Redis.");
+                                let mut components_to_update = vec![];
                                 if !msg.states.is_empty() {
                                     log::info!("Received {} new states, updating protosims.", msg.states.len());
                                     let mut mtx = shdstate.write().await;
                                     let cpids = msg.states.keys().map(|x| x.clone().to_lowercase()).collect::<Vec<String>>();
                                     for x in msg.states.iter() {
                                         mtx.protosims.insert(x.0.clone().to_lowercase(), x.1.clone());
+                                        components_to_update.push(x.0.clone().to_lowercase());
                                     }
                                     let key = keys::stream::updated(network.name.clone());
                                     shd::data::redis::set::<Vec<String>>(key.as_str(), cpids.clone()).await;
                                     drop(mtx);
                                 }
-                                if !msg.new_pairs.is_empty() || !msg.removed_pairs.is_empty() {
+
+                                if !components_to_update.is_empty() || !msg.new_pairs.is_empty() || !msg.removed_pairs.is_empty() {
                                     log::info!("Received {} new pairs, and {} pairs to be removed. Updating Redis ...", msg.new_pairs.len(), msg.removed_pairs.len());
                                     match api::_components(network.clone()).await {
                                         Some(mut components) => {
+                                            let timestamp = current_timestamp();
+                                            for x in components_to_update.iter() {
+                                                if let Some(pos) = components.iter().position(|current| current.id.to_string().to_lowercase() == x.to_string().to_lowercase()) {
+                                                    // New last_updated_at
+                                                    components[pos].last_updated_at = timestamp;
+                                                    // log::info!("Updating component {} with new last_updated_at", components[pos].id);
+                                                }
+                                            }
                                             for x in msg.new_pairs.iter() {
                                                 let pc = SrzProtocolComponent::from(x.1.clone());
+                                                // The from function also set the updated_at field, used to cache orderbooks when asked later
                                                 if let Some(pos) = components.iter().position(|current| current.id.to_string().to_lowercase() == x.0.to_string().to_lowercase()) {
                                                     components[pos] = pc;
                                                 } else {

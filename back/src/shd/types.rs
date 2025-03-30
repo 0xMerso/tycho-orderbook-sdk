@@ -493,7 +493,7 @@ pub struct OrderbookProvider {
     /// The shared state, accessible both to the internal task and the client.
     pub state: SharedTychoStreamState,
     /// The API token used to facilitate the Tycho queries
-    pub api_token: Option<String>,
+    pub apikey: Option<String>,
 }
 
 /// Orderbook builder, used to create the OBP
@@ -536,7 +536,7 @@ pub struct Status {
     pub status: String,
     #[schema(example = "22051447")]
     pub latest: String,
-    #[schema(example = "[0xUNI-ETH, 0xUSDC-ETH]")]
+    #[schema(example = "[0x123, 0xabc]")]
     pub updated: Vec<String>,
 }
 

@@ -10,6 +10,7 @@ use tap2::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
     types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookRequestParams, ProtoTychoState, Response, SharedTychoStreamState, Status, SyncState, Version},
+    utils::misc::current_timestamp,
 };
 
 use utoipa::OpenApi;
@@ -47,11 +48,6 @@ use utoipa_swagger_ui::SwaggerUi;
 struct APIDoc;
 
 /// ===== API Helpers =====
-
-/// Returns the current timestamp in seconds
-pub fn current_timestamp() -> u64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs()
-}
 
 pub fn wrap<T: serde::Serialize>(data: Option<T>, error: Option<String>) -> impl IntoResponse {
     match error {
@@ -235,29 +231,30 @@ async fn execute(Extension(network): Extension<Network>, Extension(config): Exte
 
 /// Verify orderbook cache
 /// If the orderbook is not in the cache, the function will be computed
-/// If the orderbook is in the cache,
-pub async fn _verify_obcache(network: Network, tag: String) -> Option<String> {
-    let key = shd::r#static::data::keys::stream::orderbooks(network.name.clone());
-    match shd::data::redis::get::<Vec<String>>(key.as_str()).await {
-        Some(tags) => {
-            if !tags.contains(&tag) {
-                log::info!("Tag {} not found in orderbooks cache", tag);
-            } else {
-                log::info!("Tag {} found in orderbooks cache", tag);
-                let key = shd::r#static::data::keys::stream::orderbook(network.name.clone(), tag);
-                match shd::data::redis::get::<Orderbook>(key.as_str()).await {
-                    Some(orderbook) => {
-                        let timestamp = current_timestamp();
-                        log::info!("Orderbook found in cache, at block {} and timestamp: {}", orderbook.block, orderbook.timestamp);
+/// If the orderbook is in the cache, check
+pub async fn _verify_obcache(network: Network, acps: Vec<SrzProtocolComponent>, tag: String) -> Option<Orderbook> {
+    let key = shd::r#static::data::keys::stream::orderbook(network.name.clone(), tag);
+    match shd::data::redis::get::<Orderbook>(key.as_str()).await {
+        Some(orderbook) => {
+            log::info!("Orderbook found in cache, at block {} and timestamp: {}", orderbook.block, orderbook.timestamp);
+            let pools = orderbook.pools.clone();
+            for previous in pools {
+                if let Some(current) = acps.iter().find(|x| x.id.to_lowercase() == previous.id.to_lowercase()) {
+                    let delta = current.last_updated_at as i64 - previous.last_updated_at as i64;
+                    if delta > 0 {
+                        log::info!("Cp {} outdated (new: {} vs old: {} = delta {})", current.id, current.last_updated_at, previous.last_updated_at, delta);
+                        return None;
                     }
-                    _ => {
-                        log::error!("Couldn't find orderbook in cache");
-                    }
+                } else {
+                    log::info!("Component {} not found in current components", previous.id);
+                    return None;
                 }
             }
+            log::info!("Orderbook is up to date");
+            return Some(orderbook);
         }
         _ => {
-            log::error!("Couldn't find orderbooks");
+            log::info!("Couldn't find orderbook in cache");
         }
     }
     None
@@ -279,7 +276,6 @@ pub async fn _verify_obcache(network: Network, tag: String) -> Option<String> {
 )]
 async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extension(network): Extension<Network>, AxumExJson(params): AxumExJson<OrderbookRequestParams>) -> impl IntoResponse {
     let single = params.sps.is_some();
-
     log::info!("👾 API: OrderbookRequestParams: {:?} | Single point: {}", params, single);
     match (_tokens(network.clone()).await, _components(network.clone()).await) {
         (Some(atks), Some(acps)) => {
@@ -336,18 +332,25 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                         drop(mtx);
                     }
                 }
+
                 if ptss.is_empty() {
-                    // return AxumJson(json!({ "orderbook": "backend error: ProtoTychoState vector is empty" }));
-                    return wrap(None, Some("ProtoTychoState: pair has 0 associated components".to_string()));
+                    return wrap(None, Some("ProtoTychoState: pair requested has 0 associated pools".to_string()));
                 }
+
+                if !single {
+                    if let Some(cache_obk) = _verify_obcache(network.clone(), acps.clone(), params.tag.clone()).await {
+                        return wrap(Some(cache_obk), None);
+                    }
+                }
+
                 let unit_base_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), base_to_eth_path.clone());
                 let unit_quote_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), quote_to_eth_path.clone());
                 match (unit_base_ethworth, unit_quote_ethworth) {
                     (Some(unit_base_ethworth), Some(unit_quote_ethworth)) => {
                         let result = shd::core::book::build(network.clone(), None, ptss.clone(), targets.clone(), params.clone(), None, unit_base_ethworth, unit_quote_ethworth).await;
                         if !single {
-                            let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
-                            crate::shd::utils::misc::save1(result.clone(), path.as_str());
+                            // let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
+                            // crate::shd::utils::misc::save1(result.clone(), path.as_str());
                             // Save Redis cache
                             let tag = format!("{}-{}", result.base.address.to_lowercase(), result.quote.address.to_lowercase());
                             let key = shd::r#static::data::keys::stream::orderbook(network.name.clone(), tag);
