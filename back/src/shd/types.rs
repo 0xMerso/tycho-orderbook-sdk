@@ -519,3 +519,30 @@ pub struct ExchangeInfo {
     pub order_types: Vec<String>,
     pub components: Vec<SrzProtocolComponent>,
 }
+
+/// ================================================================ API =======================================================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct Response<T = String> {
+    pub success: bool,
+    pub error: String,
+    pub ts: u64,
+    pub data: Option<T>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct Status {
+    #[schema(example = "Running")]
+    pub status: String,
+    #[schema(example = "22051447")]
+    pub latest: String,
+    #[schema(example = "[0xUNI-ETH, 0xUSDC-ETH]")]
+    pub updated: Vec<String>,
+}
+
+// A simple structure for the API version.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct Version {
+    #[schema(example = "0.1.0")]
+    pub version: String,
+}

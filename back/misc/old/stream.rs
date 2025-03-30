@@ -84,22 +84,69 @@ async fn stream(network: Network, shdstate: SharedTychoStreamState, config: EnvC
                                 let mut components = vec![];
                                 log::info!("--------- States on network: {} --------- ", network.name);
                                 for m in targets.clone() {
-                                    if let Some(_proto) = msg.states.get(&m.to_string()) {
+                                    if let Some(proto) = msg.states.get(&m.to_string()) {
                                         let comp = msg.new_pairs.get(&m.to_string()).expect("New pair not found");
                                         if comp.id.to_string().contains(NULL_ADDRESS) {
                                             log::info!("Component {} has no address. Skipping.", comp.id);
                                             continue;
                                         }
-                                        components.push(SrzProtocolComponent::from(comp.clone()));
+                                        'outer: for tk in comp.tokens.clone() {
+                                            if tk.address.to_string().contains(NULL_ADDRESS) {
+                                                break 'outer; // Just skip this component
+                                            }
+                                        }
+                                        let pc = SrzProtocolComponent::from(comp.clone());
+                                        components.push(pc.clone());
+                                        // match AmmType::from(comp.protocol_type_name.as_str()) {
+                                        //     AmmType::Pancakeswap | AmmType::Sushiswap | AmmType::UniswapV2 => {
+                                        //         if let Some(_state) = proto.as_any().downcast_ref::<UniswapV2State>() {
+                                        //             let pc = SrzProtocolComponent::from(comp.clone());
+                                        //             components.push(pc.clone());
+                                        //             let key1 = keys::stream::component(network.name.clone(), comp.id.to_string().to_lowercase());
+                                        //             shd::data::redis::set(key1.as_str(), pc.clone()).await;
+                                        //         } else {
+                                        //             log::error!("Downcast to 'UniswapV2State' failed on proto '{}'", comp.protocol_type_name);
+                                        //         }
+                                        //     }
+                                        //     AmmType::UniswapV3 => {
+                                        //         if let Some(_state) = proto.as_any().downcast_ref::<UniswapV3State>() {
+                                        //             let key1 = keys::stream::component(network.name.clone(), comp.id.to_string().to_lowercase());
+                                        //             let pc = SrzProtocolComponent::from(comp.clone());
+                                        //             components.push(pc.clone());
+                                        //             shd::data::redis::set(key1.as_str(), pc.clone()).await;
+                                        //         } else {
+                                        //             log::error!("Downcast to 'UniswapV3State' failed on proto '{}'", comp.protocol_type_name);
+                                        //         }
+                                        //     }
+                                        //     AmmType::UniswapV4 => {
+                                        //         if let Some(_state) = proto.as_any().downcast_ref::<UniswapV4State>() {
+                                        //             let key1 = keys::stream::component(network.name.clone(), comp.id.to_string().to_lowercase());
+                                        //             let pc = SrzProtocolComponent::from(comp.clone());
+                                        //             components.push(pc.clone());
+                                        //             shd::data::redis::set(key1.as_str(), pc.clone()).await;
+                                        //         } else {
+                                        //             log::error!("Downcast to 'UniswapV4State' failed on proto '{}'", comp.protocol_type_name);
+                                        //         }
+                                        //     }
+                                        //     AmmType::Balancer | AmmType::Curve => {
+                                        //         if let Some(_state) = proto.as_any().downcast_ref::<EVMPoolState<PreCachedDB>>() {
+                                        //             let key1 = keys::stream::component(network.name.clone(), comp.id.to_string().to_lowercase());
+                                        //             let pc = SrzProtocolComponent::from(comp.clone());
+                                        //             components.push(pc.clone());
+                                        //             shd::data::redis::set(key1.as_str(), pc.clone()).await;
+                                        //         } else {
+                                        //             log::error!("Downcast to 'EVMPoolState<PreCachedDB>' failed on proto '{}'", comp.protocol_type_name);
+                                        //         }
+                                        //     }
+                                        // }
                                     }
                                 }
+
                                 // ===== Storing ALL components =====
                                 log::info!("Storing {} components", components.len());
                                 let key = keys::stream::components(network.name.clone());
                                 shd::data::redis::set(key.as_str(), components.clone()).await;
-                                let key = keys::stream::updated(network.name.clone());
-                                shd::data::redis::set::<Vec<String>>(key.as_str(), vec![]).await;
-                                let key = keys::stream::orderbooks(network.name.clone());
+                                let key = keys::stream::updatedcps(network.name.clone());
                                 shd::data::redis::set::<Vec<String>>(key.as_str(), vec![]).await;
                                 // ===== Set SyncState to up and running =====
                                 shd::data::redis::set(keys::stream::status(network.name.clone()).as_str(), SyncState::Running as u128).await;
@@ -114,7 +161,7 @@ async fn stream(network: Network, shdstate: SharedTychoStreamState, config: EnvC
                                     for x in msg.states.iter() {
                                         mtx.protosims.insert(x.0.clone().to_lowercase(), x.1.clone());
                                     }
-                                    let key = keys::stream::updated(network.name.clone());
+                                    let key = keys::stream::updatedcps(network.name.clone());
                                     shd::data::redis::set::<Vec<String>>(key.as_str(), cpids.clone()).await;
                                     drop(mtx);
                                 }

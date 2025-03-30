@@ -9,7 +9,7 @@ use serde_json::json;
 use tap2::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
-    types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookRequestParams, ProtoTychoState, SharedTychoStreamState, SyncState},
+    types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookRequestParams, ProtoTychoState, Response, SharedTychoStreamState, Status, SyncState, Version},
 };
 
 use utoipa::OpenApi;
@@ -35,24 +35,49 @@ use utoipa_swagger_ui::SwaggerUi;
         execute
     ),
     components(
-        schemas(APIVersion, Network, Status, SrzToken, SrzProtocolComponent, Orderbook, ExecutionPayload, ExecutionRequest)
+        schemas(Version, Network, Status, SrzToken, SrzProtocolComponent, Orderbook, ExecutionPayload, ExecutionRequest)
     ),
     tags(
         (name = "API", description = "Endpoints")
     )
 )]
-struct ApiDoc;
+struct APIDoc;
 
-// A simple structure for the API version.
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct APIVersion {
-    #[schema(example = "0.1.0")]
-    pub version: String,
+/// ===== API Helpers =====
+
+/// Returns the current timestamp in seconds
+pub fn current_timestamp() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs()
 }
+
+pub fn wrap<T: serde::Serialize>(data: Option<T>, error: Option<String>) -> impl IntoResponse {
+    match error {
+        Some(err) => {
+            let response = Response::<String> {
+                success: false,
+                error: err.clone(),
+                data: None,
+                ts: current_timestamp(),
+            };
+            AxumJson(json!(response))
+        }
+        None => {
+            let response = Response {
+                success: true,
+                error: String::default(),
+                data: data,
+                ts: current_timestamp(),
+            };
+            AxumJson(json!(response))
+        }
+    }
+}
+
+/// ===== API Helpers =====
 
 // GET / => "Hello, Tycho!"
 async fn root() -> impl IntoResponse {
-    AxumJson(json!({ "data": "HeLLo Tycho" }))
+    wrap(Some("Gm!"), None)
 }
 
 /// Version endpoint: returns the API version.
@@ -61,7 +86,7 @@ async fn root() -> impl IntoResponse {
     path = "/version",
     summary = "API version",
     responses(
-        (status = 200, description = "API Version", body = APIVersion)
+        (status = 200, description = "API Version", body = Version)
     ),
     tag = (
         "API"
@@ -69,7 +94,7 @@ async fn root() -> impl IntoResponse {
 )]
 async fn version() -> impl IntoResponse {
     log::info!("👾 API: GET /version");
-    AxumJson(APIVersion { version: "0.1.0".into() })
+    wrap(Some(Version { version: "0.1.0".into() }), None)
 }
 
 // GET /network => Get network object and its configuration
@@ -86,17 +111,7 @@ async fn version() -> impl IntoResponse {
 )]
 async fn network(Extension(network): Extension<Network>) -> impl IntoResponse {
     log::info!("👾 API: GET /network on {} network", network.name);
-    AxumJson(network)
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-struct Status {
-    #[schema(example = "Running")]
-    status: String,
-    #[schema(example = "22051447")]
-    latest: String,
-    #[schema(example = "[0xUNI-ETH, 0xUSDC-ETH]")]
-    updated: Vec<String>,
+    wrap(Some(network.clone()), None)
 }
 
 // GET /status => Get network status + last block synced
@@ -106,7 +121,7 @@ struct Status {
     summary = "API status and latest block synchronized",
     description = "API is 'running' when Redis and Stream are ready. Block updated at each new header after processing state updates",
     responses(
-        (status = 200, description = "Current API status and latest block synchronized, along with last block updated components", body = Status)
+        (status = 200, description = "Current API status and latest block synchronized, along with last block updated components", body = Response<Status>)
     ),
     tag = (
         "API"
@@ -116,21 +131,20 @@ async fn status(Extension(network): Extension<Network>) -> impl IntoResponse {
     log::info!("👾 API: GET /status on {} network", network.name);
     let key1 = shd::r#static::data::keys::stream::status(network.name.clone());
     let key2 = shd::r#static::data::keys::stream::latest(network.name.clone());
-    let key3 = shd::r#static::data::keys::stream::updatedcps(network.name.clone());
+    let key3 = shd::r#static::data::keys::stream::updated(network.name.clone());
     let status = shd::data::redis::get::<u128>(key1.as_str()).await;
     let latest = shd::data::redis::get::<u64>(key2.as_str()).await;
-    let updatedcps = shd::data::redis::get::<Vec<String>>(key3.as_str()).await;
-    match (status, latest, updatedcps) {
-        (Some(status), Some(latest), Some(updatedcps)) => AxumJson(json!(Status {
-            status: status.to_string(),
-            latest: latest.to_string(),
-            updated: updatedcps
-        })),
-        _ => AxumJson(json!(Status {
-            status: SyncState::Error.to_string(),
-            latest: "0".to_string(),
-            updated: vec![]
-        })),
+    let updated = shd::data::redis::get::<Vec<String>>(key3.as_str()).await;
+    match (status, latest, updated) {
+        (Some(status), Some(latest), Some(updated)) => {
+            let data = Status {
+                status: status.to_string(),
+                latest: latest.to_string(),
+                updated,
+            };
+            wrap(Some(data), None)
+        }
+        _ => wrap(None, Some("Failed to get status".to_string())),
     }
 }
 
@@ -155,8 +169,8 @@ async fn _tokens(network: Network) -> Option<Vec<SrzToken>> {
 async fn tokens(Extension(network): Extension<Network>) -> impl IntoResponse {
     log::info!("👾 API: GET /tokens on {} network", network.name);
     match _tokens(network.clone()).await {
-        Some(tokens) => AxumJson(json!({ "tokens": tokens })),
-        _ => AxumJson(json!({ "tokens": [] })),
+        Some(tokens) => wrap(Some(tokens), None),
+        _ => wrap(None, Some("Failed to get tokens".to_string())),
     }
 }
 
@@ -178,15 +192,17 @@ pub async fn _components(network: Network) -> Option<Vec<SrzProtocolComponent>> 
         "API"
     )
 )]
-
 async fn components(Extension(network): Extension<Network>) -> impl IntoResponse {
     log::info!("👾 API: GET /components on {} network", network.name);
     match _components(network).await {
         Some(cps) => {
             log::info!("Returning {} components", cps.len());
-            AxumJson(json!({ "components": cps }))
+            wrap(Some(cps), None)
         }
-        _ => AxumJson(json!({ "components": [] })),
+        _ => {
+            log::error!("Failed to get components");
+            wrap(None, Some("Failed to get components".to_string()))
+        }
     }
 }
 
@@ -206,9 +222,38 @@ async fn execute(Extension(network): Extension<Network>, Extension(config): Exte
     log::info!("👾 API: Querying execute endpoint: {:?}", execution);
 
     match shd::core::exec::swap(network.clone(), execution.clone(), config.clone()).await {
-        Ok(result) => AxumJson(json!({ "execute": result })),
-        Err(e) => AxumJson(json!({ "execute": e.to_string() })),
+        Ok(result) => wrap(Some(result), None),
+        Err(e) => {
+            let error = e.to_string();
+            wrap(None, Some(error))
+        }
     }
+}
+
+pub async fn _verify_obcache(network: Network, tag: String) -> Option<String> {
+    let key = shd::r#static::data::keys::stream::orderbooks(network.name.clone());
+    match shd::data::redis::get::<Vec<String>>(key.as_str()).await {
+        Some(tags) => {
+            if !tags.contains(&tag) {
+                log::info!("Tag {} not found in orderbooks cache", tag);
+            } else {
+                log::info!("Tag {} found in orderbooks cache", tag);
+                let key = shd::r#static::data::keys::stream::orderbook(network.name.clone(), tag);
+                match shd::data::redis::get::<Orderbook>(key.as_str()).await {
+                    Some(orderbook) => {
+                        log::info!("Orderbook found in cache, at block {} and timestamp: {}", orderbook.block, orderbook.timestamp);
+                    }
+                    _ => {
+                        log::error!("Couldn't find orderbook in cache");
+                    }
+                }
+            }
+        }
+        _ => {
+            log::error!("Couldn't find orderbooks");
+        }
+    }
+    None
 }
 
 // POST /orderbook/{0xt0-0xt1} => Simulate the orderbook
@@ -227,6 +272,7 @@ async fn execute(Extension(network): Extension<Network>, Extension(config): Exte
 )]
 async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extension(network): Extension<Network>, AxumExJson(params): AxumExJson<OrderbookRequestParams>) -> impl IntoResponse {
     let single = params.sps.is_some();
+
     log::info!("👾 API: OrderbookRequestParams: {:?} | Single point: {}", params, single);
     match (_tokens(network.clone()).await, _components(network.clone()).await) {
         (Some(atks), Some(acps)) => {
@@ -236,10 +282,10 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
             let srzt1 = atks.iter().find(|x| x.address.to_lowercase() == targets[1].clone().to_lowercase());
             if srzt0.is_none() {
                 log::error!("Couldn't find tokens[0]: {}", targets[0]);
-                return AxumJson(json!({ "orderbook": "Couldn't find tokens for pair tag given" }));
+                return wrap(None, Some("Couldn't find tokens for pair tag given (tokens[0])".to_string()));
             } else if srzt1.is_none() {
                 log::error!("Couldn't find  tokens[1]: {}", targets[1]);
-                return AxumJson(json!({ "orderbook": "Couldn't find tokens for pair tag given" }));
+                return wrap(None, Some("Couldn't find tokens for pair tag given (tokens[1])".to_string()));
             }
             let srzt0 = srzt0.unwrap();
             let srzt1 = srzt1.unwrap();
@@ -284,7 +330,8 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                     }
                 }
                 if ptss.is_empty() {
-                    return AxumJson(json!({ "orderbook": "backend error: ProtoTychoState vector is empty" }));
+                    // return AxumJson(json!({ "orderbook": "backend error: ProtoTychoState vector is empty" }));
+                    return wrap(None, Some("ProtoTychoState: pair has 0 associated components".to_string()));
                 }
                 let unit_base_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), base_to_eth_path.clone());
                 let unit_quote_ethworth = shd::maths::path::quote(to_eth_ptss.clone(), atks.clone(), quote_to_eth_path.clone());
@@ -294,13 +341,14 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                         if !single {
                             let path = format!("misc/data-front-v2/orderbook.{}.{}-{}.json", network.name, srzt0.symbol.to_lowercase(), srzt1.symbol.to_lowercase());
                             crate::shd::utils::misc::save1(result.clone(), path.as_str());
+                            // Save Redis cache
                         }
-                        AxumJson(json!({ "orderbook": result.clone() }))
+                        return wrap(Some(result), None);
                     }
                     _ => {
                         let msg = format!("Couldn't find the quote path from {} to ETH", srzt0.symbol);
                         log::error!("{}", msg);
-                        AxumJson(json!({ "orderbook": msg }))
+                        return wrap(None, Some(msg));
                     }
                 }
             } else {
@@ -309,12 +357,13 @@ async fn orderbook(Extension(shtss): Extension<SharedTychoStreamState>, Extensio
                     target
                 );
                 log::error!("{}", msg);
-                AxumJson(json!({ "orderbook": msg }))
+                return wrap(None, Some(msg));
             }
         }
         _ => {
-            log::error!("Couldn't not read internal components");
-            AxumJson(json!({ "orderbook": "Couldn't not read internal components" }))
+            let msg = "Couldn't not read internal components";
+            log::error!("{}", msg);
+            return wrap(None, Some(msg.to_string()));
         }
     }
 }
@@ -348,7 +397,7 @@ pub async fn start(n: Network, shared: SharedTychoStreamState, config: EnvConfig
         .layer(Extension(n.clone()))
         .layer(Extension(config.clone())); // EnvConfig
 
-    let app = Router::new().nest("/api", inner).merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", ApiDoc::openapi()));
+    let app = Router::new().nest("/api", inner).merge(SwaggerUi::new("/swagger").url("/api-docs/openapi.json", APIDoc::openapi()));
 
     match tokio::net::TcpListener::bind(format!("0.0.0.0:{}", n.port)).await {
         Ok(listener) => match axum::serve(listener, app).await {

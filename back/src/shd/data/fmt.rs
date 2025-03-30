@@ -129,6 +129,7 @@ impl From<ProtocolComponent> for SrzProtocolComponent {
             creation_tx: pc.creation_tx.to_string(),
             // bck_created_at: pc.created_at, // Backup for reverse ::from
             fee: crate::shd::core::rpc::feebps(pc.protocol_type_name.to_string().clone(), pc.id.to_string().clone(), fee_value),
+            // Add: last_updated_at
         }
     }
 }
@@ -145,7 +146,7 @@ impl SrzProtocolComponent {
             contract_ids: srz.contract_ids.into_iter().map(|s| Bytes::from(s.into_bytes())).collect(),
             static_attributes: srz.static_attributes.into_iter().map(|(k, v)| (k, Bytes::from(v.into_bytes()))).collect(),
             creation_tx: Bytes::from(srz.creation_tx.into_bytes()),
-            created_at: chrono::NaiveDateTime::default(), // ! Importantt
+            created_at: chrono::NaiveDateTime::default(), // ! Important
         }
     }
 }

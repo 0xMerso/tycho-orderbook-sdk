@@ -61,13 +61,23 @@ pub mod data {
             }
 
             // stream:latest:<network> => u64
-            pub fn updatedcps(network: String) -> String {
-                format!("stream:updatedcps:{}", network.to_lowercase())
+            pub fn updated(network: String) -> String {
+                format!("stream:updated:{}", network.to_lowercase())
             }
 
             // stream:tokens:<network> => array of tokens
             pub fn tokens(network: String) -> String {
                 format!("stream:tokens:{}", network.to_lowercase())
+            }
+
+            // Get ALL orderbooks tag already computed
+            pub fn orderbooks(network: String) -> String {
+                format!("stream:orderbooks:{}", network.to_lowercase())
+            }
+
+            // Get one orderbook via tag
+            pub fn orderbook(network: String, tag: String) -> String {
+                format!("stream:orderbook:{}:{}", network.to_lowercase(), tag.to_lowercase())
             }
 
             // stream:pairs:<network> => array of pairs
@@ -80,22 +90,10 @@ pub mod data {
                 format!("stream:{}:component:{}", network, id.to_lowercase())
             }
 
-            // stream:state:id => one state
-            pub fn state(network: String, id: String) -> String {
-                format!("stream:{}:state:{}", network, id.to_lowercase())
-            }
-
-            // stream:component:<id> => Component (serialized)
+            // stream:components
             pub fn components(network: String) -> String {
                 format!("stream:components:{}", network.to_lowercase())
             }
-
-            // stream:component:<id> => ProtocolState (serialized)
-            pub fn states(network: String) -> String {
-                format!("stream:state:{}", network.to_lowercase())
-            }
-
-            // Need to harmonize keys !
         }
     }
 }
