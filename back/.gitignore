@@ -1,9 +1,0 @@
-/target
-.env
-src/py
-plot/
-.env.prod 
-**.env.prod 
-misc/logs
-dump.rdb
-front

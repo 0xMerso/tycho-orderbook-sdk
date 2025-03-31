@@ -1,0 +1,71 @@
+[package]
+name = "tycho-orderbook"
+version = "0.1.0"
+edition = "2021"
+
+# ======================================================================================================================================================================================================
+
+[dependencies]
+
+tokio = { version = "1.28", features = ["full"] }
+chrono = "0.4.23"
+futures = "0.3.31"
+num-bigint = "0.4.6"
+tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt"] }
+
+tycho-core = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-core", tag = "0.56.5" }
+tycho-client = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-client" , tag = "0.56.5"}
+tycho-execution = { git = "https://github.com/propeller-heads/tycho-execution.git", package = "tycho-execution", tag = "0.61.0",  features = ["evm"] }
+tycho-simulation = { git = "https://github.com/0xMerso/TychoSimu.git", branch = "protocol-state-pub-fields", features = ["evm"]  }
+
+toml = "0.8.12"
+serde = { version = "1.0.104", features = ["derive"] }
+clippy = "0.0.302"
+env_logger = "0.11.3"
+eyre = "0.6.11"
+log = "0.4.20"
+url = "2.5.0"
+anyhow = "1.0"
+hex-literal = "0.4"
+hex = "0.4.3"
+bytes = "1.4.0"
+fern = { version = "0.6.2", features = ["colored"] }
+colored = "2.0.0"
+rand = "0.8.5"
+serde_json = "1.0"
+dotenv = "0.15.0"
+dotenv_codegen = "0.15.0"
+reqwest = "0.12.4"
+redis = { version = "0.26.1", features = ["tokio-comp"] }
+alloy = { version = "0.3.1", features = ["full", "node-bindings", "json-rpc", "rpc-client", "providers", "signer-local", "rpc-types-eth"] }
+num-traits = "0.2.19"
+alloy-chains = "0.1.63"
+# axum = "0.8.1"
+axum = { version = "0.8.1", features = ["macros"] }
+# axum-macros = "0.5.0"
+primitive-types = "0.10.1"
+indicatif = "0.17.11"
+
+utoipa = "5.3.1"
+utoipa-axum = "0.2.0"
+# utoipa-swagger-ui = { version = "9", features = ["axum"] }
+
+alloy-primitives = "0.8.23"
+axum-macros = "0.5.0"
+rayon = "1.10.0"
+async-trait = "0.1.88"
+
+# utoipa-redoc = "6.0.0"
+# utoipa-rapidoc = "6.0.0"
+# utoipa-scalar = "0.3.0"
+
+# ======================================================================================================================================================================================================
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "orderbook" 
+path = "examples/orderbook.rs"
+
+# ======================================================================================================================================================================================================
