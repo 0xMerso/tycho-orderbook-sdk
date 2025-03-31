@@ -45,28 +45,14 @@ pub struct Network {
     pub chainid: u64,
     #[schema(example = "0x")]
     pub eth: String,
-    #[schema(example = "0x")]
-    pub usdc: String,
-    #[schema(example = "0x")]
-    pub exotic: String,
-    #[schema(example = "0x")]
-    pub wbtc: String,
-    #[schema(example = "0x")]
-    pub dai: String,
-    #[schema(example = "0x")]
-    pub usdt: String,
     #[schema(example = "https://rpc.payload.de")]
     pub rpc: String,
     #[schema(example = "https://etherscan.io/")]
     pub exp: String,
-    #[schema(example = "true")]
-    pub enabled: bool,
     #[schema(example = "http://tycho-beta.propellerheads.xyz")]
     pub tycho: String,
     #[schema(example = "4242")]
     pub port: u64,
-    #[schema(example = "0x")]
-    pub balancer: String,
     #[schema(example = "0x")]
     pub permit2: String,
 }
@@ -153,7 +139,7 @@ impl From<&str> for AmmType {
 
 /// Used to safely progress with Redis database
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum SyncState {
+pub enum StreamState {
     Down = 1,
     Launching = 2,
     Syncing = 3,
@@ -161,14 +147,14 @@ pub enum SyncState {
     Error = 5,
 }
 
-impl Display for SyncState {
+impl Display for StreamState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            SyncState::Down => write!(f, "Down"),
-            SyncState::Launching => write!(f, "Launching"),
-            SyncState::Syncing => write!(f, "Syncing"),
-            SyncState::Running => write!(f, "Running"),
-            SyncState::Error => write!(f, "Error"),
+            StreamState::Down => write!(f, "Down"),
+            StreamState::Launching => write!(f, "Launching"),
+            StreamState::Syncing => write!(f, "Syncing"),
+            StreamState::Running => write!(f, "Running"),
+            StreamState::Error => write!(f, "Error"),
         }
     }
 }
@@ -307,7 +293,7 @@ pub fn chain(name: String) -> Option<(ChainCore, ChainSimCore, ChainSimu)> {
         "arbitrum" => Some((ChainCore::Arbitrum, ChainSimCore::Arbitrum, ChainSimu::Arbitrum)),
         "base" => Some((ChainCore::Base, ChainSimCore::Base, ChainSimu::Base)),
         _ => {
-            log::error!("Unknown chain: {}", name);
+            tracing::error!("Unknown chain: {}", name);
             None
         }
     }
@@ -322,7 +308,7 @@ pub fn chain_timing(name: String) -> u64 {
         "arbitrum" => 1,
         "base" => 10,
         _ => {
-            log::error!("Unknown chain: {}", name);
+            tracing::error!("Unknown chain: {}", name);
             600
         }
     }
@@ -532,12 +518,10 @@ pub struct Response<T = String> {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct Status {
-    #[schema(example = "Running")]
-    pub status: String,
+    #[schema(example = "4")]
+    pub stream: u128,
     #[schema(example = "22051447")]
     pub latest: String,
-    #[schema(example = "[0x123, 0xabc]")]
-    pub updated: Vec<String>,
 }
 
 // A simple structure for the API version.

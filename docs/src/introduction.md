@@ -1,6 +1,6 @@
 # Introduction
 
-The tycho-orderbook crate transpose onchain liquidity into a familiar orderbook format
+The tycho-orderbook crate transpose onchain liquidity into a familiar orderbook format.
 
 ## Why 
 
@@ -42,16 +42,15 @@ There are many reasons for building such a tool:
 Under the hood, tycho-orderbook uses [Tycho](https://docs.propellerheads.xyz/tycho).
 
 Tycho-orderbook works as follows:
-- Open a stream on Tycho
-- Receive notification of state update
-- Calculate the orderbook for a specific pair with all relevant liquidity pools
-  - With a default solver, quote different trades (e.g. 1 ETH, 10 ETH, 100 ETH, then, 2K USDC, 20K USDC, 200K USDC)
-  - Take into account gas costs
-  - Produce the onchain price for a given swap
-- Aggregate the output in bids|asks
-- And constantly monitor status updates ...
+1. Open a stream on Tycho
+2. Receive notification of state update
+3. Calculate the orderbook for a specific pair with all relevant liquidity pools
+   1. With a default solver, quote different trades (e.g. 1 ETH, 10 ETH, 100 ETH, then, 2K USDC, 20K USDC, 200K USDC)
+   2. Take into account gas costs
+   3. Produce the onchain price for a given swap
+4. Aggregate the output in bids|asks
+5. Loop on 2) to constantly monitor status updates.
 
-Visually, it looks like this:
 
 ![Image](img/escalidraw.flow.png)
 

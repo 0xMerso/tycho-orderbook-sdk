@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tycho_orderbook::{
+    adapter::OrderBookAdapter,
     core::{book, rpc},
     types::{EnvConfig, Network, OBPConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookFunctions, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState},
     utils,
@@ -8,18 +9,12 @@ use tycho_orderbook::{
 
 #[tokio::main]
 async fn main() {
-    utils::misc::log::new("quickstart".to_string());
     dotenv::from_filename(".env.prod").ok(); // Use .env.ex for testing
     let env = EnvConfig::new();
-    log::info!("Launching OBP Client on {} | 🧪 Testing mode: {:?}", env.network, env.testing);
+    // log::info!("Launching OBP Client on {} | 🧪 Testing mode: {:?}", env.network, env.testing);
     let path = "networks.json".to_string();
     let networks: Vec<Network> = utils::misc::read(&path);
-    let network = networks
-        .clone()
-        .into_iter()
-        .filter(|x| x.enabled)
-        .find(|x| x.name == env.network)
-        .expect("Network not found or not enabled");
+    let network = networks.clone().into_iter().find(|x| x.name == env.network).expect("Network not found or not enabled");
     log::info!("Tycho Stream for '{}' network", network.name.clone());
     // Create cross/shared state for the protocol stream
     let xstate: SharedTychoStreamState = Arc::new(RwLock::new(TychoStreamState {
@@ -34,14 +29,17 @@ async fn main() {
         hmt.insert(t.address.clone(), t.clone());
     });
 
-    // --- Adjust as needed ---
-    let btcusdc = symtag(network.clone(), "BTC", "USDC").unwrap();
-    // let btc_eth = symtag(network.clone(), "BTC", "ETH").unwrap();
-    // let eth_usdc = symtag(network.clone(), "ETH", "USDC").unwrap();
+    // --- Adjust as needed --- Mainnet here
+    let eth = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+    let usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    let btc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599";
+    let btcusdc = format!("{}-{}", btc, usdc); // "BTC" "USDC"
+    let btc_eth = format!("{}-{}", btc, eth); // "BTC" "ETH"
+    let eth_usdc = format!("{}-{}", eth, usdc); // "ETH" "USDC"
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
     tracked.insert(btcusdc, None);
-    // tracked.insert(btc_eth, None);
-    // tracked.insert(eth_usdc, None);
+    tracked.insert(btc_eth, None);
+    tracked.insert(eth_usdc, None);
     // --- --- --- --- ---
 
     // Create the OBP provider from the protocol stream builder and shared state.
@@ -145,33 +143,4 @@ async fn main() {
             }
         }
     }
-}
-
-/// ======================================================= Helpers =======================================================
-
-/// Convert the base and quote to a tag format, used in Orderbook query params
-/// Only on ETH USDC BTC DAI WBTC, but feel free to add more.
-pub fn symtag(network: Network, base: &str, quote: &str) -> Option<String> {
-    let base = match base.to_lowercase().as_str() {
-        "eth" | "weth" => network.eth.clone(),
-        "usdc" => network.usdc.clone(),
-        "usdt" => network.usdt.clone(),
-        "btc" | "wbtc" => network.wbtc.clone(),
-        "dai" => network.dai.clone(),
-        _ => String::default(),
-    };
-    let quote = match quote.to_lowercase().as_str() {
-        "eth" | "weth" => network.eth.clone(),
-        "usdc" => network.usdc.clone(),
-        "usdt" => network.usdt.clone(),
-        "btc" | "wbtc" => network.wbtc.clone(),
-        "dai" => network.dai.clone(),
-        _ => String::default(),
-    };
-    let tag = format!("{}-{}", base.to_lowercase(), quote.to_lowercase());
-    if tag.is_empty() {
-        log::error!("Failed to convert base and quote to tag");
-        return None;
-    }
-    Some(tag)
 }

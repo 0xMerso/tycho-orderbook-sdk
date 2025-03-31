@@ -12,12 +12,7 @@ use tycho_client::rpc::RPCClient;
 use tycho_core::dto::ProtocolStateRequestBody;
 use tycho_simulation::models::Token;
 
-/**
- * Get the balances of the component in the specified protocol system.
- * let ps = "uniswap_v3".to_string();
- * let res = shd::core::client::get_component_balances(network.clone(), config.clone(), "0x391e8501b626c623d39474afca6f9e46c2686649".to_string(), ps).await;
- * dbg!(res);
- */
+/// Get the balances of the component in the specified protocol system.
 pub async fn get_component_balances(network: Network, cp: String, protosys: String, api_token: Option<String>) -> Option<HashMap<String, u128>> {
     // log::info!("Getting component balances on {}", network.name);
     let key: &str = match &api_token {
@@ -27,7 +22,7 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
     let client = match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(key)) {
         Ok(client) => client,
         Err(e) => {
-            log::error!("Failed to create client: {:?}", e.to_string());
+            tracing::error!("Failed to create client: {:?}", e.to_string());
             return None;
         }
     };
@@ -56,12 +51,14 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
             Some(result)
         }
         Err(e) => {
-            log::error!("Failed to get protocol states: {:?}", e.to_string());
+            tracing::error!("Failed to get protocol states: {:?}", e.to_string());
             None
         }
     }
 }
 
+/// Get the tokens from the Tycho API
+/// Filters are hardcoded for now.
 pub async fn tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>> {
     match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(&config.tycho_api_key)) {
         Ok(client) => {
@@ -80,25 +77,23 @@ pub async fn tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>>
                         });
                     }
                     let elasped = time.elapsed().unwrap().as_millis();
-                    log::info!("Took {:?} ms to get {} tokens on {}", elasped, tokens.len(), network.name);
+                    tracing::info!("Took {:?} ms to get {} tokens on {}", elasped, tokens.len(), network.name);
                     Some(tokens)
                 }
                 Err(e) => {
-                    log::error!("Failed to get tokens: {:?}", e.to_string());
+                    tracing::error!("Failed to get tokens: {:?}", e.to_string());
                     None
                 }
             }
         }
         Err(e) => {
-            log::error!("Failed to create client: {:?}", e.to_string());
+            tracing::error!("Failed to create client: {:?}", e.to_string());
             None
         }
     }
 }
 
-/**
- * Get the balance of the owner for the specified tokens.
- */
+/// Get the balance of the owner for the specified tokens.
 pub async fn erc20b(provider: &RootProvider<Http<Client>>, owner: String, tokens: Vec<String>) -> Result<Vec<u128>, String> {
     let mut balances = vec![];
     let client = Arc::new(provider);
@@ -110,7 +105,7 @@ pub async fn erc20b(provider: &RootProvider<Http<Client>>, owner: String, tokens
                 balances.push(balance);
             }
             Err(e) => {
-                log::error!("Failed to get balance for {}: {:?}", t, e);
+                tracing::error!("Failed to get balance for {}: {:?}", t, e);
                 balances.push(0);
             }
         }
@@ -125,10 +120,6 @@ use crate::types::Network;
 use crate::types::IERC20;
 use crate::utils::r#static::maths::BPD;
 
-/**
- * Convert Tycho fee attributes to basis point fee
- */
-
 /// Converts a native fee (as a hex string) into a byte vector representing fee in basis points.
 /// The conversion depends on the protocol type:
 /// - uniswap_v2_pool: fee is already in basis points (e.g., "0x1e" → 30)
@@ -138,18 +129,11 @@ use crate::utils::r#static::maths::BPD;
 pub fn feebps(protocol: String, _id: String, value: String) -> u128 {
     let fee = value.trim_start_matches("0x");
     let fee = u128::from_str_radix(fee, 16).unwrap_or(0);
-    // log::info!("Fee value: {} (from {})", fee, value);
     let fee = match AmmType::from(protocol.as_str()) {
         AmmType::Pancakeswap | AmmType::Sushiswap | AmmType::UniswapV2 => fee, // Already in bps
         AmmType::UniswapV3 | AmmType::UniswapV4 => fee * (BPD as u128) / 1_000_000,
         AmmType::Curve => 4, // Not implemented, assuming 4 bps by default
         AmmType::Balancer => (fee * (BPD as u128)) / 1e18 as u128,
     };
-    // log::info!("Proto: {} | ID: {} | Fee in bps: {} | Initial: {}", protocol, _id, fee, value);
     fee
-    // "uniswap_v2_pool" => fee_value,                           // already in bps
-    // "uniswap_v3_pool" | "uniswap_v4_pool" => fee_value / 100, // 1e6 scale → bps conversion
-    // "curve" => fee_value / 1_000_000,                         // pow10 scale → bps conversion
-    // "balancer_v2_pool" => fee_value / 100_000_000_000_000,    // pow18 scale → bps conversion
-    // _ => fee_value,                                           // default: no conversion applied
 }

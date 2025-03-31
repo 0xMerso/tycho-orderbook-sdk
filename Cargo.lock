@@ -8663,7 +8663,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "toml",
- "tracing-subscriber",
+ "tracing",
  "tycho-client",
  "tycho-core",
  "tycho-execution",
@@ -8676,7 +8676,7 @@ dependencies = [
 [[package]]
 name = "tycho-simulation"
 version = "0.82.1"
-source = "git+https://github.com/0xMerso/TychoSimu.git?branch=protocol-state-pub-fields#8b09b1fd72a609841662a1dfa9077957a83f1abe"
+source = "git+https://github.com/0xMerso/tycho-simulation.git?branch=protocol-state-pub-fields#8b09b1fd72a609841662a1dfa9077957a83f1abe"
 dependencies = [
  "alloy 0.5.4",
  "alloy-primitives",

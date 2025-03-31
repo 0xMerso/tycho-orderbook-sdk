@@ -53,7 +53,7 @@ impl OrderbookBuilder {
             hmt.insert(t.address.clone(), t.clone());
             srzt.push(SrzToken::from(t.clone()));
         });
-        log::info!("Prebuild. Got {} tokens", hmt.len());
+        tracing::debug!("Prebuild. Got {} tokens", hmt.len());
         let mut psb = ProtocolStreamBuilder::new(&network.tycho, chain)
             .exchange::<UniswapV2State>(TychoSupportedProtocol::UniswapV2.to_string().as_str(), filter.clone(), None)
             .exchange::<UniswapV3State>(TychoSupportedProtocol::UniswapV3.to_string().as_str(), filter.clone(), None)
@@ -64,7 +64,7 @@ impl OrderbookBuilder {
             .await;
 
         if network.name.as_str() == "ethereum" {
-            log::info!("Prebuild. Adding mainnet-specific exchanges");
+            tracing::debug!("Prebuild. Adding mainnet-specific exchanges");
             psb = psb
                 .exchange::<UniswapV2State>(TychoSupportedProtocol::Sushiswap.to_string().as_str(), filter.clone(), None)
                 .exchange::<UniswapV2State>(TychoSupportedProtocol::Pancakeswap.to_string().as_str(), filter.clone(), None)
@@ -89,7 +89,7 @@ impl OrderbookBuilder {
     }
 
     pub async fn build(self, config: OBPConfig, state: SharedTychoStreamState) -> Result<OrderbookProvider, StreamError> {
-        log::info!("Building OBP ... (it might take a while depending the API key)");
+        tracing::info!("Building OBP ... (it might take a while depending the API key)");
         OrderbookProvider::build(self, config, state).await
     }
 }

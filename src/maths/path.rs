@@ -77,10 +77,10 @@ pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) ->
 pub fn quote(ptss: Vec<ProtoTychoState>, atks: Vec<SrzToken>, path: Vec<String>) -> Option<f64> {
     // If ETH, return 1. Else, if the path is empty, return None.
     if path.len() == 1 {
-        log::info!(" - Path is just ETH. Returning quote of 1.0");
+        tracing::warn!(" - Path is just ETH. Returning quote of 1.0");
         return Some(1.0);
     } else if path.len() < 2 {
-        log::info!("🔺 Path is too short: {:?}", path);
+        tracing::warn!("🔺 Path is too short: {:?}", path);
         return None;
     }
     let mut cumulative_price = 1.0;
@@ -112,10 +112,10 @@ pub fn quote(ptss: Vec<ProtoTychoState>, atks: Vec<SrzToken>, path: Vec<String>)
             }
         }
         if !found {
-            log::info!("🔺 Quote error: no conversion path found for {} -> {}", token_in, token_out);
+            tracing::warn!("🔺 Quote error: no conversion path found for {} -> {}", token_in, token_out);
             return None;
         }
     }
-    log::info!(" - One unit of token ({:?} to {:?}) quoted to ETH = {}", path.first(), path.last(), cumulative_price);
+    tracing::debug!(" - One unit of token ({:?} to {:?}) quoted to ETH = {}", path.first(), path.last(), cumulative_price);
     Some(cumulative_price)
 }

@@ -1,4 +1,4 @@
-pub mod adapters;
+pub mod adapter;
 pub mod builder;
 pub mod core;
 pub mod data;

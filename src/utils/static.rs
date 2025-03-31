@@ -1,3 +1,31 @@
+use crate::types::Network;
+
+/// Static data for the networks
+pub fn networks() -> Vec<Network> {
+    vec![
+        Network {
+            chainid: 1,
+            name: "ethereum".to_string(),
+            eth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".to_string(),
+            rpc: "https://rpc.payload.de".to_string(),
+            exp: "https://etherscan.io/".to_string(),
+            tycho: "tycho-beta.propellerheads.xyz".to_string(),
+            permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3".to_string(),
+            port: 42001,
+        },
+        Network {
+            chainid: 8453,
+            name: "base".to_string(),
+            eth: "0x4200000000000000000000000000000000000006".to_string(),
+            rpc: "https://mainnet.base.org".to_string(),
+            exp: "https://basescan.io/".to_string(),
+            tycho: "tycho-base-beta.propellerheads.xyz".to_string(),
+            permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3".to_string(),
+            port: 42003,
+        },
+    ]
+}
+
 pub mod maths {
 
     pub static UNISWAP_Q96: u128 = 1 << 96;
@@ -22,7 +50,7 @@ pub mod maths {
 
 pub mod filter {
     pub static REMOVE_TVL_THRESHOLD: f64 = 1.; // 50 iteration maximum to optimize allocation
-    pub static ADD_TVL_THRESHOLD: f64 = 100.; // 50 iteration maximum to optimize allocation
+    pub static ADD_TVL_THRESHOLD: f64 = 50.; // 50 iteration maximum to optimize allocation
     pub static NULL_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 }
 
@@ -46,13 +74,8 @@ pub mod data {
         pub mod stream {
 
             // stream:status:<network> => SyncState
-            pub fn status(network: String) -> String {
-                format!("stream:status:{}", network.to_lowercase())
-            }
-
-            // stream:status2:<network> => SyncState => Used to wait for Stream to fully sync (balances)
-            pub fn stream2(network: String) -> String {
-                format!("stream2:status:{}", network.to_lowercase())
+            pub fn tycho(network: String) -> String {
+                format!("stream:stream:{}", network.to_lowercase())
             }
 
             // stream:latest:<network> => u64
@@ -73,11 +96,6 @@ pub mod data {
             // Get one orderbook via tag
             pub fn orderbook(network: String, tag: String) -> String {
                 format!("stream:orderbook:{}:{}", network.to_lowercase(), tag.to_lowercase())
-            }
-
-            // stream:pairs:<network> => array of pairs
-            pub fn pairs(network: String) -> String {
-                format!("stream:pairs:{}", network.to_lowercase())
             }
 
             // stream:component:id => one component

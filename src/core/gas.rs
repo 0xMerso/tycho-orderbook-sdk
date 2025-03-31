@@ -46,7 +46,7 @@ pub async fn eth_usd() -> f64 {
         Err(_) => 2000.0,
     };
     if price == 0. {
-        log::error!("Failed to get ETH price from CoinGecko, returning 2000.");
+        tracing::error!("Failed to get ETH price from CoinGecko, returning 2000.");
     }
     price
 }

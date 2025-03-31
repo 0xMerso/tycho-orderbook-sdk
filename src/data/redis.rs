@@ -11,7 +11,7 @@ use redis::{
     AsyncCommands, Client, RedisError,
 };
 
-use crate::types::SyncState;
+use crate::types::StreamState;
 
 /// ================ Naming Convention ================
 /// ALL             : <network>                            : One struct for eveything related to a network
@@ -27,7 +27,7 @@ pub async fn ping() {
             let pong: redis::RedisResult<String> = redis::cmd("PING").query_async(&mut co).await;
             match pong {
                 Ok(pong) => {
-                    log::info!("📕 Redis Ping Good");
+                    tracing::debug!("📕 Redis Ping Good");
                 }
                 Err(e) => {
                     panic!("Redis PING Error: {}", e);
@@ -55,7 +55,7 @@ pub async fn connect() -> Result<MultiplexedConnection, RedisError> {
     match client {
         Ok(client) => client.get_multiplexed_tokio_connection().await,
         Err(e) => {
-            log::error!("Redis Client Error: {}", e);
+            tracing::error!("Redis Client Error: {}", e);
             Err(e)
         }
     }
@@ -64,17 +64,17 @@ pub async fn connect() -> Result<MultiplexedConnection, RedisError> {
 /**
  * Get the status of the Redis db for a given network
  */
-pub async fn status(key: String) -> SyncState {
+pub async fn status(key: String) -> StreamState {
     let status = get::<u128>(key.as_str()).await;
     match status {
         Some(status) => match status {
-            1 => SyncState::Down,
-            2 => SyncState::Launching,
-            3 => SyncState::Syncing,
-            4 => SyncState::Running,
-            _ => SyncState::Error,
+            1 => StreamState::Down,
+            2 => StreamState::Launching,
+            3 => StreamState::Syncing,
+            4 => StreamState::Running,
+            _ => StreamState::Error,
         },
-        None => SyncState::Error,
+        None => StreamState::Error,
     }
 }
 
@@ -83,14 +83,14 @@ pub async fn status(key: String) -> SyncState {
  */
 pub async fn wstatus(key: String, object: String) {
     let time = std::time::SystemTime::now();
-    log::info!("Waiting Redis Synchro");
+    tracing::debug!("Waiting Redis Synchro");
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
         let status = status(key.clone()).await;
-        log::info!("Waiting for '{object}'. Current status: {:?}", status);
-        if let SyncState::Running = status {
+        tracing::debug!("Waiting for '{object}'. Current status: {:?}", status);
+        if let StreamState::Running = status {
             let elasped = time.elapsed().unwrap().as_millis();
-            log::info!("wstatus: redis db is ready. Took {} ms to sync", elasped);
+            tracing::debug!("wstatus: redis db is ready. Took {} ms to sync", elasped);
             break;
         }
     }
@@ -105,11 +105,11 @@ pub async fn delete(key: &str) {
         Ok(mut co) => {
             let deletion: redis::RedisResult<()> = redis::cmd("DEL").arg(key).query_async(&mut co).await;
             if let Err(err) = deletion {
-                log::error!("Failed to delete JSON object with key '{}': {}", key, err);
+                tracing::error!("Failed to delete JSON object with key '{}': {}", key, err);
             }
         }
         Err(e) => {
-            log::error!("Redis connection error: {}", e);
+            tracing::error!("Redis connection error: {}", e);
         }
     }
 }
@@ -127,18 +127,17 @@ pub async fn set<T: Serialize>(key: &str, data: T) {
                 Ok(mut co) => {
                     let result: redis::RedisResult<()> = redis::cmd("SET").arg(key).arg(data.clone()).query_async(&mut co).await;
                     if let Err(err) = result {
-                        log::error!("📕 Failed to set value for key '{}': {}", key, err);
+                        tracing::error!("📕 Failed to set value for key '{}': {}", key, err);
                     }
-                    // log::info!("📕 Set succeeded for key '{}'", key);
                 }
 
                 Err(e) => {
-                    log::error!("📕 Redis connection error: {}", e);
+                    tracing::error!("📕 Redis connection error: {}", e);
                 }
             }
         }
         Err(err) => {
-            log::error!("📕 Failed to serialize JSON object: {}", err);
+            tracing::error!("📕 Failed to serialize JSON object: {}", err);
         }
     }
 }
@@ -161,7 +160,7 @@ pub async fn get<T: Serialize + DeserializeOwned>(key: &str) -> Option<T> {
                             Some(value)
                         }
                         Err(err) => {
-                            log::error!("📕 Failed to deserialize JSON object: {}", err);
+                            tracing::error!("📕 Failed to deserialize JSON object: {}", err);
                             None
                         }
                     }
@@ -173,7 +172,7 @@ pub async fn get<T: Serialize + DeserializeOwned>(key: &str) -> Option<T> {
             }
         }
         Err(e) => {
-            log::error!("📕 Redis connection error: {}", e);
+            tracing::error!("📕 Redis connection error: {}", e);
             None
         }
     }

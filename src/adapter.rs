@@ -1,24 +1,37 @@
 use crate::types::{ExchangeInfo, Orderbook, OrderbookDepth};
+use async_trait::async_trait;
 use std::cmp::min;
 
 /// Implement conversion from Orderbook to a standard Orderbook format like Binance
 /// Binance: https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-endpoints
-
-/// ======================================================= Read =======================================================
-/// GET /api/v3/exchangeInfo --> implemented ✅
-/// GET /api/v3/depth        --> implemented ✅
+/// GET /api/v3/exchangeInfo --> implemented
+/// GET /api/v3/depth        --> implemented
 /// GET /api/v3/trades       --> not implementable
 /// GET /api/v3/avgPrice     --> not implementable
 
-impl Orderbook {
-    /// Onchain liquidity is not splitted by orders like in a traditional orderbook, the implementation is a bit different than the one from Binance or other exchanges
+#[async_trait]
+pub trait OrderBookAdapter: Send + Sync {
+    /// Returns orderbook depth snapshot (limited if specified).
+    fn depth(&self, limit: Option<u64>) -> OrderbookDepth;
 
+    /// Returns static metadata (e.g., name, symbols, fees).
+    fn info(&self) -> ExchangeInfo;
+
+    /// Executes a real trade (or sends the order to the exchange).
+    async fn execute(&self) -> u64; // (&mut self, side: Side, quantity: f64, price: f64);
+
+    /// Simulates a trade against the current orderbook.
+    async fn simulate(&self) -> u64; // (&self, side: Side, quantity: f64) -> TradeSimulationResult;
+}
+
+#[async_trait]
+impl OrderBookAdapter for Orderbook {
     /// Get the orderbook depth (depends on the amounts (= points) used to simulate the orderbook)
     /// Price are in quote asset, while quantity are in base asset
     /// See https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-endpoints#terminology
     /// curl -X GET "https://api.binance.com/api/v3/depth?symbol=ETHUSDC&limit=10"
     /// curl -X GET "https://api.binance.com/api/v3/exchangeInfo?symbol=ETHUSDC" (base = ETH, quote = USDC)
-    pub fn depth(&self, limit: Option<u64>) -> OrderbookDepth {
+    fn depth(&self, limit: Option<u64>) -> OrderbookDepth {
         let limit = match limit {
             Some(limit) => limit,
             None => min(self.bids.len() as u64, self.asks.len() as u64),
@@ -53,7 +66,7 @@ impl Orderbook {
     }
 
     /// Get the exchange info
-    pub fn exchange(&self) -> ExchangeInfo {
+    fn info(&self) -> ExchangeInfo {
         ExchangeInfo {
             timezone: "UTC".to_string(),
             base: self.base.clone(),
@@ -66,12 +79,14 @@ impl Orderbook {
     /// ======================================================= Write =======================================================
 
     /// POST /api/v3/order
-    pub async fn execute_trade(&self) {
-        log::info!("execute_trade");
+    async fn execute(&self) -> u64 {
+        tracing::debug!("execute");
+        0
     }
 
     /// POST /api/v3/order/test
-    pub async fn simulate_trade(&self) {
-        log::info!("simulate_trade");
+    async fn simulate(&self) -> u64 {
+        tracing::debug!("simulate");
+        0
     }
 }

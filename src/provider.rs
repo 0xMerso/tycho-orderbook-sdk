@@ -37,7 +37,7 @@ impl OrderbookProvider {
                 let taskstate = state.clone();
                 // Spawn an asynchronous task that processes the protocol stream.
                 // For each message received, update the shared state and send an OBPEvent.
-                log::info!("Starting stream processing task.");
+                tracing::info!("Starting stream processing task.");
 
                 let handle = tokio::spawn(async move {
                     futures::pin_mut!(stream);
@@ -53,7 +53,7 @@ impl OrderbookProvider {
                         drop(mtx);
                         match update {
                             Ok(msg) => {
-                                log::info!(
+                                tracing::debug!(
                                     "🔸 OBP: TychoStream: b#{} with {} states, pairs: +{} -{}",
                                     msg.block_number,
                                     msg.states.len(),
@@ -61,7 +61,7 @@ impl OrderbookProvider {
                                     msg.removed_pairs.len()
                                 );
                                 if !initialised {
-                                    log::info!("First stream (initialised was false). Writing the entire streamed data into the shared struct.");
+                                    tracing::info!("First stream (initialised was false). Writing the entire streamed data into the shared struct.");
                                     let mut targets = vec![];
                                     for (_, comp) in msg.new_pairs.iter() {
                                         targets.push(comp.id.to_string().to_lowercase());
@@ -92,7 +92,7 @@ impl OrderbookProvider {
                                         for x in msg.removed_pairs.iter() {
                                             mtx.components.remove(x.0);
                                         }
-                                        log::info!("Received {} new pairs, and {} pairs to be removed. Updating Redis ...", msg.new_pairs.len(), msg.removed_pairs.len());
+                                        tracing::debug!("Received {} new pairs, and {} pairs to be removed. Updating Redis ...", msg.new_pairs.len(), msg.removed_pairs.len());
                                         drop(mtx);
                                     }
                                     let event = OBPEvent::NewHeader(msg.block_number, updated.clone());
@@ -119,7 +119,7 @@ impl OrderbookProvider {
                 Ok(obp)
             }
             Err(err) => {
-                log::error!("Failed to build OBP: {:?}", err.to_string());
+                tracing::error!("Failed to build OBP: {:?}", err.to_string());
                 Err(err)
             }
         }
@@ -132,7 +132,7 @@ impl OrderbookProvider {
         let mtx = self.state.read().await;
         let comp = mtx.components.clone();
         if comp.is_empty() {
-            log::error!(" 🔺 No components found in the shared state");
+            tracing::error!(" 🔺 No components found in the shared state");
         }
         for (_k, v) in comp.iter() {
             let tokens: Vec<SrzToken> = v.tokens.clone().iter().map(|x| SrzToken::from(x.clone())).collect();
@@ -144,6 +144,7 @@ impl OrderbookProvider {
         output
     }
 
+    /// Compute the orderbook for the given pair by simulating trades on the components matching the requested pair
     pub async fn get_orderbook(&self, params: OrderbookRequestParams, simufns: Option<OrderbookFunctions>) -> Result<Orderbook, anyhow::Error> {
         let single = params.sps.is_some();
         let mtx = self.state.read().await;
@@ -165,7 +166,7 @@ impl OrderbookProvider {
             .ok_or_else(|| anyhow::anyhow!("Token {} not found", targets[0]))
             .unwrap();
         let targets = vec![srzt0.clone(), srzt1.clone()];
-        log::info!("Building orderbook for pair {}-{} | Single point: {}", targets[0].symbol.clone(), targets[1].symbol.clone(), single);
+        tracing::info!("Building orderbook for pair {}-{} | Single point: {}", targets[0].symbol.clone(), targets[1].symbol.clone(), single);
         let (base_to_eth_path, base_to_eth_comps) = maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
         let (quote_to_eth_path, quote_to_eth_comps) = maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
 
@@ -193,7 +194,7 @@ impl OrderbookProvider {
         if ptss.is_empty() {
             return Err(anyhow::anyhow!("No components found for the given pair"));
         }
-        log::info!("Found {} components for the pair. Evaluation t0/t1 ETH value ...", ptss.len());
+        tracing::debug!("Found {} components for the pair. Evaluation t0/t1 ETH value ...", ptss.len());
         let unit_base_eth_worth = maths::path::quote(to_eth_ptss.clone(), atks.clone(), base_to_eth_path.clone());
         let unit_quote_eth_worth = maths::path::quote(to_eth_ptss.clone(), atks.clone(), quote_to_eth_path.clone());
         match (unit_base_eth_worth, unit_quote_eth_worth) {
@@ -215,7 +216,7 @@ impl OrderbookProvider {
     /// Generates the struct param to build an orderbook
     /// Min_comps is the minimum number of components that the pair should have (= liquidity pools), the higher it is, the more iterations it will take to find a pair
     pub async fn generate_random_orderbook_params(&self, min_comps: usize) -> OrderbookRequestParams {
-        log::info!("Generating random orderbook ...");
+        tracing::debug!("Generating random orderbook ...");
         let seed = [42u8; 32]; // 256-bit seed
         let mut rng = StdRng::from_seed(seed);
         let tokens = self.tokens.clone();
@@ -232,7 +233,7 @@ impl OrderbookProvider {
                 if token0.symbol == *"WETH" || token1.symbol == *"WETH" || token0.symbol == *"SolvBTC" || token1.symbol == *"SolvBTC" {
                     continue;
                 }
-                log::info!(
+                tracing::debug!(
                     "Got {} components found for pair >>> {}  🔄  {} ({}-{}) (after {} iterations)",
                     tgcps.len(),
                     token0.symbol.clone(),
@@ -246,7 +247,7 @@ impl OrderbookProvider {
                 components = tgcps;
             } else {
                 if iterations % 1000 == 0 {
-                    log::info!("No components found for pair {}-{} (iterations # {})", token0.symbol.clone(), token1.symbol.clone(), iterations);
+                    tracing::debug!("No components found for pair {}-{} (iterations # {})", token0.symbol.clone(), token1.symbol.clone(), iterations);
                 }
                 iterations += 1;
             }
