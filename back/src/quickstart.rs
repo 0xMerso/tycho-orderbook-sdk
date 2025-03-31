@@ -1,9 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
-use tap2::shd::types::{EnvConfig, OBPConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookFunctions, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState};
 use tokio::sync::RwLock;
+use tycho_orderbook::shd::types::{EnvConfig, OBPConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookFunctions, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState};
 
-use tap2::shd;
-use tap2::shd::types::Network;
+use tycho_orderbook::shd;
+use tycho_orderbook::shd::types::Network;
 
 #[tokio::main]
 async fn main() {

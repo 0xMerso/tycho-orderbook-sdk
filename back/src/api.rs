@@ -7,7 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tap2::shd::{
+use tycho_orderbook::shd::{
     self,
     data::fmt::{SrzProtocolComponent, SrzToken},
     types::{EnvConfig, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookRequestParams, ProtoTychoState, Response, SharedTychoStreamState, Status, SyncState, Version},
@@ -306,7 +306,9 @@ async fn orderbook(
     let single = params.sps.is_some();
     log::info!("👾 API: OrderbookRequestParams: {:?} | Single point: {}", params, single);
     if validation(&headers) == false {
-        return wrap(None, Some("Invalid orderbook API key for header: 'tycho-orderbook-ui-api-key'".to_string()));
+        let msg = " 🔺 Invalid orderbook API key for header: 'tycho-orderbook-ui-api-key'";
+        log::info!("{}", msg);
+        return wrap(None, Some(msg.to_string()));
     }
     match (_tokens(network.clone()).await, _components(network.clone()).await) {
         (Some(atks), Some(acps)) => {

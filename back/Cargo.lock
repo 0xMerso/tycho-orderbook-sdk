@@ -7963,53 +7963,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
-name = "tap2"
-version = "0.1.0"
-dependencies = [
- "alloy 0.3.6",
- "alloy-chains",
- "alloy-primitives",
- "anyhow",
- "async-trait",
- "axum 0.8.1",
- "axum-macros",
- "bytes",
- "chrono",
- "clippy",
- "colored 2.2.0",
- "dotenv",
- "dotenv_codegen",
- "env_logger",
- "eyre",
- "fern",
- "futures 0.3.31",
- "hex",
- "hex-literal",
- "indicatif",
- "log",
- "num-bigint",
- "num-traits",
- "primitive-types 0.10.1",
- "rand 0.8.5",
- "rayon",
- "redis",
- "reqwest 0.12.12",
- "serde",
- "serde_json",
- "tokio",
- "toml",
- "tracing-subscriber",
- "tycho-client 0.59.3",
- "tycho-core 0.59.3",
- "tycho-execution 0.58.0",
- "tycho-simulation",
- "url",
- "utoipa 5.3.1",
- "utoipa-axum",
- "utoipa-swagger-ui",
-]
-
-[[package]]
 name = "tempfile"
 version = "3.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8778,6 +8731,53 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tycho-core 0.56.5",
+]
+
+[[package]]
+name = "tycho-orderbook"
+version = "0.1.0"
+dependencies = [
+ "alloy 0.3.6",
+ "alloy-chains",
+ "alloy-primitives",
+ "anyhow",
+ "async-trait",
+ "axum 0.8.1",
+ "axum-macros",
+ "bytes",
+ "chrono",
+ "clippy",
+ "colored 2.2.0",
+ "dotenv",
+ "dotenv_codegen",
+ "env_logger",
+ "eyre",
+ "fern",
+ "futures 0.3.31",
+ "hex",
+ "hex-literal",
+ "indicatif",
+ "log",
+ "num-bigint",
+ "num-traits",
+ "primitive-types 0.10.1",
+ "rand 0.8.5",
+ "rayon",
+ "redis",
+ "reqwest 0.12.12",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+ "tracing-subscriber",
+ "tycho-client 0.59.3",
+ "tycho-core 0.59.3",
+ "tycho-execution 0.58.0",
+ "tycho-simulation",
+ "url",
+ "utoipa 5.3.1",
+ "utoipa-axum",
+ "utoipa-swagger-ui",
 ]
 
 [[package]]
