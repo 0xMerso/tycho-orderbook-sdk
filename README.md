@@ -1,12 +1,12 @@
 
-# Tycho TAP-2
+# tycho-orderbook
 
-@authors 0xMerso & FBerger
-@contact Twitter @0xMerso
-@protocol Tycho
-@program Tycho Orderbook 
-@link [Tycho TAP-2](https://github.com/propeller-heads/tycho-x/blob/main/TAP-2.md)
-@date March 2025
+@authors 0xMerso & FBerger  
+@contact Twitter @0xMerso  
+@protocol Tycho  
+@program Tycho Orderbook   
+@link [Tycho TAP-2](https://github.com/propeller-heads/tycho-x/blob/main/TAP-2.md)  
+@date March 2025  
 
 Tycho Orderbook is a Rust crate that transposes onchain liquidity from AMMs into a familiar orderbook format.
 It simulates trades to derive an incremental supply curve and reconstructs liquidity as discrete limit orders.
