@@ -142,7 +142,7 @@ pub fn compute_cumulative_liquidity(active_liquidity: i128, current_tick: i32, t
 
 /// Simulates available token amounts for each tick in the tick list in both directions (bid/ask).
 /// For each tick, it calculates cumulative liquidity and then computes token amounts using derive().
-pub fn ticks_liquidity(active: i128, current_tick: i32, tick_spacing: i32, tick_list: &SrzTickList, t0: SrzToken, t1: SrzToken, verbose: bool) -> Vec<LiquidityTickAmounts> {
+pub fn ticks_liquidity(active: i128, current_tick: i32, tick_spacing: i32, tick_list: &SrzTickList, t0: SrzToken, t1: SrzToken, _verbose: bool) -> Vec<LiquidityTickAmounts> {
     tracing::debug!("------- Computing liquidity across ticks -------");
     let mut output = vec![];
     for tick in tick_list.ticks.iter() {

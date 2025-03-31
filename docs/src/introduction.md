@@ -57,4 +57,4 @@ Tycho-orderbook works as follows:
 ## Resources
 
 - [On-chain liquidity as an orderbook](https://www.propellerheads.xyz/blog/amm-liquidity-as-an-orderbook)
-
+- [On-chain liquidity for a token pair presented in familiar orderbook format](https://github.com/propeller-heads/tycho-x/blob/main/TAP-2.md)

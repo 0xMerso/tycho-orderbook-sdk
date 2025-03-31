@@ -1,5 +1,3 @@
-use futures::StreamExt;
-
 use std::collections::HashMap;
 use tycho_simulation::models::Token;
 use tycho_simulation::tycho_client::stream::StreamError;
@@ -33,10 +31,8 @@ use crate::utils::r#static::filter::REMOVE_TVL_THRESHOLD;
 
 /// OrderbookBuilder is a struct that allows the creation of an OrderbookProvider instance, using a default or custom ProtocolStreamBuilder from Tycho.
 impl OrderbookBuilder {
-    /**
-     * Default logic to create a ProtocolStreamBuilder, used to build a OrderbookProvider
-     * For more advanced use-cases, you can create your own ProtocolStreamBuilder and pass it to custom() fn
-     */
+    /// Default logic to create a ProtocolStreamBuilder, used to build a OrderbookProvider
+    /// For more advanced use-cases, you can create your own ProtocolStreamBuilder and pass it to custom() fn
     pub async fn new(network: Network, config: EnvConfig, tokens: Option<Vec<Token>>) -> Self {
         let (_, _, chain) = types::chain(network.name.clone()).expect("Invalid chain");
         let u4 = uniswap_v4_pool_with_hook_filter;
@@ -53,7 +49,6 @@ impl OrderbookBuilder {
             hmt.insert(t.address.clone(), t.clone());
             srzt.push(SrzToken::from(t.clone()));
         });
-        tracing::debug!("Prebuild. Got {} tokens", hmt.len());
         let mut psb = ProtocolStreamBuilder::new(&network.tycho, chain)
             .exchange::<UniswapV2State>(TychoSupportedProtocol::UniswapV2.to_string().as_str(), filter.clone(), None)
             .exchange::<UniswapV3State>(TychoSupportedProtocol::UniswapV3.to_string().as_str(), filter.clone(), None)
@@ -64,7 +59,7 @@ impl OrderbookBuilder {
             .await;
 
         if network.name.as_str() == "ethereum" {
-            tracing::debug!("Prebuild. Adding mainnet-specific exchanges");
+            tracing::trace!("Prebuild. Adding mainnet-specific exchanges");
             psb = psb
                 .exchange::<UniswapV2State>(TychoSupportedProtocol::Sushiswap.to_string().as_str(), filter.clone(), None)
                 .exchange::<UniswapV2State>(TychoSupportedProtocol::Pancakeswap.to_string().as_str(), filter.clone(), None)
@@ -79,6 +74,7 @@ impl OrderbookBuilder {
         }
     }
 
+    /// Custom logic to create a ProtocolStreamBuilder (custom exchanges, filters, etc.)
     pub async fn custom(network: Network, psb: ProtocolStreamBuilder, tokens: Vec<SrzToken>, api_token: String) -> Self {
         OrderbookBuilder {
             network,
@@ -88,6 +84,7 @@ impl OrderbookBuilder {
         }
     }
 
+    /// Build the OrderbookProvider instance
     pub async fn build(self, config: OBPConfig, state: SharedTychoStreamState) -> Result<OrderbookProvider, StreamError> {
         tracing::info!("Building OBP ... (it might take a while depending the API key)");
         OrderbookProvider::build(self, config, state).await

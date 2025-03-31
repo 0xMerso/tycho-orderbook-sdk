@@ -73,7 +73,7 @@ pub async fn build(
     pso.prices_quote_to_base = prices_quote_to_base;
     pso.base_lqdty = base_lqdty.clone();
     pso.quote_lqdty = quote_lqdty.clone();
-    tracing::info!("Optimization done. Returning Simulated Orderbook for pair (base-quote) => '{}-{}'\n", base.symbol, quote.symbol);
+    tracing::info!("Optimization done. Returning Simulated Orderbook for pair (base-quote) => '{}-{}'", base.symbol, quote.symbol);
     pso
 }
 

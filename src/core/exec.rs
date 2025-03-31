@@ -93,7 +93,7 @@ pub fn batch2tx(network: Network, solution: Solution, tx: Transaction, block: al
 /**
  * Prepare a swap execution.
  */
-pub async fn prepare(network: Network, chain: ChainSimu, provider: &RootProvider<Http<Client>>, request: ExecutionRequest, config: EnvConfig, balances: Vec<u128>) -> Option<Solution> {
+pub async fn prepare(_network: Network, chain: ChainSimu, _provider: &RootProvider<Http<Client>>, request: ExecutionRequest, _config: EnvConfig, _balances: Vec<u128>) -> Option<Solution> {
     tracing::debug!("Preparing swap. Request: {:?}", request);
     let router = ROUTER_ADDRESSES.get(&chain).expect("Router address not found").clone();
     let sum = request.distribution.iter().fold(0., |acc, x| acc + x);
@@ -142,8 +142,8 @@ pub async fn prepare(network: Network, chain: ChainSimu, provider: &RootProvider
 pub async fn presimulate(network: Network, nchain: NamedChain, config: EnvConfig, approve: TransactionRequest, swap: TransactionRequest) -> Result<String, String> {
     let wallet = PrivateKeySigner::from_bytes(&B256::from_str(&config.pvkey).expect("Failed to convert swapper pk to B256")).expect("Failed to private key signer");
     let signer = alloy::network::EthereumWallet::from(wallet.clone());
-    let prvdww = ProviderBuilder::new().with_chain(nchain).wallet(signer.clone()).on_http(network.rpc.parse().unwrap());
-    let payload = SimulatePayload {
+    let _prvdww = ProviderBuilder::new().with_chain(nchain).wallet(signer.clone()).on_http(network.rpc.parse().unwrap());
+    let _payload = SimulatePayload {
         block_state_calls: vec![SimBlock {
             block_overrides: None,
             state_overrides: None,

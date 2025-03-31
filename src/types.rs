@@ -10,6 +10,13 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use utoipa::ToSchema;
 
+use super::{
+    core::book::OrderbookQuoteFn,
+    data::fmt::{SrzProtocolComponent, SrzToken},
+};
+use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
+pub type SharedTychoStreamState = Arc<RwLock<TychoStreamState>>;
+
 alloy::sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -273,6 +280,7 @@ pub struct PairSimuIncrementConfig {
 }
 
 /// ================================================================ SDK ================================================================
+
 /// + shared-task data
 /// + API specific structs
 use tokio::sync::mpsc;
@@ -313,13 +321,6 @@ pub fn chain_timing(name: String) -> u64 {
         }
     }
 }
-
-use super::{
-    core::book::OrderbookQuoteFn,
-    data::fmt::{SrzProtocolComponent, SrzToken},
-};
-use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
-pub type SharedTychoStreamState = Arc<RwLock<TychoStreamState>>;
 
 /// Tycho Stream Data, stored in a Mutex/Arc for shared access between the SDK stream and the client or API.
 pub struct TychoStreamState {
@@ -432,8 +433,6 @@ pub struct Orderbook {
     /// One unit, multi-hop spot_price, needed to value the TVL and other stuff
     pub quote_worth_eth: f64,
 }
-
-/// Client side structs
 
 /// Orderbook Provider Event
 #[derive(Debug)]
