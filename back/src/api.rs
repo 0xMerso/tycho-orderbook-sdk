@@ -263,7 +263,6 @@ pub async fn _verify_obcache(network: Network, acps: Vec<SrzProtocolComponent>, 
 pub fn validation(headers: &HeaderMap) -> bool {
     let pwd = "todo";
     let key = "tycho-orderbook-ui-api-key";
-    return true;
     match headers.get(key) {
         Some(value) => {
             if let Ok(api_key) = value.to_str() {
@@ -280,7 +279,7 @@ pub fn validation(headers: &HeaderMap) -> bool {
             log::error!("Header not found. Rejecting request");
         }
     }
-    false
+    true // ! Hardcoded
 }
 
 // POST /orderbook/{0xt0-0xt1} => Simulate the orderbook
