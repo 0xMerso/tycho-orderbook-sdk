@@ -4,17 +4,17 @@ NETWORK="$1"
 
 # --- Usage ---
 # Requires Rust and Cargo to be installed.
-# sh examples/local.demo.sh ethereum
+# sh examples/quickstart.sh ethereum
 
 function start() {
     trap '' SIGINT
-    echo "Building ..."
+    echo "Building Quickstart"
     export NETWORK=$NETWORK
-    cargo build --bin ORDERBOOK -q 2>/dev/null
+    cargo build --bin quickstart -q 2>/dev/null
     echo "Build successful. Executing..."
     (
         trap - SIGINT
-        cargo run --bin ORDERBOOK -q # 2>/dev/null
+        cargo run --bin quickstart -q # 2>/dev/null
     )
     echo "Program has finished or was interrupted. Continuing with the rest of the shell script ..."
     status+=($?)
