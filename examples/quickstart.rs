@@ -1,16 +1,14 @@
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
-use tracing::Level;
 use tycho_client::feed::component_tracker::ComponentFilter;
 use tycho_orderbook::{
     adapter::OrderBookAdapter,
     core::{book, rpc},
     types::{
-        EnvConfig, Network, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState,
+        EnvConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState,
         TychoStreamState,
     },
     utils::{
-        self,
         r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
     },
 };

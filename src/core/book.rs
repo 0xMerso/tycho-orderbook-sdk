@@ -5,7 +5,7 @@ use crate::{
     data::fmt::{SrzProtocolComponent, SrzToken},
     maths,
     types::{MidPriceData, Network, Orderbook, OrderbookFunctions, OrderbookRequestParams, ProtoTychoState, TradeResult},
-    utils::{self, r#static::maths::simu},
+    utils::{self},
 };
 use rayon::prelude::*;
 use std::{collections::HashMap, time::Instant}; // Ensure Rayon is in your dependencies.
@@ -158,14 +158,14 @@ pub async fn simulate(
                         steps: fns.steps,
                     }
                 }
-                None => OrderbookFunctions { optimize: optimize, steps: steps },
+                None => OrderbookFunctions { optimize, steps },
             };
-            let steps = (obfs.steps)(aggb_base.clone());
-            let bids = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &base, &quote, aggb_base.clone(), quote_worth_eth);
+            let steps = (obfs.steps)(*aggb_base);
+            let bids = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &base, &quote, *aggb_base, quote_worth_eth);
             result.bids = bids;
             tracing::trace!(" 🔄  Bids done, now switching to asks");
-            let steps = (obfs.steps)(aggb_quote.clone());
-            let asks = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &quote, &base, aggb_quote.clone(), base_worth_eth);
+            let steps = (obfs.steps)(*aggb_quote);
+            let asks = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &quote, &base, *aggb_quote, base_worth_eth);
             result.asks = asks;
         }
     }

@@ -7,14 +7,11 @@ use tycho_simulation::evm::protocol::filters::uniswap_v4_pool_with_hook_filter;
 use tycho_simulation::evm::protocol::uniswap_v3::state::UniswapV3State;
 use tycho_simulation::evm::protocol::uniswap_v4::state::UniswapV4State;
 
-use tycho_simulation::{
-    evm::{
+use tycho_simulation::evm::{
         engine_db::tycho_db::PreCachedDB,
         protocol::{filters::balancer_pool_filter, uniswap_v2::state::UniswapV2State, vm::state::EVMPoolState},
         stream::ProtocolStreamBuilder,
-    },
-    tycho_client::feed::component_tracker::ComponentFilter,
-};
+    };
 
 use crate::core::rpc;
 use crate::data::fmt::SrzToken;
@@ -27,8 +24,6 @@ use crate::types::OrderbookProvider;
 use crate::types::OrderbookProviderConfig;
 use crate::types::SharedTychoStreamState;
 use crate::types::TychoSupportedProtocol;
-use crate::utils::r#static::filter::ADD_TVL_THRESHOLD;
-use crate::utils::r#static::filter::REMOVE_TVL_THRESHOLD;
 
 /// OrderbookBuilder is a struct that allows the creation of an OrderbookProvider instance, using a default or custom ProtocolStreamBuilder from Tycho.
 impl OrderbookBuilder {
