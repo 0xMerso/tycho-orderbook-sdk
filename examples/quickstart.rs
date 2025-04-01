@@ -39,8 +39,8 @@ async fn main() {
     });
     // --- Adjust as needed --- Mainnet here
     let eth = network.eth.clone();
-    let usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // base: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
-    let btc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"; // base: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
+    let usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string().to_lowercase(); // base: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
+    let btc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599".to_string().to_lowercase(); // base: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
     let btcusdc = format!("{}-{}", btc, usdc); // "BTC" "USDC"
     let btc_eth = format!("{}-{}", btc, eth); // "BTC" "ETH"
     let eth_usdc = format!("{}-{}", eth, usdc); // "ETH" "USDC"
@@ -72,7 +72,6 @@ async fn main() {
 
     let obp = Arc::new(obp);
     let state = Arc::clone(&obp.state);
-
     tracing::debug!("OBP Client started. Waiting for updates");
     loop {
         // Loop indefinitely over the stream, printing received events.
@@ -86,7 +85,10 @@ async fn main() {
                     tracing::info!("Event: NewHeader: #{} with {} components updated", block, updated.len());
                     for (k, v) in tracked.clone().iter() {
                         if v.is_none() {
-                            let simufns = OrderbookFunctions { optimize: book::optifast };
+                            let simufns = OrderbookFunctions {
+                                optimize: book::optimize,
+                                steps: book::steps,
+                            };
                             tracing::info!("🧱 OBP Event: Orderbook {} isn't build yet, building it ...", k.clone());
                             match obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
                                 Ok(orderbook) => {
@@ -106,7 +108,7 @@ async fn main() {
                             for (x, cp) in cps.iter().enumerate() {
                                 if updated.contains(&cp.id.to_lowercase()) {
                                     tracing::info!(
-                                        "- 📍 Component #{x} {} {} for {}-{} orderbook has changed, need to update it",
+                                        " - Component #{x} {} {} for {}-{} orderbook has changed, need to update it",
                                         cp.id,
                                         cp.protocol_type_name,
                                         current.base.symbol,
@@ -117,7 +119,10 @@ async fn main() {
                             }
                             if refresh {
                                 tracing::info!(" ⚖️  Orderbook {}-{} has changed, need to update it", current.base.symbol, current.quote.symbol);
-                                let simufns = OrderbookFunctions { optimize: book::optifast };
+                                let simufns = OrderbookFunctions {
+                                    optimize: book::optimize,
+                                    steps: book::steps,
+                                };
                                 if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
                                     tracing::info!("OBP Event: Orderbook {}-{} has been updated", current.base.symbol, current.quote.symbol);
                                     tracked.insert(k.clone(), Some(newob.clone()));
@@ -125,11 +130,11 @@ async fn main() {
                                     let depth = newob.depth(None);
                                     tracing::info!("Bids ({})", depth.bids.len());
                                     for d in depth.bids {
-                                        tracing::info!(" - {:.5} {} at {:.5} {}", d.1, current.base.symbol, d.0, current.quote.symbol);
+                                        tracing::info!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
                                     }
                                     tracing::info!("Asks ({})", depth.asks.len());
                                     for d in depth.asks {
-                                        tracing::info!(" - {:.5} {} at {:.5} {}", d.1, current.base.symbol, d.0, current.quote.symbol);
+                                        tracing::info!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
                                     }
                                 } else {
                                     tracing::error!("OBP Event: Error updating orderbook");

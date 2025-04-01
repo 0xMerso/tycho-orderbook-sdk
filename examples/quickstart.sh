@@ -14,7 +14,7 @@ function start() {
     echo "Build successful. Executing..."
     (
         trap - SIGINT
-        export RUST_LOG="off,tycho_orderbook=debug,quickstart=debug"
+        export RUST_LOG="off,tycho_orderbook=trace,quickstart=trace"
         cargo run --bin quickstart -q # 2>/dev/null
     )
     echo "Program has finished or was interrupted. Continuing with the rest of the shell script ..."

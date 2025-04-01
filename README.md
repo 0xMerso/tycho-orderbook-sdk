@@ -1,7 +1,7 @@
 
 # tycho-orderbook
 
-**authors:** 0xMerso x fberger  
+**authors:** 0xMerso and FBerger  
 **contact:** @0xMerso on X.
 **link:** [Tycho TAP-2](https://github.com/propeller-heads/tycho-x/blob/main/TAP-2.md)  
 **date:** March 2025  
@@ -17,7 +17,7 @@ You can run the quickstart, directly with cargo
     
     cargo run --bin quickstart
 
-Or using a custom script
+Or using a custom script (full logs enabled)
 
     sh examples/quickstart.sh ethereum
 

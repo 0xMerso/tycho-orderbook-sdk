@@ -11,7 +11,8 @@ use tokio::sync::RwLock;
 use utoipa::ToSchema;
 
 use super::{
-    core::book::OrderbookQuoteFn,
+    core::book::AmountStepsFn,
+    core::book::QuoteFn,
     data::fmt::{SrzProtocolComponent, SrzToken},
 };
 use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
@@ -466,8 +467,16 @@ pub struct OrderbookBuilderConfig {
 /// Struct used to build the orderbook functions in order to customize the orderbook construction
 /// If None, default simple and naive optimization is used, including gas costs.
 pub struct OrderbookFunctions {
-    pub optimize: OrderbookQuoteFn,
-    // pub generate_steps: OrderbookStepFn, // ToDo
+    pub optimize: QuoteFn,    // Custom optimization function, ideally a DEX aggregator algorithm
+    pub steps: AmountStepsFn, // Simulated amount/steps (returning for instance: 0.2 ETH, 2 ETH, 20 ETH, etc.). By default, it's an exponential curve based, up to 25% of total onchain liquidity
+}
+
+use crate::core::book::{optimize, steps};
+
+impl Default for OrderbookFunctions {
+    fn default() -> Self {
+        OrderbookFunctions { optimize, steps }
+    }
 }
 
 /// SDK prderbook provider (OBP) that wraps a ProtocolStreamBuilder stream

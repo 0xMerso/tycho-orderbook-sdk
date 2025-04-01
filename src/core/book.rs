@@ -88,7 +88,7 @@ pub async fn simulate(
     pcsdata: Vec<ProtoTychoState>,
     tokens: Vec<SrzToken>,
     body: OrderbookRequestParams,
-    simufns: Option<OrderbookFunctions>,
+    functions: Option<OrderbookFunctions>,
     balances: HashMap<String, f64>,
     base_worth_eth: f64,
     quote_worth_eth: f64,
@@ -150,76 +150,50 @@ pub async fn simulate(
             }
         }
         None => {
-            let fn_opti = match simufns {
-                Some(fns) => fns.optimize,
-                None => optimize,
+            let obfs = match functions {
+                Some(ref fns) => {
+                    tracing::trace!("Using custom functions for orderbook simulation, be sure of their correctness");
+                    OrderbookFunctions {
+                        optimize: fns.optimize,
+                        steps: fns.steps,
+                    }
+                }
+                None => OrderbookFunctions { optimize: optimize, steps: steps },
             };
-            // FuLL Orderbook optimization
-            let bids = (fn_opti)(&pcsdata, eth_usd, gas_price, &base, &quote, *aggb_base, quote_worth_eth);
+            let steps = (obfs.steps)(aggb_base.clone());
+            let bids = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &base, &quote, aggb_base.clone(), quote_worth_eth);
             result.bids = bids;
-            tracing::trace!(" 🔄  Switching to 1to0");
-            let asks = (fn_opti)(&pcsdata, eth_usd, gas_price, &quote, &base, *aggb_quote, base_worth_eth);
+            tracing::trace!(" 🔄  Bids done, now switching to asks");
+            let steps = (obfs.steps)(aggb_quote.clone());
+            let asks = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &quote, &base, aggb_quote.clone(), base_worth_eth);
             result.asks = asks;
         }
     }
     result
 }
 
-pub type OrderbookQuoteFn = fn(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult>;
+pub type AmountStepsFn = fn(liquidity: f64) -> Vec<f64>;
 
-pub fn optifast(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
-    let mut trades = Vec::new();
-    let start = aggb / utils::r#static::maths::TEN_MILLIONS; // No longer needed: / 10f64.powi(from.decimals as i32);
-    tracing::debug!(
-        "Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}",
-        from.symbol,
-        aggb,
-        start,
-        output_u_ethworth
-    );
+/// Default steps function
+/// This function generates a set of quoted amounts based on the aggregated liquidity of the pools.
+/// Up to END_MULTIPLIER % of the aggregated liquidity, it generates a set of amounts using an exponential function with minimum delta percentage.
+pub fn steps(liquidity: f64) -> Vec<f64> {
+    let start = liquidity / utils::r#static::maths::TEN_MILLIONS;
     let steps = maths::steps::exponential(
         utils::r#static::maths::simu::COUNT_FAST,
         utils::r#static::maths::simu::START_MULTIPLIER,
         utils::r#static::maths::simu::END_MULTIPLIER,
         utils::r#static::maths::simu::END_MULTIPLIER * utils::r#static::maths::simu::MIN_EXP_DELTA_PCT,
     );
-    let steps = steps.iter().map(|x| x * start).collect::<Vec<f64>>();
-    for (x, amount) in steps.iter().enumerate() {
-        let tmstp = Instant::now();
-        let result = maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
-        let elapsed = tmstp.elapsed().as_millis();
-        let gas_cost = result.gas_costs_usd.iter().sum::<f64>();
-        tracing::trace!(
-            " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {} ms",
-            x,
-            result.amount,
-            from.symbol,
-            result.output,
-            to.symbol,
-            result.average_sell_price,
-            gas_cost,
-            result.distribution,
-            elapsed
-        );
-        trades.push(result);
-    }
-    trades
+    steps.iter().map(|x| x * start).collect::<Vec<f64>>()
 }
 
-/**
- * Executes the optimizer for a given token pair and a set of pools.
- */
-pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
-    let start = aggb / utils::r#static::maths::TEN_MILLIONS;
-    tracing::trace!(
-        "Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}",
-        from.symbol,
-        aggb,
-        start,
-        output_u_ethworth
-    );
-    let steps = maths::steps::exponential(simu::COUNT, simu::START_MULTIPLIER, simu::END_MULTIPLIER, simu::END_MULTIPLIER * simu::MIN_EXP_DELTA_PCT);
-    let steps = steps.iter().map(|x| x * start).collect::<Vec<f64>>();
+pub type QuoteFn = fn(pcs: &Vec<ProtoTychoState>, steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult>;
+
+// Executes the optimizer for a given token pair and a set of pools.
+/// Use the steps generated by function pointer
+pub fn optimize(pcs: &Vec<ProtoTychoState>, steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
+    tracing::debug!("Agg onchain liquidity balance for {} is {} | Output unit worth eth: {}", from.symbol, aggb, output_u_ethworth);
     let trades: Vec<TradeResult> = steps
         .par_iter()
         .enumerate()
