@@ -2,7 +2,7 @@
 
 The tycho-orderbook crate transpose onchain liquidity into a familiar orderbook format.
 
-## Why 
+## Challenge solved 
 
 In DeFi, liquidity is typically provided by AMMs, which use continuous formulas to distribute liquidity, unlike orderbooks that aggregate discrete limit orders. Despite their differences, both approaches ultimately produce strictly increasing supply curves.
 

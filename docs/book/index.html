@@ -154,7 +154,7 @@
                     <main>
                         <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
 <p>The tycho-orderbook crate transpose onchain liquidity into a familiar orderbook format.</p>
-<h2 id="why"><a class="header" href="#why">Why</a></h2>
+<h2 id="problem-solved"><a class="header" href="#problem-solved">Problem solved</a></h2>
 <p>In DeFi, liquidity is typically provided by AMMs, which use continuous formulas to distribute liquidity, unlike orderbooks that aggregate discrete limit orders. Despite their differences, both approaches ultimately produce strictly increasing supply curves.</p>
 <p>The key insight is that if on-chain liquidity can be seen as a strictly increasing supply curve, it’s possible to replicate that curve with a series of limit orders.</p>
 <p>By running numerous simulations, one can derive the incremental supply—essentially, the price levels at which liquidity is available—and then reconstruct an equivalent orderbook.</p>
@@ -235,6 +235,22 @@
 
         </div>
 
+        <!-- Livereload script (if served using the cli tool) -->
+        <script>
+            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsAddress = wsProtocol + "//" + location.host + "/" + "__livereload";
+            const socket = new WebSocket(wsAddress);
+            socket.onmessage = function (event) {
+                if (event.data === "reload") {
+                    socket.close();
+                    location.reload();
+                }
+            };
+
+            window.onbeforeunload = function() {
+                socket.close();
+            }
+        </script>
 
 
 
