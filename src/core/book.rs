@@ -180,7 +180,7 @@ pub type AmountStepsFn = fn(liquidity: f64) -> Vec<f64>;
 pub fn steps(liquidity: f64) -> Vec<f64> {
     let start = liquidity / utils::r#static::maths::TEN_MILLIONS;
     let steps = maths::steps::exponential(
-        utils::r#static::maths::simu::COUNT_FAST,
+        utils::r#static::maths::simu::COUNT,
         utils::r#static::maths::simu::START_MULTIPLIER,
         utils::r#static::maths::simu::END_MULTIPLIER,
         utils::r#static::maths::simu::END_MULTIPLIER * utils::r#static::maths::simu::MIN_EXP_DELTA_PCT,
