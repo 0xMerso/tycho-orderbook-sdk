@@ -4,13 +4,8 @@ use tycho_client::feed::component_tracker::ComponentFilter;
 use tycho_orderbook::{
     adapter::OrderBookAdapter,
     core::{book, rpc},
-    types::{
-        EnvConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState,
-        TychoStreamState,
-    },
-    utils::{
-        r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
-    },
+    types::{EnvConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState},
+    utils::r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
 };
 
 #[tokio::main]

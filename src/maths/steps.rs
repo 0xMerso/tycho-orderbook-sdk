@@ -81,14 +81,8 @@ pub fn generate_segments(tb_one_mn: f64) -> Vec<IncrementationSegment> {
         end: tb_one_mn * ONE_PERCENT_IN_MN,
         step: tb_one_mn * 2000.,
     };
-    let s3 = IncrementationSegment {
-        start: tb_one_mn * ONE_PERCENT_IN_MN,
-        end: tb_one_mn * (5. * ONE_PERCENT_IN_MN),
-        step: tb_one_mn * 5000.,
-    };
     segments.push(s1);
     segments.push(s2);
-    // segments.push(s3);
     segments
 }
 

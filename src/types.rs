@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use alloy::rpc::types::TransactionRequest;
 use alloy_primitives::TxKind;
@@ -75,6 +72,7 @@ pub enum TychoSupportedProtocol {
     Curve,
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for TychoSupportedProtocol {
     fn to_string(&self) -> String {
         match self {
@@ -115,6 +113,7 @@ pub enum AmmType {
     Curve,
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for AmmType {
     fn to_string(&self) -> String {
         match self {
@@ -210,9 +209,6 @@ impl From<TransactionRequest> for SrzTransactionRequest {
     }
 }
 
-/// ====================================================================================================================================================================================================
-/// Ticks and Liquidity
-
 #[derive(Debug, Clone)]
 pub struct TickDataRange {
     pub tick_lower: i32,
@@ -248,10 +244,6 @@ pub struct PairSimuIncrementConfig {
     pub segments: Vec<IncrementationSegment>,
 }
 
-/// ================================================================ SDK ================================================================
-
-/// + shared-task data
-/// + API specific structs
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;

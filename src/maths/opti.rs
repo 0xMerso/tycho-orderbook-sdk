@@ -11,7 +11,7 @@ use tycho_simulation::models::Token;
 /// Only “activate” an additional pool if the net benefit (output after gas cost) exceeds a fixed activation penalty.
 pub fn gradient(
     amount: f64, // human–readable amount (e.g. 100 meaning 100 ETH)
-    pools: &Vec<ProtoTychoState>,
+    pools: &[ProtoTychoState],
     tkinput: SrzToken,
     tkoutput: SrzToken,
     eth_usd: f64,       // ETH price in USD

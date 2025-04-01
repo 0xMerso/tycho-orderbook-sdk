@@ -124,16 +124,19 @@ pub fn derive(
 /// If target_tick > current_tick, adds net liquidity; if target_tick < current_tick, subtracts net liquidity.
 pub fn compute_cumulative_liquidity(active_liquidity: i128, current_tick: i32, target_tick: i32, tick_list: &SrzTickList) -> i128 {
     let mut liquidity = active_liquidity;
-    if target_tick > current_tick {
-        for tick in tick_list.ticks.iter() {
-            if tick.index > current_tick && tick.index <= target_tick {
-                liquidity += tick.net_liquidity;
+    match target_tick > current_tick {
+        true => {
+            for tick in tick_list.ticks.iter() {
+                if tick.index > current_tick && tick.index <= target_tick {
+                    liquidity += tick.net_liquidity;
+                }
             }
         }
-    } else if target_tick < current_tick {
-        for tick in tick_list.ticks.iter() {
-            if tick.index <= current_tick && tick.index > target_tick {
-                liquidity -= tick.net_liquidity;
+        false => {
+            for tick in tick_list.ticks.iter() {
+                if tick.index <= current_tick && tick.index > target_tick {
+                    liquidity -= tick.net_liquidity;
+                }
             }
         }
     }
@@ -150,25 +153,25 @@ pub fn ticks_liquidity(active: i128, current_tick: i32, tick_spacing: i32, tick_
         // Compute cumulative liquidity at target_tick.
         let cum_liq = compute_cumulative_liquidity(active, current_tick, target_tick, tick_list);
         // Determine the range boundaries and simulate an "active" sqrt price.
-        let (range_low, range_high, simulated_sqrt_price_x96): (i32, i32, f64) = if target_tick < current_tick {
-            let low = target_tick;
-            let high = target_tick + tick_spacing;
-            let _sqrt_low = 1.0001_f64.powf(low as f64 / 2.0) * (UNISWAP_Q96 as f64);
-            let sqrt_high = 1.0001_f64.powf(high as f64 / 2.0) * (UNISWAP_Q96 as f64);
-            // let mid = (sqrt_low + sqrt_high) / 2.0;
-            let mid = sqrt_high; // ! This might not work as expected. Use this if you want 0 on the token outside
-            (low, high, mid)
-        } else if target_tick > current_tick {
-            let low = target_tick - tick_spacing;
-            let high = target_tick;
-            let sqrt_low = 1.0001_f64.powf(low as f64 / 2.0) * (UNISWAP_Q96 as f64);
-            let _sqrt_high = 1.0001_f64.powf(high as f64 / 2.0) * (UNISWAP_Q96 as f64);
-            // let mid = (sqrt_low + sqrt_high) / 2.0;
-            let mid = sqrt_low; // ! This might not work as expected. Use this if you want 0 on the token outside
-            (low, high, mid)
-        } else {
-            // For current tick, use the actual pool's sqrt price from the tick info.
-            (current_tick, current_tick, tick.sqrt_price.to_string().parse::<f64>().unwrap())
+        let (range_low, range_high, simulated_sqrt_price_x96): (i32, i32, f64) = match target_tick.cmp(&current_tick) {
+            std::cmp::Ordering::Less => {
+                let low = target_tick;
+                let high = target_tick + tick_spacing;
+                let _sqrt_low = 1.0001_f64.powf(low as f64 / 2.0) * (UNISWAP_Q96 as f64);
+                let sqrt_high = 1.0001_f64.powf(high as f64 / 2.0) * (UNISWAP_Q96 as f64);
+                (low, high, sqrt_high)
+            }
+            std::cmp::Ordering::Greater => {
+                let low = target_tick - tick_spacing;
+                let high = target_tick;
+                let sqrt_low = 1.0001_f64.powf(low as f64 / 2.0) * (UNISWAP_Q96 as f64);
+                let _sqrt_high = 1.0001_f64.powf(high as f64 / 2.0) * (UNISWAP_Q96 as f64);
+                (low, high, sqrt_low)
+            }
+            std::cmp::Ordering::Equal => {
+                // For current tick, use the actual pool's sqrt price from the tick info.
+                (current_tick, current_tick, tick.sqrt_price.to_string().parse::<f64>().unwrap())
+            }
         };
         // Enable verbose logging if target_tick is within ±10×tick_spacing of current_tick.
         let verbose = (target_tick - current_tick).abs() <= 5 * tick_spacing;

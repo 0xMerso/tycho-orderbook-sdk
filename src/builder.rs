@@ -8,10 +8,10 @@ use tycho_simulation::evm::protocol::uniswap_v3::state::UniswapV3State;
 use tycho_simulation::evm::protocol::uniswap_v4::state::UniswapV4State;
 
 use tycho_simulation::evm::{
-        engine_db::tycho_db::PreCachedDB,
-        protocol::{filters::balancer_pool_filter, uniswap_v2::state::UniswapV2State, vm::state::EVMPoolState},
-        stream::ProtocolStreamBuilder,
-    };
+    engine_db::tycho_db::PreCachedDB,
+    protocol::{filters::balancer_pool_filter, uniswap_v2::state::UniswapV2State, vm::state::EVMPoolState},
+    stream::ProtocolStreamBuilder,
+};
 
 use crate::core::rpc;
 use crate::data::fmt::SrzToken;

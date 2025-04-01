@@ -7,11 +7,13 @@ use crate::{
 use serde::Deserialize;
 use tycho_simulation::models::Token;
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct CoinGeckoResponse {
     pub ethereum: CryptoPrice,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct CryptoPrice {
     pub usd: f64,

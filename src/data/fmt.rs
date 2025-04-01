@@ -141,9 +141,9 @@ impl From<ProtocolComponent> for SrzProtocolComponent {
 }
 
 impl SrzProtocolComponent {
+    #[allow(deprecated)]
     pub fn original(srz: SrzProtocolComponent, chain: tycho_simulation::evm::tycho_models::Chain) -> ProtocolComponent {
         ProtocolComponent {
-            #[allow(deprecated)]
             address: Bytes::from_str(srz.address.to_lowercase().as_str()).unwrap(),
             id: Bytes::from_str(srz.id.to_lowercase().as_str()).unwrap(),
             tokens: srz.tokens.into_iter().map(Token::from).collect(),

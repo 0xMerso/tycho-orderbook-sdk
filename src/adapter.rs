@@ -75,8 +75,6 @@ impl OrderBookAdapter for Orderbook {
         }
     }
 
-    /// ======================================================= Write =======================================================
-
     /// POST /api/v3/order
     async fn execute(&self) -> u64 {
         tracing::debug!("execute");
