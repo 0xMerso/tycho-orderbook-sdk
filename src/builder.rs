@@ -47,6 +47,7 @@ impl OrderbookBuilder {
             hmt.insert(t.address.clone(), t.clone());
             srzt.push(SrzToken::from(t.clone()));
         });
+        tracing::debug!("network.tycho: {} and chain: {}", network.tycho, chain);
         let mut psb = ProtocolStreamBuilder::new(&network.tycho, chain)
             .exchange::<UniswapV2State>(TychoSupportedProtocol::UniswapV2.to_string().as_str(), filter.clone(), None)
             .exchange::<UniswapV3State>(TychoSupportedProtocol::UniswapV3.to_string().as_str(), filter.clone(), None)

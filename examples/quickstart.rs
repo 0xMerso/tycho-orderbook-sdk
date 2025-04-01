@@ -14,7 +14,7 @@ async fn main() {
     tracing_subscriber::fmt().with_env_filter(filter).init(); // <--- Set the tracing level here
     tracing::info!("--- --- --- Launching Quickstart Tycho Orderbook --- --- ---");
     // tracing::info!("Gm"); tracing::debug!("Gm"); tracing::trace!("Gm");
-    dotenv::from_filename(".env.ex").ok(); // Use .env.ex for testing
+    dotenv::from_filename(".env.prod").ok(); // Use .env.ex for testing
     let env = EnvConfig::new();
     let networks = tycho_orderbook::utils::r#static::networks();
     let network = networks.clone().into_iter().find(|x| x.name == env.network).expect("Network not found");
@@ -25,7 +25,13 @@ async fn main() {
         components: HashMap::new(),
         initialised: false,
     }));
-    let tokens = rpc::tokens(&network, &env).await.unwrap();
+    let tokens = match rpc::tokens(&network, &env).await {
+        Some(t) => t,
+        None => {
+            tracing::error!("Failed to get tokens. Something anormal, make sure Tycho endpoint is operational. Exiting.");
+            return;
+        }
+    };
     let mut hmt = HashMap::new();
     tokens.iter().for_each(|t| {
         hmt.insert(t.address.clone(), t.clone());

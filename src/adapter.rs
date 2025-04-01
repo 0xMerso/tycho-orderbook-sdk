@@ -2,12 +2,15 @@ use crate::types::{ExchangeInfo, Orderbook, OrderbookDepth};
 use async_trait::async_trait;
 use std::cmp::min;
 
-/// Implement conversion from Orderbook to a standard Orderbook format like Binance
+/// Adapters are customized interfaces implemented for specific needs on the Orderbook struct, such as the reproduction of the exchange's orderbook format.
+/// The default adapter is designed to match as much as possible the Binance standard.
+
+/// Implement conversion from Orderbook to a standard Orderbook format.
 /// Binance: https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-endpoints
 /// GET /api/v3/exchangeInfo --> implemented
 /// GET /api/v3/depth        --> implemented
-/// GET /api/v3/trades       --> not implementable
-/// GET /api/v3/avgPrice     --> not implementable
+/// GET /api/v3/trades       --> not relevant
+/// GET /api/v3/avgPrice     --> not relevant
 
 #[async_trait]
 pub trait OrderBookAdapter: Send + Sync {
