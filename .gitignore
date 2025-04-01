@@ -3,3 +3,4 @@ target
 dump.rdb
 .env.prod
 rustfmt.toml
+docs/build

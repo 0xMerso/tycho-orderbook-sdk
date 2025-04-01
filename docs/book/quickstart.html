@@ -157,10 +157,14 @@
 <p>Clone the tycho-orderbook repository, where you'll find the quickstart code.
 The .env.ex file provides the default environment variables needed to launch the quickstart program.</p>
 <p>ToDo</p>
-<h3 id="frontend"><a class="header" href="#frontend">Frontend</a></h3>
+<h3 id="frontend-setup-instructions"><a class="header" href="#frontend-setup-instructions">Frontend Setup Instructions</a></h3>
 <p>A NextJS frontend is also available, with an API using the tycho-orderbook source code.
 To launch it, you need docker compose.</p>
 <p>ToDo</p>
+<h3 id="local-setup-instructions"><a class="header" href="#local-setup-instructions">Local Setup Instructions</a></h3>
+<p>If activated, the logs provided a genered information of what's happening under the hood.</p>
+<p>The script  <code>ops/local.api.start.sh</code>  can be used to launch the API.
+The script <code>ops/api.test.sh</code>  can be used to test the API without using the frontend.</p>
 
                     </main>
 
@@ -191,22 +195,6 @@ To launch it, you need docker compose.</p>
 
         </div>
 
-        <!-- Livereload script (if served using the cli tool) -->
-        <script>
-            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsAddress = wsProtocol + "//" + location.host + "/" + "__livereload";
-            const socket = new WebSocket(wsAddress);
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload();
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
 
 
 

@@ -203,9 +203,12 @@
 <li>Loop on 2) to constantly monitor status updates.</li>
 </ol>
 <p><img src="img/escalidraw.flow.png" alt="Image" /></p>
+<p>For example, a Binance-formatted version of an order book would contain the following data on pair BTC-USDC.</p>
+<p><img src="img/bidask.list.png" alt="Image" /></p>
 <h2 id="resources"><a class="header" href="#resources">Resources</a></h2>
 <ul>
 <li><a href="https://www.propellerheads.xyz/blog/amm-liquidity-as-an-orderbook">On-chain liquidity as an orderbook</a></li>
+<li><a href="https://github.com/propeller-heads/tycho-x/blob/main/TAP-2.md">On-chain liquidity for a token pair presented in familiar orderbook format</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="usage"><a class="header" href="#usage">Usage</a></h1>
 <p>This section explains how to integrate and use the <strong>Tycho-Orderbook</strong> crate in your project.</p>
@@ -218,11 +221,15 @@ tycho-orderbook = "0.1.0"</code></pre>
 <p>Clone the tycho-orderbook repository, where you'll find the quickstart code.
 The .env.ex file provides the default environment variables needed to launch the quickstart program.</p>
 <p>ToDo</p>
-<h3 id="frontend"><a class="header" href="#frontend">Frontend</a></h3>
+<h3 id="frontend-setup-instructions"><a class="header" href="#frontend-setup-instructions">Frontend Setup Instructions</a></h3>
 <p>A NextJS frontend is also available, with an API using the tycho-orderbook source code.
 To launch it, you need docker compose.</p>
 <p>ToDo</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="frontend-1"><a class="header" href="#frontend-1">Frontend</a></h1>
+<h3 id="local-setup-instructions"><a class="header" href="#local-setup-instructions">Local Setup Instructions</a></h3>
+<p>If activated, the logs provided a genered information of what's happening under the hood.</p>
+<p>The script  <code>ops/local.api.start.sh</code>  can be used to launch the API.
+The script <code>ops/api.test.sh</code>  can be used to test the API without using the frontend.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="frontend"><a class="header" href="#frontend">Frontend</a></h1>
 <p>The public version of tycho-orderbook is limited in its ability to handle all orderbook requests and update them dynamically.
 To solve this problem, and to allow more flexibility, we provide an open-source Next JS frontend.
 You can find it in this repository: https://github.com/0xMerso/tycho-orderbook-web</p>
@@ -240,12 +247,15 @@ The entire system is designed to be modular and can be launched effortlessly usi
 <li><strong>Rust</strong>: Required for building and modifying the code (optional).</li>
 <li><strong>Solver</strong> Custom Solver Implementation: your solver module (optional).</li>
 </ul>
-<h3 id="setup-instructions"><a class="header" href="#setup-instructions">Setup Instructions</a></h3>
+<h3 id="docker-setup-instructions"><a class="header" href="#docker-setup-instructions">Docker Setup Instructions</a></h3>
 <ol>
 <li>
 <p><strong>Clone the Repository</strong></p>
 <pre><code class="language-bash">git clone &lt;repository-url&gt;
-cd &lt;repository-directory&gt;</code></pre>
+cd &lt;repository-directory&gt;
+
+
+</code></pre>
 </li>
 </ol>
 
@@ -266,22 +276,6 @@ cd &lt;repository-directory&gt;</code></pre>
 
         </div>
 
-        <!-- Livereload script (if served using the cli tool) -->
-        <script>
-            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsAddress = wsProtocol + "//" + location.host + "/" + "__livereload";
-            const socket = new WebSocket(wsAddress);
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload();
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
 
 
 

@@ -170,12 +170,15 @@ The entire system is designed to be modular and can be launched effortlessly usi
 <li><strong>Rust</strong>: Required for building and modifying the code (optional).</li>
 <li><strong>Solver</strong> Custom Solver Implementation: your solver module (optional).</li>
 </ul>
-<h3 id="setup-instructions"><a class="header" href="#setup-instructions">Setup Instructions</a></h3>
+<h3 id="docker-setup-instructions"><a class="header" href="#docker-setup-instructions">Docker Setup Instructions</a></h3>
 <ol>
 <li>
 <p><strong>Clone the Repository</strong></p>
 <pre><code class="language-bash">git clone &lt;repository-url&gt;
-cd &lt;repository-directory&gt;</code></pre>
+cd &lt;repository-directory&gt;
+
+
+</code></pre>
 </li>
 </ol>
 
@@ -202,22 +205,6 @@ cd &lt;repository-directory&gt;</code></pre>
 
         </div>
 
-        <!-- Livereload script (if served using the cli tool) -->
-        <script>
-            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsAddress = wsProtocol + "//" + location.host + "/" + "__livereload";
-            const socket = new WebSocket(wsAddress);
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload();
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
 
 
 
