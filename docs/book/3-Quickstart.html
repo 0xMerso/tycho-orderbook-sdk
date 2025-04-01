@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Usage - Tycho Orderbook</title>
+        <title>Quickstart - Tycho Orderbook</title>
 
 
         <!-- Custom HTML head -->
@@ -152,22 +152,30 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="usage"><a class="header" href="#usage">Usage</a></h1>
-<p>This section explains how to integrate and use the <strong>Tycho-Orderbook</strong> crate in your project.</p>
-<h2 id="1-adding-the-dependency"><a class="header" href="#1-adding-the-dependency">1. Adding the Dependency</a></h2>
-<p>To use the tycho-orderbook crate, add it to your <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies]
-tycho-orderbook = "0.1.0"</code></pre>
+                        <h1 id="quickstart"><a class="header" href="#quickstart">Quickstart</a></h1>
+<p>The quickstart program is an example usage of the tycho-orderbook crate.
+It opens a Tycho stream, listen to it, build or update orderbooks each time states has changed, and prints out the formatted orderbooks.</p>
+<h3 id="terminal"><a class="header" href="#terminal">Terminal</a></h3>
+<p>Clone the tycho-orderbook repository, where you'll find the quickstart code.
+The .env.ex file provides the default environment variables needed to launch the quickstart program.</p>
+<h3 id="local-setup-instructions"><a class="header" href="#local-setup-instructions">Local Setup Instructions</a></h3>
+<p>You must have Rust installed.</p>
+<p>To run the program:</p>
+<pre><code>sh examples/quickstart.sh ethereum
+</code></pre>
+<p>If activated, the logs provided a genered information of what's happening under the hood.</p>
+<p>The script  <code>ops/local.api.start.sh</code>  can be used to launch the API.
+The script <code>ops/api.test.sh</code>  can be used to test the API without using the frontend.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="introduction.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="2-Usage.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="quickstart.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="4-Frontend.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -177,11 +185,11 @@ tycho-orderbook = "0.1.0"</code></pre>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="introduction.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="2-Usage.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="quickstart.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="4-Frontend.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

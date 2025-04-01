@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Frontend - Tycho Orderbook</title>
+        <title>Usage - Tycho Orderbook</title>
 
 
         <!-- Custom HTML head -->
@@ -152,44 +152,48 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="frontend"><a class="header" href="#frontend">Frontend</a></h1>
-<p>The public version of tycho-orderbook is limited in its ability to handle all orderbook requests and update them dynamically.
-To solve this problem, and to allow more flexibility, we provide an open-source Next JS frontend.
-You can find it in this repository: https://github.com/0xMerso/tycho-orderbook-web</p>
-<p>This project provides a website that lets you run your own order book simulations and use your own solver to customize the order book construction algorithm.
-The entire system is designed to be modular and can be launched effortlessly using <code>docker compose</code>.</p>
-<h3 id="features"><a class="header" href="#features">Features</a></h3>
-<ul>
-<li><strong>Simulations</strong>: Run infinite simulations with a local stream.</li>
-<li><strong>Solver</strong>s: Integrate your own solver module to build orderbooks.</li>
-<li><strong>Deployment</strong>: Launch the entire setup with docker.</li>
-</ul>
-<h3 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h3>
-<ul>
-<li><strong>Docker Compose</strong>: Ensure both are installed on your machine.</li>
-<li><strong>Rust</strong>: Required for building and modifying the code (optional).</li>
-<li><strong>Solver</strong> Custom Solver Implementation: your solver module (optional).</li>
-</ul>
-<h3 id="docker-setup-instructions"><a class="header" href="#docker-setup-instructions">Docker Setup Instructions</a></h3>
-<ol>
-<li>
-<p><strong>Clone the Repository</strong></p>
-<pre><code class="language-bash">git clone &lt;repository-url&gt;
-cd &lt;repository-directory&gt;
-
-
+                        <h1 id="usage"><a class="header" href="#usage">Usage</a></h1>
+<p>This section explains how to integrate and use the <strong>Tycho-Orderbook</strong> crate in your project.</p>
+<h2 id="1-adding-the-dependency"><a class="header" href="#1-adding-the-dependency">1. Adding the Dependency</a></h2>
+<p>🔺 The crate is not yet published !</p>
+<p>To use the tycho-orderbook crate, add it to your <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml">[dependencies]
+tycho-orderbook = "0.1.0"
 </code></pre>
-</li>
-</ol>
+<h2 id="2-instanciate-the-provider"><a class="header" href="#2-instanciate-the-provider">2. Instanciate the provider</a></h2>
+<p>The OrderbookBuilder structure is used to build a Tycho ProtocolStreamBuilder, which creates a data and event stream for the specified network.
+The ProtocolStreamBuilder takes into account numerous configuration parameters, such as supported exchanges (Uniswap, Curve, etc.) and pool filters (minimum TVL).</p>
+<pre><code>let builder = OrderbookBuilder::new(network.clone(), env.clone(), builder_config.clone(), Some(tokens.clone())).await;
+</code></pre>
+<p>The OrderbookProvider structure is the crate's main component. It listens to Tycho streams, and opens a stream on which the client will listen for new events.
+Each time a new event is emitted, you'll know which states have changed, i.e. which liquidity pools have evolved, and you can trigger the recalculation of the orderbook.</p>
+<p>The OrderbookProvider has a shared memory state which is used to internally update data that includes liquidity pool (= component) data.
+More importantly, this Arc Mutex structure contains pointers to the simulation functions provided by Tycho for each component, used to compute the orderbooks.</p>
+<pre><code>match builder.build(provider_config.clone(), xstate.clone()).await
+</code></pre>
+<h2 id="3-compute-an-orderbook"><a class="header" href="#3-compute-an-orderbook">3. Compute an orderbook</a></h2>
+<p>An orderbook is characterized by a tag, which is the address of base token, a dash '-', and the address of the quote token.
+For instance, for BTC-USDC on ethereum, it would be:</p>
+<pre><code>0x2260fac5e5542a773aa44fbcfedf7c193bc2c599-0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+</code></pre>
+<p>To create an orderbook and obtain its formalized bids/asks, using OrderbookProvider, you need to do:</p>
+<pre><code>obp.get_orderbook(OrderbookRequestParams { tag: tag.clone(), sps: None }, Some(simufns)).await
+let depth = newob.depth(None);    
+</code></pre>
+<p>The <em>sps</em> structure for SinglePointSimulation can be filled in to simulate a single trade, a degree of depth in the orderbook in fact.</p>
+<p>This is a tiny doc but feel free to read the source code of the crate</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="quickstart.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="1-Introduction.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
+                            <a rel="next prefetch" href="3-Quickstart.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -197,10 +201,13 @@ cd &lt;repository-directory&gt;
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="quickstart.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="1-Introduction.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
+                    <a rel="next prefetch" href="3-Quickstart.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
             </nav>
 
         </div>

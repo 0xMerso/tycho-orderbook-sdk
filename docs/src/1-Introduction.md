@@ -12,6 +12,10 @@ By running numerous simulations, one can derive the incremental supply—essenti
 
 Since no single liquidity pool fully represents all on-chain liquidity, a router can be used to gather the best price at any depth across various pools, ultimately building an aggregate on-chain liquidity book.
 
+The aim is to be able to recalculate or approximate all the data in this centralized order book, but for all onchain liquidity.
+
+<img src="img/orderbook.png" alt="Description" width="800"/>
+
 This reconstructed DeFi Orderbook allows traders to:
 - Visualize the shape of on-chain liquidity.
 - Make informed trade decisions based on precise price levels.

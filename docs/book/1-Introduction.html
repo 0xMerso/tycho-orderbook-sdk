@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Quickstart - Tycho Orderbook</title>
+        <title>Introduction - Tycho Orderbook</title>
 
 
         <!-- Custom HTML head -->
@@ -152,29 +152,72 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="quickstart"><a class="header" href="#quickstart">Quickstart</a></h1>
-<h3 id="terminal"><a class="header" href="#terminal">Terminal</a></h3>
-<p>Clone the tycho-orderbook repository, where you'll find the quickstart code.
-The .env.ex file provides the default environment variables needed to launch the quickstart program.</p>
-<p>ToDo</p>
-<h3 id="frontend-setup-instructions"><a class="header" href="#frontend-setup-instructions">Frontend Setup Instructions</a></h3>
-<p>A NextJS frontend is also available, with an API using the tycho-orderbook source code.
-To launch it, you need docker compose.</p>
-<p>ToDo</p>
-<h3 id="local-setup-instructions"><a class="header" href="#local-setup-instructions">Local Setup Instructions</a></h3>
-<p>If activated, the logs provided a genered information of what's happening under the hood.</p>
-<p>The script  <code>ops/local.api.start.sh</code>  can be used to launch the API.
-The script <code>ops/api.test.sh</code>  can be used to test the API without using the frontend.</p>
+                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+<p>The tycho-orderbook crate transpose onchain liquidity into a familiar orderbook format.</p>
+<h2 id="why"><a class="header" href="#why">Why</a></h2>
+<p>In DeFi, liquidity is typically provided by AMMs, which use continuous formulas to distribute liquidity, unlike orderbooks that aggregate discrete limit orders. Despite their differences, both approaches ultimately produce strictly increasing supply curves.</p>
+<p>The key insight is that if on-chain liquidity can be seen as a strictly increasing supply curve, it’s possible to replicate that curve with a series of limit orders.</p>
+<p>By running numerous simulations, one can derive the incremental supply—essentially, the price levels at which liquidity is available—and then reconstruct an equivalent orderbook.</p>
+<p>Since no single liquidity pool fully represents all on-chain liquidity, a router can be used to gather the best price at any depth across various pools, ultimately building an aggregate on-chain liquidity book.</p>
+<p>The aim is to be able to recalculate or approximate all the data in this centralized order book, but for all onchain liquidity.</p>
+<img src="img/orderbook.png" alt="Description" width="800"/>
+<p>This reconstructed DeFi Orderbook allows traders to:</p>
+<ul>
+<li>Visualize the shape of on-chain liquidity.</li>
+<li>Make informed trade decisions based on precise price levels.</li>
+<li>Query the expected price for a given trade size or the available depth at a specific price.</li>
+</ul>
+<p>Tycho can simulate trades across any liquidity pool in microseconds, updating only the parts of the orderbook corresponding to pools that changed in the latest block.</p>
+<p>Moreover, it converts any market order on this synthetic orderbook into on-chain call data, enabling execution directly on the blockchain.</p>
+<p>An important caveat is that gas costs can cause the supply curve to deviate slightly from being strictly increasing. Unlike traditional orderbooks where costs scale proportionally.</p>
+<p>Gas fees introduce discrete jumps—especially noticeable at very small trade amounts or when new liquidity pools (or ticks) are added.</p>
+<p>Initially, these costs can worsen the price before improving it as the trade size increases, adding a layer of complexity to the simulated orderbook.</p>
+<p>There are many reasons for building such a tool:</p>
+<ol>
+<li>
+<p>Bring more traders on-chain: In the familiar format of an orderbook, on-chain liquidity will be easier to read and execute over for a wider set of traders. This can bring new traders, e.g. those with existing strategies for orderbook markets, to use on-chain liquidity.</p>
+</li>
+<li>
+<p>Strengthen on-chain liquidity: Making on-chain liquidity more accessible can increase on-chain volumes, and consequently revenues, and incentivise deeper on-chain liquidity, and the resulting deeper books further incentivises more on-chain trading through better prices.</p>
+</li>
+<li>
+<p>Aggregate liquidity: Another high barrier for traders to trade efficiently against on-chain liquidity is to use the liquidity fragmented over different pools and protocols. A unified orderbook also abstracts the different protocols and pools – and presents them in a unified form.</p>
+</li>
+<li>
+<p>Save time: Unless you have a specifically optimised setup – its hard to do all the simulations required for running sophisticated trading strategies (e.g. determining the supply for 1000 different tokens at 10 different trading volumes). A unified orderbook includes pre-simulated trade amounts that traders can use directly, or as a starting point for "final mile" simulations.</p>
+</li>
+</ol>
+<h2 id="how"><a class="header" href="#how">How</a></h2>
+<p>Under the hood, tycho-orderbook uses <a href="https://docs.propellerheads.xyz/tycho">Tycho</a>.</p>
+<p>Tycho-orderbook works as follows:</p>
+<ol>
+<li>Open a stream on Tycho</li>
+<li>Receive notification of state update</li>
+<li>Calculate the orderbook for a specific pair with all relevant liquidity pools
+<ol>
+<li>With a default solver, quote different trades (e.g. 1 ETH, 10 ETH, 100 ETH, then, 2K USDC, 20K USDC, 200K USDC)</li>
+<li>Take into account gas costs</li>
+<li>Produce the onchain price for a given swap</li>
+</ol>
+</li>
+<li>Aggregate the output in bids|asks</li>
+<li>Loop on 2) to constantly monitor status updates.</li>
+</ol>
+<p><img src="img/escalidraw.flow.png" alt="Image" /></p>
+<p>For example, a Binance-formatted version of an order book would contain the following data on pair BTC-USDC.</p>
+<p><img src="img/bidask.list.png" alt="Image" /></p>
+<h2 id="resources"><a class="header" href="#resources">Resources</a></h2>
+<ul>
+<li><a href="https://www.propellerheads.xyz/blog/amm-liquidity-as-an-orderbook">On-chain liquidity as an orderbook</a></li>
+<li><a href="https://github.com/propeller-heads/tycho-x/blob/main/TAP-2.md">On-chain liquidity for a token pair presented in familiar orderbook format</a></li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="usage.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                                <i class="fa fa-angle-left"></i>
-                            </a>
 
-                            <a rel="next prefetch" href="frontend.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="2-Usage.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -184,11 +227,8 @@ The script <code>ops/api.test.sh</code>  can be used to test the API without usi
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="usage.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                        <i class="fa fa-angle-left"></i>
-                    </a>
 
-                    <a rel="next prefetch" href="frontend.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="2-Usage.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

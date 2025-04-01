@@ -82,17 +82,26 @@ async fn main() {
                 }
                 OBPEvent::NewHeader(block, updated) => {
                     tracing::info!("Event: NewHeader: #{} with {} components updated", block, updated.len());
-                    for (k, v) in tracked.clone().iter() {
-                        if v.is_none() {
+                    for (key, value) in tracked.clone().iter() {
+                        if value.is_none() {
                             let simufns = OrderbookFunctions {
                                 optimize: book::optimize,
                                 steps: book::steps,
                             };
-                            tracing::info!("🧱 OBP Event: Orderbook {} isn't build yet, building it ...", k.clone());
-                            match obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
+                            tracing::info!("🧱 OBP Event: Orderbook {} isn't build yet, building it ...", key.clone());
+                            match obp
+                                .get_orderbook(
+                                    OrderbookRequestParams {
+                                        tag: key.clone().to_lowercase(),
+                                        sps: None,
+                                    },
+                                    Some(simufns),
+                                )
+                                .await
+                            {
                                 Ok(orderbook) => {
                                     tracing::info!("OBP Event: Orderbook received");
-                                    tracked.insert(k.clone(), Some(orderbook.clone()));
+                                    tracked.insert(key.clone().to_lowercase(), Some(orderbook.clone()));
                                 }
                                 Err(err) => {
                                     tracing::error!("OBP Event: Error: {:?}", err);
@@ -100,7 +109,7 @@ async fn main() {
                             }
                         } else {
                             tracing::debug!("OBP Event: Orderbook already built, checking for update.");
-                            let current = v.clone().unwrap();
+                            let current = value.clone().unwrap();
                             let cps = current.pools.clone();
                             // If one of the components/pools is updated, we need to update the orderbook too.
                             let mut refresh = false;
@@ -122,9 +131,9 @@ async fn main() {
                                     optimize: book::optimize,
                                     steps: book::steps,
                                 };
-                                if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: k.clone(), sps: None }, Some(simufns)).await {
+                                if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: key.clone(), sps: None }, Some(simufns)).await {
                                     tracing::info!("OBP Event: Orderbook {}-{} has been updated", current.base.symbol, current.quote.symbol);
-                                    tracked.insert(k.clone(), Some(newob.clone()));
+                                    tracked.insert(key.clone(), Some(newob.clone()));
 
                                     let depth = newob.depth(None);
                                     tracing::info!("Bids ({})", depth.bids.len());

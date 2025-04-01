@@ -160,6 +160,8 @@
 <p>The key insight is that if on-chain liquidity can be seen as a strictly increasing supply curve, it’s possible to replicate that curve with a series of limit orders.</p>
 <p>By running numerous simulations, one can derive the incremental supply—essentially, the price levels at which liquidity is available—and then reconstruct an equivalent orderbook.</p>
 <p>Since no single liquidity pool fully represents all on-chain liquidity, a router can be used to gather the best price at any depth across various pools, ultimately building an aggregate on-chain liquidity book.</p>
+<p>The aim is to be able to recalculate or approximate all the data in this centralized order book, but for all onchain liquidity.</p>
+<img src="img/orderbook.png" alt="Description" width="800"/>
 <p>This reconstructed DeFi Orderbook allows traders to:</p>
 <ul>
 <li>Visualize the shape of on-chain liquidity.</li>
@@ -213,33 +215,59 @@
 <div style="break-before: page; page-break-before: always;"></div><h1 id="usage"><a class="header" href="#usage">Usage</a></h1>
 <p>This section explains how to integrate and use the <strong>Tycho-Orderbook</strong> crate in your project.</p>
 <h2 id="1-adding-the-dependency"><a class="header" href="#1-adding-the-dependency">1. Adding the Dependency</a></h2>
+<p>🔺 The crate is not yet published !</p>
 <p>To use the tycho-orderbook crate, add it to your <code>Cargo.toml</code>:</p>
 <pre><code class="language-toml">[dependencies]
-tycho-orderbook = "0.1.0"</code></pre>
+tycho-orderbook = "0.1.0"
+</code></pre>
+<h2 id="2-instanciate-the-provider"><a class="header" href="#2-instanciate-the-provider">2. Instanciate the provider</a></h2>
+<p>The OrderbookBuilder structure is used to build a Tycho ProtocolStreamBuilder, which creates a data and event stream for the specified network.
+The ProtocolStreamBuilder takes into account numerous configuration parameters, such as supported exchanges (Uniswap, Curve, etc.) and pool filters (minimum TVL).</p>
+<pre><code>let builder = OrderbookBuilder::new(network.clone(), env.clone(), builder_config.clone(), Some(tokens.clone())).await;
+</code></pre>
+<p>The OrderbookProvider structure is the crate's main component. It listens to Tycho streams, and opens a stream on which the client will listen for new events.
+Each time a new event is emitted, you'll know which states have changed, i.e. which liquidity pools have evolved, and you can trigger the recalculation of the orderbook.</p>
+<p>The OrderbookProvider has a shared memory state which is used to internally update data that includes liquidity pool (= component) data.
+More importantly, this Arc Mutex structure contains pointers to the simulation functions provided by Tycho for each component, used to compute the orderbooks.</p>
+<pre><code>match builder.build(provider_config.clone(), xstate.clone()).await
+</code></pre>
+<h2 id="3-compute-an-orderbook"><a class="header" href="#3-compute-an-orderbook">3. Compute an orderbook</a></h2>
+<p>An orderbook is characterized by a tag, which is the address of base token, a dash '-', and the address of the quote token.
+For instance, for BTC-USDC on ethereum, it would be:</p>
+<pre><code>0x2260fac5e5542a773aa44fbcfedf7c193bc2c599-0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+</code></pre>
+<p>To create an orderbook and obtain its formalized bids/asks, using OrderbookProvider, you need to do:</p>
+<pre><code>obp.get_orderbook(OrderbookRequestParams { tag: tag.clone(), sps: None }, Some(simufns)).await
+let depth = newob.depth(None);    
+</code></pre>
+<p>The <em>sps</em> structure for SinglePointSimulation can be filled in to simulate a single trade, a degree of depth in the orderbook in fact.</p>
+<p>This is a tiny doc but feel free to read the source code of the crate</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="quickstart"><a class="header" href="#quickstart">Quickstart</a></h1>
+<p>The quickstart program is an example usage of the tycho-orderbook crate.
+It opens a Tycho stream, listen to it, build or update orderbooks each time states has changed, and prints out the formatted orderbooks.</p>
 <h3 id="terminal"><a class="header" href="#terminal">Terminal</a></h3>
 <p>Clone the tycho-orderbook repository, where you'll find the quickstart code.
 The .env.ex file provides the default environment variables needed to launch the quickstart program.</p>
-<p>ToDo</p>
-<h3 id="frontend-setup-instructions"><a class="header" href="#frontend-setup-instructions">Frontend Setup Instructions</a></h3>
-<p>A NextJS frontend is also available, with an API using the tycho-orderbook source code.
-To launch it, you need docker compose.</p>
-<p>ToDo</p>
 <h3 id="local-setup-instructions"><a class="header" href="#local-setup-instructions">Local Setup Instructions</a></h3>
+<p>You must have Rust installed.</p>
+<p>To run the program:</p>
+<pre><code>sh examples/quickstart.sh ethereum
+</code></pre>
 <p>If activated, the logs provided a genered information of what's happening under the hood.</p>
 <p>The script  <code>ops/local.api.start.sh</code>  can be used to launch the API.
 The script <code>ops/api.test.sh</code>  can be used to test the API without using the frontend.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="frontend"><a class="header" href="#frontend">Frontend</a></h1>
 <p>The public version of tycho-orderbook is limited in its ability to handle all orderbook requests and update them dynamically.
-To solve this problem, and to allow more flexibility, we provide an open-source Next JS frontend.
+To solve this, and to allow more flexibility, we provide an open-source Next JS frontend, and a Rust API with it (Axum).
 You can find it in this repository: https://github.com/0xMerso/tycho-orderbook-web</p>
-<p>This project provides a website that lets you run your own order book simulations and use your own solver to customize the order book construction algorithm.
-The entire system is designed to be modular and can be launched effortlessly using <code>docker compose</code>.</p>
+<p><strong>tycho-orderbook-web</strong> has a NextJS frontend and a Rust backend. The public website has not yet been launched.</p>
+<p>By customizing the backend, you can run your own orderbook simulations and use your own solver to customize the orderbook construction algorithm.
+The application is designed to be modular and can be launched effortlessly using <code>docker compose</code>.</p>
 <h3 id="features"><a class="header" href="#features">Features</a></h3>
 <ul>
 <li><strong>Simulations</strong>: Run infinite simulations with a local stream.</li>
-<li><strong>Solver</strong>s: Integrate your own solver module to build orderbooks.</li>
-<li><strong>Deployment</strong>: Launch the entire setup with docker.</li>
+<li><strong>Solvers</strong>: Integrate your own solver module to build orderbooks.</li>
+<li><strong>Deployment</strong>: Launch the entire setup with docker compose.</li>
 </ul>
 <h3 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h3>
 <ul>
@@ -247,17 +275,38 @@ The entire system is designed to be modular and can be launched effortlessly usi
 <li><strong>Rust</strong>: Required for building and modifying the code (optional).</li>
 <li><strong>Solver</strong> Custom Solver Implementation: your solver module (optional).</li>
 </ul>
-<h3 id="docker-setup-instructions"><a class="header" href="#docker-setup-instructions">Docker Setup Instructions</a></h3>
-<ol>
-<li>
-<p><strong>Clone the Repository</strong></p>
-<pre><code class="language-bash">git clone &lt;repository-url&gt;
-cd &lt;repository-directory&gt;
-
-
+<h3 id="clone-the-repository"><a class="header" href="#clone-the-repository">Clone the Repository</a></h3>
+<p>The repo has the front part as a submodule, so to clone it, do :</p>
+<pre><code class="language-bash">git clone --recurse-submodules tycho-orderbook-web
+cd tycho-orderbook-web
 </code></pre>
-</li>
-</ol>
+<h3 id="docker-setup-instructions"><a class="header" href="#docker-setup-instructions">Docker Setup Instructions</a></h3>
+<p>Make sure Docker is installed and active. Run the application in one command :</p>
+<pre><code class="language-bash"># Start
+docker compose up --build -d
+docker compose logs -f
+# Stop it
+docker compose stop
+# Remove it
+docker compose down
+</code></pre>
+<p>Then, access to:</p>
+<ul>
+<li>UI: http://localhost:3000/</li>
+<li>Swagger: http://localhost:42001/swagger</li>
+</ul>
+<p>You can use you own WALLET_CONNECT_PROJECT_ID env variable in the .env file at the root of the <em>front</em> folder, used with the package WalletConnect.</p>
+<h3 id="local-setup-instructions-1"><a class="header" href="#local-setup-instructions-1">Local Setup Instructions</a></h3>
+<p>If you prefer to build and run the application directly, we provide shell scripts for simple startup.
+You will need to install <strong>Rust, Node, Redis and pnpm.</strong></p>
+<pre><code class="language-bash">cd back
+# Launch 'ethereum' Axum API + Redis. You can use 'base' instead
+sh ops/local.api.start.sh ethereum
+</code></pre>
+<pre><code class="language-bash">cd front
+pnpm install
+pnpm dev
+</code></pre>
 
                     </main>
 
