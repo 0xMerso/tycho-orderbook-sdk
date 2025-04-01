@@ -14,7 +14,6 @@ use tycho_simulation::models::Token;
 
 /// Get the balances of the component in the specified protocol system.
 pub async fn get_component_balances(network: Network, cp: String, protosys: String, api_token: Option<String>) -> Option<HashMap<String, u128>> {
-    // log::info!("Getting component balances on {}", network.name);
     let key: &str = match &api_token {
         Some(t) => t.as_str(),
         None => "sampletoken",
@@ -47,7 +46,6 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
                     result.insert(c.0.clone().to_string().to_lowercase(), u128::from_str_radix(c.1.to_string().trim_start_matches("0x"), 16).unwrap());
                 }
             }
-            // log::info!("Successfully retrieved {} component balances on {}", component_balances.len(), network.name);
             Some(result)
         }
         Err(e) => {
@@ -77,7 +75,7 @@ pub async fn tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>>
                         });
                     }
                     let elasped = time.elapsed().unwrap().as_millis();
-                    tracing::info!("Took {:?} ms to get {} tokens on {}", elasped, tokens.len(), network.name);
+                    tracing::debug!("Took {:?} ms to get {} tokens on {}", elasped, tokens.len(), network.name);
                     Some(tokens)
                 }
                 Err(e) => {

@@ -55,13 +55,12 @@ impl OrderBookAdapter for Orderbook {
         // Sort quantities in ascending order
         bids_depth.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         asks_depth.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-
-        let bids_depth_str: Vec<(String, String)> = bids_depth.iter().map(|(price, amount)| (price.to_string(), amount.to_string())).collect();
-        let asks_depth_str: Vec<(String, String)> = asks_depth.iter().map(|(price, amount)| (price.to_string(), amount.to_string())).collect();
+        // let bids_depth_str: Vec<(String, String)> = bids_depth.iter().map(|(price, amount)| (price.to_string(), amount.to_string())).collect();
+        // let asks_depth_str: Vec<(String, String)> = asks_depth.iter().map(|(price, amount)| (price.to_string(), amount.to_string())).collect();
         OrderbookDepth {
             last_update_id: self.timestamp,
-            bids: bids_depth_str,
-            asks: asks_depth_str,
+            bids: bids_depth,
+            asks: asks_depth,
         }
     }
 

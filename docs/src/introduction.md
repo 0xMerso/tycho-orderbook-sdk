@@ -54,6 +54,11 @@ Tycho-orderbook works as follows:
 
 ![Image](img/escalidraw.flow.png)
 
+For example, a Binance-formatted version of an order book would contain the following data on pair BTC-USDC.
+
+![Image](img/bidask.list.png)
+
+
 ## Resources
 
 - [On-chain liquidity as an orderbook](https://www.propellerheads.xyz/blog/amm-liquidity-as-an-orderbook)

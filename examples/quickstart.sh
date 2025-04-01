@@ -4,7 +4,7 @@ NETWORK="$1"
 
 # --- Usage ---
 # Requires Rust and Cargo to be installed.
-# sh examples/quickstart.sh ethereum
+# sh examples/quickstart.sh ethereum|base
 
 function start() {
     trap '' SIGINT
@@ -14,6 +14,7 @@ function start() {
     echo "Build successful. Executing..."
     (
         trap - SIGINT
+        export RUST_LOG="off,tycho_orderbook=debug,quickstart=debug"
         cargo run --bin quickstart -q # 2>/dev/null
     )
     echo "Program has finished or was interrupted. Continuing with the rest of the shell script ..."

@@ -14,9 +14,9 @@ use tycho_simulation::tycho_client::stream::StreamError;
 use data::fmt::SrzProtocolComponent;
 use data::fmt::SrzToken;
 use types::SharedTychoStreamState;
-use types::{OBPConfig, OrderbookRequestParams};
 use types::{Orderbook, OrderbookBuilder};
 use types::{OrderbookFunctions, ProtoTychoState};
+use types::{OrderbookProviderConfig, OrderbookRequestParams};
 
 /// OrderbookProvider is a struct that manages the protocol stream and shared state, and provides methods to interact with the stream, build orderbooks, and more.
 ///
@@ -24,11 +24,11 @@ impl OrderbookProvider {
     /// Creates a new OBP instance using a ProtocolStreamBuilder (from Tycho) with custom configuration
     /// # Arguments
     /// * `psb` - A ProtocolStreamBuilder used to build the underlying stream.
-    /// * `config` - An OBPConfig allowing customization of parameters (e.g. channel capacity).
+    /// * `config` - An OrderbookProviderConfig allowing customization of parameters (e.g. channel capacity).
     /// * `state` - A shared state structure that is both updated internally and exposed to the client.
     /// # Returns
     /// * A Result containing the OBP instance or a StreamError if the stream could not be built.
-    pub async fn build(ob: OrderbookBuilder, config: OBPConfig, state: SharedTychoStreamState) -> Result<Self, StreamError> {
+    pub async fn build(ob: OrderbookBuilder, config: OrderbookProviderConfig, state: SharedTychoStreamState) -> Result<Self, StreamError> {
         // Build the protocol stream that yields Result<BlockUpdate, StreamDecodeError>.
         match ob.psb.build().await {
             Ok(stream) => {
@@ -37,7 +37,7 @@ impl OrderbookProvider {
                 let taskstate = state.clone();
                 // Spawn an asynchronous task that processes the protocol stream.
                 // For each message received, update the shared state and send an OBPEvent.
-                tracing::info!("Starting stream processing task.");
+                tracing::debug!("Starting stream processing task.");
 
                 let handle = tokio::spawn(async move {
                     futures::pin_mut!(stream);
@@ -61,7 +61,7 @@ impl OrderbookProvider {
                                     msg.removed_pairs.len()
                                 );
                                 if !initialised {
-                                    tracing::info!("First stream (initialised was false). Writing the entire streamed data into the shared struct.");
+                                    tracing::debug!("First stream (initialised was false). Writing the entire streamed data into the shared struct.");
                                     let mut targets = vec![];
                                     for (_, comp) in msg.new_pairs.iter() {
                                         targets.push(comp.id.to_string().to_lowercase());
@@ -77,7 +77,7 @@ impl OrderbookProvider {
                                     let mut updated = vec![];
                                     if !msg.states.is_empty() {
                                         let mut mtx = state.write().await;
-                                        // log::info!("Received {} new states, updating protosims.", msg.states.len());
+
                                         for x in msg.states.iter() {
                                             mtx.protosims.insert(x.0.clone().to_lowercase(), x.1.clone());
                                             updated.push(x.0.clone().to_lowercase());
@@ -113,13 +113,17 @@ impl OrderbookProvider {
                     _handle: handle,
                     tokens: ob.tokens.clone(),
                     network: ob.network.clone(),
-                    apikey: ob.api_token.clone(),
+                    apikey: ob.apikey.clone(),
                 };
 
                 Ok(obp)
             }
             Err(err) => {
-                tracing::error!("Failed to build OBP: {:?}", err.to_string());
+                tracing::error!(
+                    "Failed to create stream abd build orderbook provider: {:?}. Retry by changing the Tycho Stream filters, or with a dedicated API key",
+                    err.to_string()
+                );
+
                 Err(err)
             }
         }
@@ -166,10 +170,9 @@ impl OrderbookProvider {
             .ok_or_else(|| anyhow::anyhow!("Token {} not found", targets[0]))
             .unwrap();
         let targets = vec![srzt0.clone(), srzt1.clone()];
-        tracing::info!("Building orderbook for pair {}-{} | Single point: {}", targets[0].symbol.clone(), targets[1].symbol.clone(), single);
+        tracing::debug!("Building orderbook for pair {}-{} | Single point: {}", targets[0].symbol.clone(), targets[1].symbol.clone(), single);
         let (base_to_eth_path, base_to_eth_comps) = maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
         let (quote_to_eth_path, quote_to_eth_comps) = maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
-
         let mut to_eth_ptss: Vec<ProtoTychoState> = vec![];
         let mut ptss: Vec<ProtoTychoState> = vec![];
         for cp in acps.clone() {

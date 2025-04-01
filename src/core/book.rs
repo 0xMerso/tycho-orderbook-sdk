@@ -21,7 +21,7 @@ pub async fn build(
     base_worth_eth: f64,
     quote_worth_eth: f64,
 ) -> Orderbook {
-    tracing::info!("Building orderbook ... Got {} pools to compute for pair: '{}'", ptss.len(), query.tag);
+    tracing::debug!("Building orderbook ... Got {} pools to compute for pair: '{}'", ptss.len(), query.tag);
     let mut pools = Vec::new();
     let mut prices_base_to_quote = vec![];
     let mut prices_quote_to_base = vec![];
@@ -41,7 +41,7 @@ pub async fn build(
         let price_quote_to_base = proto.spot_price(&quote, &base).unwrap_or_default();
         prices_base_to_quote.push(price_base_to_quote);
         prices_quote_to_base.push(price_quote_to_base);
-        tracing::debug!(
+        tracing::trace!(
             "- Pool: {} | {} | Spot price for {}-{} => price_base_to_quote = {} and price_quote_to_base = {}",
             pdata.component.id,
             pdata.component.protocol_type_name,
@@ -67,13 +67,13 @@ pub async fn build(
     let aggregated = maths::steps::depth(cps.clone(), tokens.clone(), balances.clone());
     let avg_price_base_to_quote = prices_base_to_quote.iter().sum::<f64>() / prices_base_to_quote.len() as f64;
     let avg_price_quote_to_base = prices_quote_to_base.iter().sum::<f64>() / prices_quote_to_base.len() as f64; // Ponderation by TVL ?
-    tracing::debug!("Average price 0to1: {} | Average price 1to0: {}", avg_price_base_to_quote, avg_price_quote_to_base);
+    tracing::trace!("Average price 0to1: {} | Average price 1to0: {}", avg_price_base_to_quote, avg_price_quote_to_base);
     let mut pso = simulate(network.clone(), pools.clone(), tokens, query.clone(), simufns, aggregated.clone(), base_worth_eth, quote_worth_eth).await;
     pso.prices_base_to_quote = prices_base_to_quote;
     pso.prices_quote_to_base = prices_quote_to_base;
     pso.base_lqdty = base_lqdty.clone();
     pso.quote_lqdty = quote_lqdty.clone();
-    tracing::info!("Optimization done. Returning Simulated Orderbook for pair (base-quote) => '{}-{}'", base.symbol, quote.symbol);
+    tracing::debug!("Done. Returning simulated orderbook for pair (base-quote) => '{}-{}'", base.symbol, quote.symbol);
     pso
 }
 
@@ -102,7 +102,7 @@ pub async fn simulate(
     let aggb_base = balances.iter().find(|x| x.0.to_lowercase() == base.address.to_lowercase()).unwrap().1;
     let aggb_quote = balances.iter().find(|x| x.0.to_lowercase() == quote.address.to_lowercase()).unwrap().1;
 
-    tracing::info!(
+    tracing::debug!(
         "🔎 Optimisation | Network: {} | ETH is worth {} in USD | Got {} pools to optimize for pair: {}-{} with aggbs {:.4} and {:.4}",
         network.name,
         eth_usd,
@@ -142,7 +142,7 @@ pub async fn simulate(
     };
     match body.sps {
         Some(spsq) => {
-            tracing::debug!(" 🎯 Partial Optimisation: input: {} and amount: {}", spsq.input, spsq.amount);
+            tracing::trace!(" 🎯 Partial Optimisation: input: {} and amount: {}", spsq.input, spsq.amount);
             if spsq.input.to_lowercase() == base.address.to_lowercase() {
                 result.bids = vec![maths::opti::gradient(spsq.amount, &pcsdata, base.clone(), quote.clone(), eth_usd, gas_price, quote_worth_eth)];
             } else if spsq.input.to_lowercase() == quote.address.to_lowercase() {
@@ -157,7 +157,7 @@ pub async fn simulate(
             // FuLL Orderbook optimization
             let bids = (fn_opti)(&pcsdata, eth_usd, gas_price, &base, &quote, *aggb_base, quote_worth_eth);
             result.bids = bids;
-            tracing::debug!(" 🔄  Switching to 1to0");
+            tracing::trace!(" 🔄  Switching to 1to0");
             let asks = (fn_opti)(&pcsdata, eth_usd, gas_price, &quote, &base, *aggb_quote, base_worth_eth);
             result.asks = asks;
         }
@@ -189,7 +189,7 @@ pub fn optifast(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from:
         let result = maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
         let elapsed = tmstp.elapsed().as_millis();
         let gas_cost = result.gas_costs_usd.iter().sum::<f64>();
-        tracing::debug!(
+        tracing::trace!(
             " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {} ms",
             x,
             result.amount,
@@ -211,7 +211,7 @@ pub fn optifast(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from:
  */
 pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
     let start = aggb / utils::r#static::maths::TEN_MILLIONS;
-    tracing::debug!(
+    tracing::trace!(
         "Agg onchain liquidity balance for {} is {} (for 1 millionth => {}) | Output unit worth eth: {}",
         from.symbol,
         aggb,
@@ -228,7 +228,7 @@ pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from:
             let result = maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
             let elapsed = tmstp.elapsed().as_millis();
             let gas_cost = result.gas_costs_usd.iter().sum::<f64>();
-            tracing::debug!(
+            tracing::trace!(
                 " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {} ms",
                 x,
                 result.amount,
@@ -258,7 +258,7 @@ pub fn optimize(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from:
 pub fn best(pcs: &Vec<ProtoTychoState>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, amount: f64, output_u_ethworth: f64) -> TradeResult {
     tracing::debug!(" - 🥇 Computing best price for {} (amount in = {})", from.symbol, amount);
     let result = maths::opti::gradient(amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
-    tracing::debug!(
+    tracing::trace!(
         " - (best) Input: {} {}, Output: {} {} at price {} | Distribution: {:?} ",
         result.amount,
         from.symbol,
@@ -280,12 +280,6 @@ pub fn midprice(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResu
     let mid = (ask + bid) / 2.;
     let spread = (ask - bid).abs();
     let spread_pct = (spread / mid) * 100.;
-    // log::info!(" - midprice: ask: {}", ask);
-    // log::info!(" - midprice: bid: {}", bid);
-    // log::info!(" - midprice: trade_quote_to_base.ratio: {}", trade_quote_to_base.ratio);
-    // log::info!(" - midprice: mid: {}", mid);
-    // log::info!(" - midprice: spread: {}", spread);
-    // log::info!(" - midprice: spread_pct: {}", spread_pct);
     MidPriceData { ask, bid, mid, spread, spread_pct }
 }
 

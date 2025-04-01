@@ -447,15 +447,20 @@ pub enum OBPEvent {
 
 /// Orderbook Provider Configuration
 #[derive(Clone)]
-pub struct OBPConfig {
+pub struct OrderbookProviderConfig {
     // The capacity of the channel used to send OBPEvents.
     pub capacity: usize,
 }
 
-impl Default for OBPConfig {
+impl Default for OrderbookProviderConfig {
     fn default() -> Self {
-        OBPConfig { capacity: 100 }
+        OrderbookProviderConfig { capacity: 100 }
     }
+}
+
+#[derive(Clone)]
+pub struct OrderbookBuilderConfig {
+    pub filter: tycho_client::feed::component_tracker::ComponentFilter,
 }
 
 /// Struct used to build the orderbook functions in order to customize the orderbook construction
@@ -486,14 +491,14 @@ pub struct OrderbookBuilder {
     pub network: Network,
     pub psb: ProtocolStreamBuilder,
     pub tokens: Vec<SrzToken>,
-    pub api_token: Option<String>,
+    pub apikey: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderbookDepth {
     pub last_update_id: u64,
-    pub bids: Vec<(String, String)>,
-    pub asks: Vec<(String, String)>,
+    pub bids: Vec<(f64, f64)>,
+    pub asks: Vec<(f64, f64)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
