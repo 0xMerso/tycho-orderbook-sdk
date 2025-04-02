@@ -2,9 +2,13 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tycho_client::feed::component_tracker::ComponentFilter;
 use tycho_orderbook::{
-    adapter::OrderBookAdapter,
+    adapters::default::DefaultOrderBookAdapter,
     core::{book, rpc},
-    types::{EnvConfig, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState},
+    maths::steps::exponential,
+    types::{
+        EnvConfig, ExecutionRequest, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState,
+        TychoStreamState,
+    },
     utils::r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
 };
 
@@ -36,18 +40,19 @@ async fn main() {
     tokens.iter().for_each(|t| {
         hmt.insert(t.address.clone(), t.clone());
     });
+
     // --- Adjust as needed --- Mainnet here
     let eth = network.eth.clone();
     let usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string().to_lowercase(); // base: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
     let btc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599".to_string().to_lowercase(); // base: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
-    let btcusdc = format!("{}-{}", btc, usdc); // "BTC" "USDC"
-    let btc_eth = format!("{}-{}", btc, eth); // "BTC" "ETH"
-    let eth_usdc = format!("{}-{}", eth, usdc); // "ETH" "USDC"
+    let btcusdc = format!("{}-{}", btc, usdc); // "0xBTC" "0xUSDC"
+    let btc_eth = format!("{}-{}", btc, eth); // "0xBTC" "0xETH"
+    let eth_usdc = format!("{}-{}", eth, usdc); // "0xETH" "0xUSDC"
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
-    tracked.insert(btcusdc, None);
-    tracked.insert(btc_eth, None);
-    tracked.insert(eth_usdc, None);
-    // --- --- --- --- ---
+    // tracked.insert(btcusdc.clone(), None);
+    // tracked.insert(btc_eth.clone(), None);
+    tracked.insert(eth_usdc.clone(), None);
+    let obexec = eth_usdc; // Orderbook tag on which we want to execute a trade for demo
 
     // Create the OBP provider from the protocol stream builder and shared state.
     let mut attempt = 0;
@@ -86,7 +91,7 @@ async fn main() {
                         if value.is_none() {
                             let simufns = OrderbookFunctions {
                                 optimize: book::optimize,
-                                steps: book::steps,
+                                steps: exponential,
                             };
                             tracing::info!("🧱 OBP Event: Orderbook {} isn't build yet, building it ...", key.clone());
                             match obp
@@ -129,13 +134,13 @@ async fn main() {
                                 tracing::info!(" ⚖️  Orderbook {}-{} has changed, need to update it", current.base.symbol, current.quote.symbol);
                                 let simufns = OrderbookFunctions {
                                     optimize: book::optimize,
-                                    steps: book::steps,
+                                    steps: exponential,
                                 };
-                                if let Ok(newob) = obp.get_orderbook(OrderbookRequestParams { tag: key.clone(), sps: None }, Some(simufns)).await {
+                                if let Ok(book) = obp.get_orderbook(OrderbookRequestParams { tag: key.clone(), sps: None }, Some(simufns)).await {
                                     tracing::info!("OBP Event: Orderbook {}-{} has been updated", current.base.symbol, current.quote.symbol);
-                                    tracked.insert(key.clone(), Some(newob.clone()));
+                                    tracked.insert(key.clone(), Some(book.clone()));
 
-                                    let depth = newob.depth(None);
+                                    let depth = book.depth(None);
                                     tracing::info!("Bids ({})", depth.bids.len());
                                     for d in depth.bids {
                                         tracing::info!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
@@ -143,6 +148,27 @@ async fn main() {
                                     tracing::info!("Asks ({})", depth.asks.len());
                                     for d in depth.asks {
                                         tracing::info!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
+                                    }
+
+                                    if book.tag.clone() == obexec.clone() {
+                                        tracing::debug!("OBP Event: Orderbook {}-{} is the one we want to execute a trade on.", current.base.symbol, current.quote.symbol);
+                                        // Execution
+                                        let sender = "0xC0F7d041defAE1045e11A6101284AbA4BCc3770f".to_string();
+                                        // let amount = book.mpd_base_to_quote.
+                                        let way = book.mpd_base_to_quote.clone();
+                                        let request = ExecutionRequest {
+                                            sender: sender.clone(),
+                                            tag: book.tag.clone(),
+                                            input: book.base.clone(),
+                                            output: book.quote.clone(),
+                                            amount: way.amount,
+                                            expected_amount_out: None,
+                                            distribution: way.distribution.clone(),
+                                            components: book.pools.clone(),
+                                        };
+                                        let _ = book.execute(network.clone(), request).await;
+                                    } else {
+                                        tracing::debug!("OBP Event: Orderbook {}-{} is not the one we want to execute a trade on.", current.base.symbol, current.quote.symbol);
                                     }
                                 } else {
                                     tracing::error!("OBP Event: Error updating orderbook");

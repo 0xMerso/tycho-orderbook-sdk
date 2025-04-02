@@ -67,6 +67,9 @@ pub async fn tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>>
                     let mut tokens = vec![];
                     for t in result.iter() {
                         let g = t.gas.first().unwrap_or(&Some(0u64)).unwrap_or_default();
+                        if t.symbol.len() >= 20 {
+                            continue; // Symbol has been mistaken for a contract address, possibly.
+                        }
                         tokens.push(Token {
                             address: tycho_simulation::tycho_core::Bytes::from_str(t.address.clone().to_string().as_str()).unwrap(),
                             decimals: t.decimals as usize,

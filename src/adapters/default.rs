@@ -1,4 +1,7 @@
-use crate::types::{ExchangeInfo, Orderbook, OrderbookDepth};
+use crate::{
+    core::exec,
+    types::{ExchangeInfo, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookDepth},
+};
 use async_trait::async_trait;
 use std::cmp::min;
 
@@ -13,7 +16,7 @@ use std::cmp::min;
 /// GET /api/v3/avgPrice     --> not relevant
 
 #[async_trait]
-pub trait OrderBookAdapter: Send + Sync {
+pub trait DefaultOrderBookAdapter: Send + Sync {
     /// Returns orderbook depth snapshot (limited if specified).
     fn depth(&self, limit: Option<u64>) -> OrderbookDepth;
 
@@ -21,14 +24,14 @@ pub trait OrderBookAdapter: Send + Sync {
     fn info(&self) -> ExchangeInfo;
 
     /// Executes a real trade (or sends the order to the exchange).
-    async fn execute(&self) -> u64; // (&mut self, side: Side, quantity: f64, price: f64);
+    async fn execute(&self, network: Network, request: ExecutionRequest) -> Result<ExecutionPayload, String>; // (&mut self, side: Side, quantity: f64, price: f64);
 
     /// Simulates a trade against the current orderbook.
     async fn simulate(&self) -> u64; // (&self, side: Side, quantity: f64) -> TradeSimulationResult;
 }
 
 #[async_trait]
-impl OrderBookAdapter for Orderbook {
+impl DefaultOrderBookAdapter for Orderbook {
     /// Get the orderbook depth (depends on the amounts (= points) used to simulate the orderbook)
     /// Price are in quote asset, while quantity are in base asset
     /// See https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-endpoints#terminology
@@ -79,9 +82,8 @@ impl OrderBookAdapter for Orderbook {
     }
 
     /// POST /api/v3/order
-    async fn execute(&self) -> u64 {
-        tracing::debug!("execute");
-        0
+    async fn execute(&self, network: Network, request: ExecutionRequest) -> Result<ExecutionPayload, String> {
+        exec::build(network.clone(), request.clone()).await
     }
 
     /// POST /api/v3/order/test

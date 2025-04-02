@@ -7,7 +7,6 @@ use tokio::sync::RwLock;
 use utoipa::ToSchema;
 
 use super::{
-    core::book::AmountStepsFn,
     core::book::QuoteFn,
     data::fmt::{SrzProtocolComponent, SrzToken},
 };
@@ -152,8 +151,8 @@ pub struct ExecutionRequest {
     pub tag: String,
     pub input: SrzToken,
     pub output: SrzToken,
-    pub amount_in: f64,
-    pub expected_amount_out: f64,
+    pub amount: f64,
+    pub expected_amount_out: Option<f64>,
     pub distribution: Vec<f64>, // Percentage distribution per pool (0–100)
     pub components: Vec<SrzProtocolComponent>,
 }
@@ -356,11 +355,15 @@ pub struct MidPriceData {
     pub mid: f64,
     pub spread: f64,
     pub spread_pct: f64,
+    // For Exec|Testing purpose
+    pub amount: f64,
+    pub distribution: Vec<f64>,
 }
 
 /// FuLL orderbook data response. Key struct of the SDK
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Orderbook {
+    pub tag: String,
     /// Block number of the orderbook, state at which the orderbook was built
     pub block: u64,
     /// When the orderbook started to be built (seconds since epoch)
@@ -431,11 +434,14 @@ pub struct OrderbookFunctions {
     pub steps: AmountStepsFn, // Simulated amount/steps (returning for instance: 0.2 ETH, 2 ETH, 20 ETH, etc.). By default, it's an exponential curve based, up to 25% of total onchain liquidity
 }
 
-use crate::core::book::{optimize, steps};
+use crate::{
+    core::book::optimize,
+    maths::steps::{exponential, AmountStepsFn},
+};
 
 impl Default for OrderbookFunctions {
     fn default() -> Self {
-        OrderbookFunctions { optimize, steps }
+        OrderbookFunctions { optimize, steps: exponential }
     }
 }
 

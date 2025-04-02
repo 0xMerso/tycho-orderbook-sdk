@@ -1,9 +1,10 @@
+use chrono::format;
 use tycho_simulation::models::Token;
 
 use crate::{
     core::{gas, rpc},
     data::fmt::{SrzProtocolComponent, SrzToken},
-    maths,
+    maths::{self, steps::exponential},
     types::{MidPriceData, Network, Orderbook, OrderbookFunctions, OrderbookRequestParams, ProtoTychoState, TradeResult},
     utils::{self},
 };
@@ -124,7 +125,9 @@ pub async fn simulate(
     let mpd_base_to_quote = midprice(best_base_to_quote.clone(), best_quote_to_base.clone());
     let mpd_quote_to_base = midprice(best_quote_to_base.clone(), best_base_to_quote.clone());
 
+    let tag = format!("{}-{}", base.address.to_lowercase(), quote.address.to_lowercase());
     let mut result = Orderbook {
+        tag,
         block: latest,
         timestamp,
         base: tokens[0].clone(),
@@ -160,7 +163,7 @@ pub async fn simulate(
                         steps: fns.steps,
                     }
                 }
-                None => OrderbookFunctions { optimize, steps },
+                None => OrderbookFunctions { optimize, steps: exponential },
             };
             let steps = (obfs.steps)(*aggb_base);
             let bids = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &base, &quote, *aggb_base, quote_worth_eth);
@@ -172,22 +175,6 @@ pub async fn simulate(
         }
     }
     result
-}
-
-pub type AmountStepsFn = fn(liquidity: f64) -> Vec<f64>;
-
-/// Default steps function
-/// This function generates a set of quoted amounts based on the aggregated liquidity of the pools.
-/// Up to END_MULTIPLIER % of the aggregated liquidity, it generates a set of amounts using an exponential function with minimum delta percentage.
-pub fn steps(liquidity: f64) -> Vec<f64> {
-    let start = liquidity / utils::r#static::maths::TEN_MILLIONS;
-    let steps = maths::steps::exponential(
-        utils::r#static::maths::simu::COUNT,
-        utils::r#static::maths::simu::START_MULTIPLIER,
-        utils::r#static::maths::simu::END_MULTIPLIER,
-        utils::r#static::maths::simu::END_MULTIPLIER * utils::r#static::maths::simu::MIN_EXP_DELTA_PCT,
-    );
-    steps.iter().map(|x| x * start).collect::<Vec<f64>>()
 }
 
 pub type QuoteFn = fn(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult>;
@@ -252,12 +239,22 @@ pub fn best(pcs: &[ProtoTychoState], eth_usd: f64, gas_price: u128, from: &SrzTo
  * ! We assume that => trade_base_to_quote = ask and trade_quote_to_base = bid
  */
 pub fn midprice(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResult) -> MidPriceData {
+    let amount = trade_base_to_quote.amount;
+    let distribution = trade_base_to_quote.distribution.clone();
     let ask = trade_base_to_quote.average_sell_price; // buy quote
     let bid = 1. / trade_quote_to_base.average_sell_price; // buy base
     let mid = (ask + bid) / 2.;
     let spread = (ask - bid).abs();
     let spread_pct = (spread / mid) * 100.;
-    MidPriceData { ask, bid, mid, spread, spread_pct }
+    MidPriceData {
+        amount,
+        distribution,
+        ask,
+        bid,
+        mid,
+        spread,
+        spread_pct,
+    }
 }
 
 /// Check if a component has the desired tokens
