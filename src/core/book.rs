@@ -44,13 +44,14 @@ pub async fn build(
         prices_base_to_quote.push(price_base_to_quote);
         prices_quote_to_base.push(price_quote_to_base);
         tracing::trace!(
-            "- Pool: {} | {} | Spot price for {}-{} => price_base_to_quote = {} and price_quote_to_base = {}",
+            "- Pool: {} | {} | Spot price for {}-{} => price_base_to_quote = {} and price_quote_to_base = {} | Fee = {}",
             pdata.component.id,
             pdata.component.protocol_type_name,
             base.symbol,
             quote.symbol,
             price_base_to_quote,
-            price_quote_to_base
+            price_quote_to_base,
+            pdata.component.fee
         );
         if let Some(cpbs) = rpc::get_component_balances(network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone(), api_token.clone()).await {
             let base_bal = cpbs.get(&srzt0.address.to_lowercase()).unwrap_or(&0u128);
@@ -70,7 +71,19 @@ pub async fn build(
     let avg_price_base_to_quote = prices_base_to_quote.iter().sum::<f64>() / prices_base_to_quote.len() as f64;
     let avg_price_quote_to_base = prices_quote_to_base.iter().sum::<f64>() / prices_quote_to_base.len() as f64; // Ponderation by TVL ?
     tracing::trace!("Average price 0to1: {} | Average price 1to0: {}", avg_price_base_to_quote, avg_price_quote_to_base);
-    let mut pso = simulate(network.clone(), pools.clone(), tokens, query.clone(), simufns, aggregated.clone(), base_worth_eth, quote_worth_eth).await;
+    let mut pso = simulate(
+        network.clone(),
+        pools.clone(),
+        tokens,
+        query.clone(),
+        simufns,
+        aggregated.clone(),
+        base_worth_eth,
+        quote_worth_eth,
+        avg_price_base_to_quote,
+        avg_price_quote_to_base,
+    )
+    .await;
     pso.prices_base_to_quote = prices_base_to_quote;
     pso.prices_quote_to_base = prices_quote_to_base;
     pso.base_lqdty = base_lqdty.clone();
@@ -95,6 +108,8 @@ pub async fn simulate(
     balances: HashMap<String, f64>,
     base_worth_eth: f64,
     quote_worth_eth: f64,
+    price_base_to_quote: f64,
+    price_quote_to_base: f64,
 ) -> Orderbook {
     let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs();
     let eth_usd = gas::eth_usd().await;
@@ -120,8 +135,8 @@ pub async fn simulate(
     let amount_eth = utils::r#static::maths::BEST_BID_ASK_ETH_BPS / utils::r#static::maths::BPD; // 1/100 of ETH = ~2$ (for 2000$ ETH)
     let amount_test_best_base_to_quote = amount_eth / base_worth_eth;
     let amount_test_best_quote_to_base = amount_eth / quote_worth_eth;
-    let best_base_to_quote = best(&pcsdata, eth_usd, gas_price, &base, &quote, amount_test_best_base_to_quote, quote_worth_eth);
-    let best_quote_to_base = best(&pcsdata, eth_usd, gas_price, &quote, &base, amount_test_best_quote_to_base, base_worth_eth);
+    let best_base_to_quote = best(&pcsdata, eth_usd, gas_price, &base, &quote, amount_test_best_base_to_quote, price_base_to_quote, quote_worth_eth);
+    let best_quote_to_base = best(&pcsdata, eth_usd, gas_price, &quote, &base, amount_test_best_quote_to_base, price_quote_to_base, base_worth_eth);
     let mpd_base_to_quote = midprice(best_base_to_quote.clone(), best_quote_to_base.clone());
     let mpd_quote_to_base = midprice(best_quote_to_base.clone(), best_base_to_quote.clone());
 
@@ -149,9 +164,27 @@ pub async fn simulate(
         Some(spsq) => {
             tracing::trace!(" 🎯 Partial Optimisation: input: {} and amount: {}", spsq.input, spsq.amount);
             if spsq.input.to_lowercase() == base.address.to_lowercase() {
-                result.bids = vec![maths::opti::gradient(spsq.amount, &pcsdata, base.clone(), quote.clone(), eth_usd, gas_price, quote_worth_eth)];
+                result.bids = vec![maths::opti::gradient(
+                    spsq.amount,
+                    &pcsdata,
+                    base.clone(),
+                    quote.clone(),
+                    eth_usd,
+                    gas_price,
+                    price_base_to_quote,
+                    quote_worth_eth,
+                )];
             } else if spsq.input.to_lowercase() == quote.address.to_lowercase() {
-                result.asks = vec![maths::opti::gradient(spsq.amount, &pcsdata, quote.clone(), base.clone(), eth_usd, gas_price, base_worth_eth)];
+                result.asks = vec![maths::opti::gradient(
+                    spsq.amount,
+                    &pcsdata,
+                    quote.clone(),
+                    base.clone(),
+                    eth_usd,
+                    gas_price,
+                    price_quote_to_base,
+                    base_worth_eth,
+                )];
             }
         }
         None => {
@@ -166,47 +199,61 @@ pub async fn simulate(
                 None => OrderbookFunctions { optimize, steps: exponential },
             };
             let steps = (obfs.steps)(*aggb_base);
-            let bids = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &base, &quote, *aggb_base, quote_worth_eth);
+            let bids = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &base, &quote, *aggb_base, price_base_to_quote, quote_worth_eth);
             result.bids = bids;
             tracing::trace!(" 🔄  Bids done, now switching to asks");
             let steps = (obfs.steps)(*aggb_quote);
-            let asks = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &quote, &base, *aggb_quote, base_worth_eth);
+            let asks = (obfs.optimize)(&pcsdata, steps.clone(), eth_usd, gas_price, &quote, &base, *aggb_quote, price_quote_to_base, base_worth_eth);
             result.asks = asks;
         }
     }
     result
 }
 
-pub type QuoteFn = fn(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult>;
+pub type QuoteFn = fn(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, spot_price: f64, output_u_ethworth: f64) -> Vec<TradeResult>;
 
 // Executes the optimizer for a given token pair and a set of pools.
 /// Use the steps generated by function pointer
 #[allow(clippy::too_many_arguments)]
-pub fn optimize(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
+pub fn optimize(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, aggb: f64, spot_price: f64, output_u_ethworth: f64) -> Vec<TradeResult> {
     tracing::debug!("Agg onchain liquidity balance for {} is {} | Output unit worth eth: {}", from.symbol, aggb, output_u_ethworth);
     let trades: Vec<TradeResult> = steps
         .par_iter()
         .enumerate()
         .map(|(x, amount)| {
             let tmstp = Instant::now();
-            let result = maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
+            let result = maths::opti::gradient(*amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, spot_price, output_u_ethworth);
             let elapsed = tmstp.elapsed().as_millis();
             let gas_cost = result.gas_costs_usd.iter().sum::<f64>();
+            let sum_distribution = result.distribution.iter().sum::<f64>();
+            let sum_distributed = result.distributed.iter().sum::<f64>();
             tracing::trace!(
-                " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {} | Gas cost {:.5}$ | Distribution: {:?} | Took: {} ms",
+                " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {:.7} (vs spot_price {:.7}) | Price impact: {:.4} | Gas cost {:.5}$ | Distribution: {:?} on {:.3} | Distributed: {:?} on {:.3} | JTook: {} ms",
                 x,
                 result.amount,
                 from.symbol,
                 result.output,
                 to.symbol,
                 result.average_sell_price,
+                spot_price,
+                result.price_impact,
                 gas_cost,
                 result.distribution,
+                sum_distribution,
+                result.distributed,
+                sum_distributed,
                 elapsed
             );
             result
         })
         .collect();
+
+    // Current gradient optimization is not always the best solution and takes a lot of time, but it is a good starting point
+    // Yet we remove trades that have a price impact not strictly increasing
+    let (trades, x) = remove_decreasing_price(&trades);
+    if x > 0 {
+        tracing::debug!("Removed {} trades with decreasing price impact", x);
+    }
     trades
 }
 
@@ -219,9 +266,9 @@ pub fn optimize(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_pric
  * --- --- --- --- ---
  * Amount out is net of gas cost
  */
-pub fn best(pcs: &[ProtoTychoState], eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, amount: f64, output_u_ethworth: f64) -> TradeResult {
+pub fn best(pcs: &[ProtoTychoState], eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, amount: f64, spot_price: f64, output_u_ethworth: f64) -> TradeResult {
     tracing::debug!(" - 🥇 Computing best price for {} (amount in = {})", from.symbol, amount);
-    let result = maths::opti::gradient(amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, output_u_ethworth);
+    let result = maths::opti::gradient(amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, spot_price, output_u_ethworth);
     tracing::trace!(
         " - (best) Input: {} {}, Output: {} {} at price {} | Distribution: {:?} ",
         result.amount,
@@ -240,6 +287,7 @@ pub fn best(pcs: &[ProtoTychoState], eth_usd: f64, gas_price: u128, from: &SrzTo
  */
 pub fn midprice(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResult) -> MidPriceData {
     let amount = trade_base_to_quote.amount;
+    let received = trade_base_to_quote.output;
     let distribution = trade_base_to_quote.distribution.clone();
     let ask = trade_base_to_quote.average_sell_price; // buy quote
     let bid = 1. / trade_quote_to_base.average_sell_price; // buy base
@@ -248,6 +296,7 @@ pub fn midprice(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResu
     let spread_pct = (spread / mid) * 100.;
     MidPriceData {
         amount,
+        received,
         distribution,
         ask,
         bid,
@@ -260,4 +309,23 @@ pub fn midprice(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResu
 /// Check if a component has the desired tokens
 pub fn matchcp(cptks: Vec<SrzToken>, tokens: Vec<SrzToken>) -> bool {
     tokens.iter().all(|token| cptks.iter().any(|cptk| cptk.address.eq_ignore_ascii_case(&token.address)))
+}
+
+/// Removes trades with decreasing price
+/// Temporarily, need a better convex optimization function
+/// Example: [0.1, 0.4, 0.3, 0.5] => [0.1, 0.4, 0.5]
+pub fn remove_decreasing_price(items: &[TradeResult]) -> (Vec<TradeResult>, usize) {
+    if items.is_empty() {
+        return (Vec::new(), 0);
+    }
+    let mut filtered = vec![items[0].clone()];
+    for item in items.iter().skip(1) {
+        // Append the item only if its price_impact is not strictly lower
+        // than the last item kept.
+        if item.average_sell_price >= filtered.last().unwrap().average_sell_price {
+            filtered.push(item.clone());
+        }
+    }
+    let count = items.len() - filtered.len();
+    (filtered, count)
 }
