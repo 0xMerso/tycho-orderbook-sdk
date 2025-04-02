@@ -152,6 +152,7 @@ impl SrzProtocolComponent {
             chain,
             contract_ids: srz.contract_ids.into_iter().map(|s| Bytes::from(s.into_bytes())).collect(),
             static_attributes: srz.static_attributes.into_iter().map(|(k, v)| (k, Bytes::from(v.into_bytes()))).collect(),
+            // Not important.
             creation_tx: Bytes::from(srz.creation_tx.into_bytes()),
             created_at: chrono::NaiveDateTime::default(), // ! Important
         }

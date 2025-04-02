@@ -87,10 +87,10 @@ impl OrderbookProvider {
                                     if !msg.new_pairs.is_empty() || !msg.removed_pairs.is_empty() {
                                         let mut mtx = state.write().await;
                                         for x in msg.new_pairs.iter() {
-                                            mtx.components.insert(x.0.clone(), x.1.clone());
+                                            mtx.components.insert(x.0.clone().to_lowercase(), x.1.clone());
                                         }
                                         for x in msg.removed_pairs.iter() {
-                                            mtx.components.remove(x.0);
+                                            mtx.components.remove(&x.0.clone().to_lowercase());
                                         }
                                         tracing::debug!("Received {} new pairs, and {} pairs to be removed. Updating Redis ...", msg.new_pairs.len(), msg.removed_pairs.len());
                                         drop(mtx);

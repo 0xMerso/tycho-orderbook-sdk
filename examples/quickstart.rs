@@ -4,6 +4,7 @@ use tycho_client::feed::component_tracker::ComponentFilter;
 use tycho_orderbook::{
     adapters::default::DefaultOrderBookAdapter,
     core::{book, rpc},
+    data::fmt::SrzProtocolComponent,
     maths::steps::exponential,
     types::{
         EnvConfig, ExecutionRequest, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState,
@@ -11,6 +12,9 @@ use tycho_orderbook::{
     },
     utils::r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
 };
+use tycho_simulation::protocol::models::ProtocolComponent;
+
+pub static SENDER: &str = "0xC0F7d041defAE1045e11A6101284AbA4BCc3770f";
 
 #[tokio::main]
 async fn main() {
@@ -154,11 +158,10 @@ async fn main() {
                                     if book.tag.clone().eq_ignore_ascii_case(obtag.as_str()) {
                                         tracing::debug!("OBP Event: Orderbook {}-{} is the one we want to execute a trade on.", current.base.symbol, current.quote.symbol);
                                         // Execution
-                                        let sender = "0xC0F7d041defAE1045e11A6101284AbA4BCc3770f".to_string();
                                         // let amount = book.mpd_base_to_quote.
                                         let way = book.mpd_base_to_quote.clone();
                                         let request = ExecutionRequest {
-                                            sender: sender.clone(),
+                                            sender: SENDER.to_string().clone(),
                                             tag: book.tag.clone(),
                                             input: book.base.clone(),
                                             output: book.quote.clone(),
@@ -167,7 +170,18 @@ async fn main() {
                                             distribution: way.distribution.clone(),
                                             components: book.pools.clone(),
                                         };
-                                        let _ = book.execute(network.clone(), request).await;
+
+                                        let mtx = state.read().await;
+                                        let originals = mtx.components.clone();
+                                        drop(mtx);
+                                        let originals = get_original_components(originals, book.pools.clone());
+
+                                        match book.execute(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
+                                            Ok(payload) => {
+                                                let _ = tycho_orderbook::core::exec::broadcast(network.clone(), payload.clone(), Some(env.pvkey.clone())).await;
+                                            }
+                                            Err(err) => {}
+                                        }
                                     } else {
                                         tracing::debug!("OBP Event: Orderbook {}-{} is not the one we want to execute a trade on.", current.base.symbol, current.quote.symbol);
                                     }
@@ -207,4 +221,38 @@ async fn main() {
             }
         }
     }
+}
+
+pub fn get_original_components(originals: HashMap<String, ProtocolComponent>, targets: Vec<SrzProtocolComponent>) -> Vec<ProtocolComponent> {
+    let mut filtered = Vec::with_capacity(targets.len());
+    for cp in targets.clone().iter().enumerate() {
+        let tgt = cp.1.id.to_string().to_lowercase();
+        if let Some(original) = originals.get(&tgt) {
+            filtered.push(original.clone());
+        } else {
+            tracing::warn!("OBP Event: Error: Component {} not found in the original list, anormal !", tgt);
+        }
+    }
+    if filtered.len() != targets.len() {
+        tracing::error!("Execution error: not all components found in the original list, anormal !");
+    }
+    let order: HashMap<String, usize> = targets.iter().enumerate().map(|(i, item)| (item.id.to_string().to_lowercase(), i)).collect();
+    filtered.sort_by_key(|item| order.get(&item.id.to_string().to_lowercase()).copied().unwrap_or(usize::MAX));
+
+    for o in filtered.iter() {
+        tracing::info!(" - originals : {}", o.id);
+        let attributes = o.static_attributes.clone();
+        for a in attributes.iter() {
+            tracing::info!("   - {}: {}", a.0, a.1);
+        }
+    }
+    for t in targets.iter() {
+        tracing::info!(" - targets   : {}", t.id);
+        let attributes = t.static_attributes.clone();
+        for a in attributes.iter() {
+            tracing::info!("   - {}: {}", a.0, a.1);
+        }
+    }
+
+    filtered
 }

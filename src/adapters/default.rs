@@ -4,6 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use std::cmp::min;
+use tycho_simulation::protocol::models::ProtocolComponent;
 
 /// Adapters are customized interfaces implemented for specific needs on the Orderbook struct, such as the reproduction of the exchange's orderbook format.
 /// The default adapter is designed to match as much as possible the Binance standard.
@@ -24,7 +25,7 @@ pub trait DefaultOrderBookAdapter: Send + Sync {
     fn info(&self) -> ExchangeInfo;
 
     /// Executes a real trade (or sends the order to the exchange).
-    async fn execute(&self, network: Network, request: ExecutionRequest) -> Result<ExecutionPayload, String>; // (&mut self, side: Side, quantity: f64, price: f64);
+    async fn execute(&self, network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<ExecutionPayload, String>; // (&mut self, side: Side, quantity: f64, price: f64);
 
     /// Simulates a trade against the current orderbook.
     async fn simulate(&self) -> u64; // (&self, side: Side, quantity: f64) -> TradeSimulationResult;
@@ -82,9 +83,18 @@ impl DefaultOrderBookAdapter for Orderbook {
     }
 
     /// POST /api/v3/order
-    async fn execute(&self, network: Network, request: ExecutionRequest) -> Result<ExecutionPayload, String> {
-        //todo Need Binance interfacing
-        exec::build(network.clone(), request.clone()).await
+    async fn execute(&self, network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<ExecutionPayload, String> {
+        // Todo Need Binance interfacing
+        match exec::build(network.clone(), request.clone(), components.clone(), pk.clone()).await {
+            Ok(payload) => {
+                let _ = exec::broadcast(network.clone(), payload.clone(), pk.clone()).await;
+                Ok(payload)
+            }
+            Err(e) => {
+                tracing::error!("Error executing order: {}", e);
+                Err(e)
+            }
+        }
     }
 
     /// POST /api/v3/order/test

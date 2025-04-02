@@ -158,10 +158,12 @@ pub struct ExecutionRequest {
 }
 
 /// Result of the execution
-#[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionPayload {
-    pub approve: SrzTransactionRequest,
-    pub swap: SrzTransactionRequest,
+    pub approve: TransactionRequest,
+    pub swap: TransactionRequest,
+    pub srz_approve: SrzTransactionRequest,
+    pub srz_swap: SrzTransactionRequest,
 }
 
 /// Transaction request, serialized for the client (srz = serialized)
@@ -173,7 +175,7 @@ pub struct SrzTransactionRequest {
     pub max_fee_per_gas: u128,          // Option<u128>,
     pub max_priority_fee_per_gas: u128, // Option<u128>,
     pub max_fee_per_blob_gas: u128,     // Option<u128>,
-    pub gas: u128,                      // Option<u128>,
+    pub gas: u64,                       // Option<u128>,
     pub value: u128,                    // Option<U256>,
     pub input: String,                  // TransactionInput,
     pub nonce: u128,                    // Option<u64>,

@@ -56,7 +56,7 @@ pub mod filter {
 pub mod execution {
     pub static EXEC_DEFAULT_SLIPPAGE: f64 = 0.0025;
     pub static APPROVE_FN_SIGNATURE: &str = "approve(address,uint256)";
-    pub static DEFAULT_APPROVE_GAS: u128 = 100_000;
+    pub static DEFAULT_APPROVE_GAS: u64 = 100_000;
 }
 
 pub mod endpoints {
