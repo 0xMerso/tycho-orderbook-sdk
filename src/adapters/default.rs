@@ -83,6 +83,7 @@ impl DefaultOrderBookAdapter for Orderbook {
 
     /// POST /api/v3/order
     async fn execute(&self, network: Network, request: ExecutionRequest) -> Result<ExecutionPayload, String> {
+        //todo Need Binance interfacing
         exec::build(network.clone(), request.clone()).await
     }
 

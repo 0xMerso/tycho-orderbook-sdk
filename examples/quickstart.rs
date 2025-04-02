@@ -42,7 +42,7 @@ async fn main() {
     });
 
     // --- Adjust as needed --- Mainnet here
-    let eth = network.eth.clone();
+    let eth = network.eth.clone().to_lowercase();
     let usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string().to_lowercase(); // base: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
     let btc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599".to_string().to_lowercase(); // base: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
     let btcusdc = format!("{}-{}", btc, usdc); // "0xBTC" "0xUSDC"
@@ -52,7 +52,8 @@ async fn main() {
     // tracked.insert(btcusdc.clone(), None);
     // tracked.insert(btc_eth.clone(), None);
     tracked.insert(eth_usdc.clone(), None);
-    let obexec = eth_usdc; // Orderbook tag on which we want to execute a trade for demo
+    let obtag = eth_usdc; // Orderbook tag on which we want to execute a trade for demo
+    tracing::debug!("Execution on obtag: {:?}", obtag);
 
     // Create the OBP provider from the protocol stream builder and shared state.
     let mut attempt = 0;
@@ -150,7 +151,7 @@ async fn main() {
                                         tracing::info!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
                                     }
 
-                                    if book.tag.clone() == obexec.clone() {
+                                    if book.tag.clone().eq_ignore_ascii_case(obtag.as_str()) {
                                         tracing::debug!("OBP Event: Orderbook {}-{} is the one we want to execute a trade on.", current.base.symbol, current.quote.symbol);
                                         // Execution
                                         let sender = "0xC0F7d041defAE1045e11A6101284AbA4BCc3770f".to_string();
