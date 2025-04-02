@@ -29,23 +29,6 @@ use crate::{
     utils::r#static::{execution, maths::BPD},
 };
 
-static ROUTER_ADDRESSES: LazyLock<HashMap<ChainSimu, tycho_simulation::tycho_core::Bytes>> = LazyLock::new(|| {
-    HashMap::from([
-        (
-            ChainSimu::Ethereum,
-            "0x0178f471f219737c51d6005556d2f44de011a08a" //" 0x023eea66B260FA2E109B0764774837629cC41FeF"
-                .parse::<tycho_simulation::tycho_core::Bytes>()
-                .expect("Failed to create Ethereum router address"),
-        ),
-        (
-            ChainSimu::Base,
-            "0x94ebf984511b06bab48545495b754760bfaa566e"
-                .parse::<tycho_simulation::tycho_core::Bytes>()
-                .expect("Failed to create Base router address"),
-        ),
-    ])
-});
-
 /// Build 2 transactions for the given solution:
 /// 1. Approve the given token to the router address.
 /// 2. Swap the given token for the checked token using the router address.
@@ -95,9 +78,9 @@ pub fn prepare(network: Network, solution: Solution, encoded: Transaction, block
 }
 
 /// Build a swap solution Tycho structure
-pub async fn solution(network: Network, chain: ChainSimu, request: ExecutionRequest, components: Vec<ProtocolComponent>) -> Option<Solution> {
+pub async fn solution(network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>) -> Option<Solution> {
     tracing::debug!("Preparing swap. Request: {:?}", request);
-    let router = ROUTER_ADDRESSES.get(&chain).expect("Router address not found").clone();
+    let router = network.router;
     let sum = request.distribution.iter().fold(0., |acc, x| acc + x);
     if !(99. ..=101.).contains(&sum) {
         tracing::debug!("Invalid distribution: {:?}, sum = {}", request.distribution, sum);
@@ -131,7 +114,7 @@ pub async fn solution(network: Network, chain: ChainSimu, request: ExecutionRequ
         })
         .collect();
 
-    tracing::debug!("Total distribution: {}. Must be strictly < 100. Adjusted swap distributions = {:?}", sum, distributions.clone());
+    tracing::debug!("Distribution: {}. Must be < 100. Adjusted distribution = {:?} (0 if single swap)", sum, distributions.clone());
     let mut swaps = vec![];
     for (x, dist) in distributions.iter().enumerate() {
         log::trace!("Distribution #{}: {}", x, dist);
@@ -147,16 +130,13 @@ pub async fn solution(network: Network, chain: ChainSimu, request: ExecutionRequ
             swaps.push(tycho_execution::encoding::models::Swap::new(original.clone(), input, output, *dist));
         }
     }
-    let amount_in_divided = (request.amount * 10f64.powi(request.input.decimals as i32)) as u128;
-    let amount_in = BigUint::from(amount_in_divided);
-    tracing::debug!("Amount in: {} (pow = {}) of {}", amount_in_divided, amount_in, request.input.symbol.clone());
-    let expected_amount_out = match request.expected_amount_out {
-        Some(amount) => {
-            let amount = (amount * 10f64.powi(request.output.decimals as i32)) as u128;
-            Some(BigUint::from(amount))
-        }
-        None => None,
-    };
+    let amount_in = BigUint::from((request.amount * 10f64.powi(request.input.decimals as i32)) as u128);
+    tracing::debug!("Amount in: {} (pow = {}) of {}", request.amount, amount_in, request.input.symbol.clone());
+    let expected = request.expected * 10f64.powi(request.output.decimals as i32);
+    let expected_bg = BigUint::from(expected as u128);
+    let slippage = execution::EXEC_DEFAULT_SLIPPAGE;
+    let checked_amount = expected.clone() * (1.0 - slippage);
+    let checked_amount_bg = BigUint::from(checked_amount as u128);
     let solution: Solution = Solution {
         // Addresses
         sender: tycho_simulation::tycho_core::Bytes::from_str(request.sender.to_lowercase().as_str()).unwrap(),
@@ -165,12 +145,12 @@ pub async fn solution(network: Network, chain: ChainSimu, request: ExecutionRequ
         checked_token: tycho_simulation::tycho_core::Bytes::from_str(request.output.clone().address.to_lowercase().as_str()).unwrap(),
         // Others fields
         given_amount: amount_in.clone(),
-        slippage: Some(execution::EXEC_DEFAULT_SLIPPAGE),
-        expected_amount: expected_amount_out,
-        exact_out: false,     // It's an exact in solution  Currently only exact input solutions are supported.
-        checked_amount: None, // The amount out will not be checked in execution
+        slippage: Some(slippage),
+        exact_out: false, // It's an exact in solution
+        expected_amount: Some(expected_bg),
+        checked_amount: Some(checked_amount_bg), // The amount out will not be checked in execution
         swaps: swaps.clone(),
-        router_address: router,
+        // router_address: router, //! wtf ?
         ..Default::default() // native_action => ?
     };
     tracing::debug!("Solution: {:?}", solution);
@@ -230,6 +210,7 @@ pub async fn broadcast(network: Network, transactions: ExecutionPayload, pk: Opt
 }
 
 /// Build swap transactions on the specified network for the given request.
+/// Some example: https://github.com/propeller-heads/tycho-execution/blob/main/examples/encoding-example/main.rs
 pub async fn build(network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<ExecutionPayload, String> {
     let (_, _, chain) = types::chain(network.name.clone()).unwrap();
     let tokens = vec![request.input.clone().address, request.output.clone().address];
@@ -238,7 +219,7 @@ pub async fn build(network: Network, request: ExecutionRequest, components: Vec<
     match super::rpc::erc20b(&provider, request.sender.clone(), tokens.clone()).await {
         Ok(balances) => {
             tracing::debug!("Building swap calldata and transactions ...");
-            if let Some(solution) = solution(network.clone(), chain, request.clone(), components.clone()).await {
+            if let Some(solution) = solution(network.clone(), request.clone(), components.clone()).await {
                 let header: alloy::rpc::types::Block = provider.get_block_by_number(alloy::eips::BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
                 let nonce = provider.get_transaction_count(solution.sender.to_string().parse().unwrap()).await.unwrap();
 

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
+use tycho_simulation::evm::protocol::utils::uniswap::tick_list::TickList;
 
 use alloy::primitives::ruint::aliases::U256;
 use num_bigint::BigUint;
@@ -8,7 +9,7 @@ use tycho_simulation::evm::engine_db::tycho_db::PreCachedDB;
 use tycho_simulation::evm::protocol::uniswap_v2::state::UniswapV2State;
 use tycho_simulation::evm::protocol::uniswap_v3::state::UniswapV3State;
 use tycho_simulation::evm::protocol::uniswap_v4::state::UniswapV4State;
-use tycho_simulation::evm::protocol::utils::uniswap::tick_list::{TickInfo, TickList};
+use tycho_simulation::evm::protocol::utils::uniswap::tick_list::TickInfo;
 use tycho_simulation::evm::protocol::vm::state::EVMPoolState;
 use tycho_simulation::models::Token;
 use tycho_simulation::protocol::models::ProtocolComponent;
@@ -239,7 +240,7 @@ impl From<(UniswapV4State, String)> for SrzUniswapV4State {
                 lp_fee: state.fees.lp_fee,
             },
             tick: state.tick,
-            ticks: SrzTickList::from(state.ticks), // ! TODO: sort by index
+            ticks: SrzTickList::from(state.ticks), // ! TODO: sort by index // WTF
         }
     }
 }
@@ -290,7 +291,6 @@ pub struct SrzEVMPoolState {
 }
 
 // From EVMPoolState to SrzEVMPoolState done manually.
-
 impl From<(EVMPoolState<PreCachedDB>, String)> for SrzEVMPoolState {
     fn from((state, id): (EVMPoolState<PreCachedDB>, String)) -> Self {
         SrzEVMPoolState {

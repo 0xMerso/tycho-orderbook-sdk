@@ -9,7 +9,9 @@ use reqwest::Client;
 use tycho_client::rpc::HttpRPCClient;
 use tycho_client::rpc::RPCClient;
 
-use tycho_core::dto::ProtocolStateRequestBody;
+use tycho_common::dto::PaginationParams;
+use tycho_common::dto::ProtocolStateRequestBody;
+use tycho_common::dto::VersionParam;
 use tycho_simulation::models::Token;
 
 /// Get the balances of the component in the specified protocol system.
@@ -30,9 +32,9 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
         protocol_ids: Some(vec![cp]),
         protocol_system: protosys.to_string(),
         chain,
-        include_balances: true,                            // We want to include account balances.
-        version: tycho_core::dto::VersionParam::default(), // { timestamp: None, block: None },
-        pagination: tycho_core::dto::PaginationParams {
+        include_balances: true,           // We want to include account balances.
+        version: VersionParam::default(), // { timestamp: None, block: None },
+        pagination: PaginationParams {
             page: 0,        // Start at the first page.
             page_size: 100, // Maximum page size supported is 100.
         },

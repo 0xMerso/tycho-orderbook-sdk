@@ -2977,6 +2977,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "enum_delegate"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8ea75f31022cba043afe037940d73684327e915f88f62478e778c3de914cd0a"
+dependencies = [
+ "enum_delegate_lib",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "enum_delegate_lib"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e1f6c3800b304a6be0012039e2a45a322a093539c45ab818d9e6895a39c90fe"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rand 0.8.5",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "enumn"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3081,7 +3105,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "thiserror 1.0.69",
- "uint",
+ "uint 0.9.5",
 ]
 
 [[package]]
@@ -3112,7 +3136,7 @@ dependencies = [
  "impl-serde",
  "primitive-types 0.12.2",
  "scale-info",
- "uint",
+ "uint 0.9.5",
 ]
 
 [[package]]
@@ -3178,6 +3202,17 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "ws_stream_wasm",
+]
+
+[[package]]
+name = "evm_ekubo_sdk"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "184f4223ac2098f31a96d659845bea6f67bb7116f328850ca6e108525ea35cdc"
+dependencies = [
+ "insta",
+ "num-traits",
+ "uint 0.10.0",
 ]
 
 [[package]]
@@ -4731,6 +4766,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "insta"
+version = "1.42.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50259abbaa67d11d2bcafc7ba1d094ed7a0c70e3ce893f0d0997f73558cb3084"
+dependencies = [
+ "console",
+ "linked-hash-map",
+ "once_cell",
+ "pin-project 1.1.10",
+ "similar",
+]
+
+[[package]]
 name = "instant"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4983,6 +5031,12 @@ dependencies = [
  "pkg-config",
  "vcpkg",
 ]
+
+[[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
 name = "linux-raw-sys"
@@ -5303,7 +5357,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
- "proc-macro-crate 3.2.0",
+ "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
  "syn 2.0.99",
@@ -5801,7 +5855,7 @@ checksum = "05e4722c697a58a99d5d06a08c30821d7c082a4632198de1eaa5a6c22ef42373"
 dependencies = [
  "fixed-hash 0.7.0",
  "impl-codec 0.5.1",
- "uint",
+ "uint 0.9.5",
 ]
 
 [[package]]
@@ -5815,7 +5869,7 @@ dependencies = [
  "impl-rlp",
  "impl-serde",
  "scale-info",
- "uint",
+ "uint 0.9.5",
 ]
 
 [[package]]
@@ -7209,6 +7263,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
+name = "similar"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
+
+[[package]]
 name = "simple_asn1"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8171,8 +8231,9 @@ dependencies = [
 
 [[package]]
 name = "tycho-client"
-version = "0.56.5"
-source = "git+https://github.com/propeller-heads/tycho-indexer.git?tag=0.56.5#2af8c1a5a61c5479eab5f7903b69943efa61e2c8"
+version = "0.64.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc7272ec59d25886cbd87fd4383ba4c043b91633b887f857c61119b2e278479f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8191,14 +8252,64 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
- "tycho-core",
+ "tycho-common 0.64.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 1.15.1",
 ]
 
 [[package]]
-name = "tycho-core"
-version = "0.56.5"
-source = "git+https://github.com/propeller-heads/tycho-indexer.git?tag=0.56.5#2af8c1a5a61c5479eab5f7903b69943efa61e2c8"
+name = "tycho-client"
+version = "0.64.2"
+source = "git+https://github.com/propeller-heads/tycho-indexer.git?tag=0.64.2#e38cc07cc90c698e85f87d7d1401efd03d2be285"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "futures 0.3.31",
+ "hex",
+ "hyper 0.14.32",
+ "lru",
+ "reqwest 0.12.12",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-tungstenite 0.20.1",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "tycho-common 0.64.2 (git+https://github.com/propeller-heads/tycho-indexer.git?tag=0.64.2)",
+ "uuid 1.15.1",
+]
+
+[[package]]
+name = "tycho-common"
+version = "0.64.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "628e9701e4a953dab64612b8f216c428ce9dd3b70592a2b3609866ed98c682f0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "hex",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "strum 0.25.0",
+ "strum_macros 0.25.3",
+ "thiserror 1.0.69",
+ "tiny-keccak",
+ "tracing",
+ "typetag",
+ "utoipa 4.2.3",
+ "uuid 1.15.1",
+]
+
+[[package]]
+name = "tycho-common"
+version = "0.64.2"
+source = "git+https://github.com/propeller-heads/tycho-indexer.git?tag=0.64.2#e38cc07cc90c698e85f87d7d1401efd03d2be285"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8220,8 +8331,8 @@ dependencies = [
 
 [[package]]
 name = "tycho-execution"
-version = "0.61.0"
-source = "git+https://github.com/propeller-heads/tycho-execution.git?tag=0.61.0#852bbbc1505a47096e8e0b4ca1ba63e61fb282c5"
+version = "0.73.0"
+source = "git+https://github.com/propeller-heads/tycho-execution.git?tag=0.73.0#69f4e748b57677e4fc97f2fc68e100df39f3f40d"
 dependencies = [
  "alloy 0.9.2",
  "alloy-primitives",
@@ -8238,7 +8349,7 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
- "tycho-core",
+ "tycho-common 0.64.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -8279,8 +8390,8 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
- "tycho-client",
- "tycho-core",
+ "tycho-client 0.64.2 (git+https://github.com/propeller-heads/tycho-indexer.git?tag=0.64.2)",
+ "tycho-common 0.64.2 (git+https://github.com/propeller-heads/tycho-indexer.git?tag=0.64.2)",
  "tycho-execution",
  "tycho-simulation",
  "url",
@@ -8290,8 +8401,8 @@ dependencies = [
 
 [[package]]
 name = "tycho-simulation"
-version = "0.82.1"
-source = "git+https://github.com/0xMerso/tycho-simulation.git?branch=protocol-state-pub-fields#8b09b1fd72a609841662a1dfa9077957a83f1abe"
+version = "0.91.1"
+source = "git+https://github.com/0xMerso/tycho-simulation.git?branch=main#a5cff8d11b6753a14d3e080c0470adc221cc2847"
 dependencies = [
  "alloy 0.5.4",
  "alloy-primitives",
@@ -8299,6 +8410,8 @@ dependencies = [
  "chrono",
  "dialoguer 0.10.4",
  "dotenv",
+ "enum_delegate",
+ "evm_ekubo_sdk",
  "foundry-config",
  "foundry-evm",
  "futures 0.3.31",
@@ -8318,9 +8431,8 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
- "tycho-client",
- "tycho-core",
- "tycho-execution",
+ "tycho-client 0.64.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tycho-common 0.64.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 1.15.1",
 ]
 
@@ -8371,6 +8483,18 @@ name = "uint"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76f64bba2c53b04fcab63c01a7d7427eadc821e3bc48c34dc9ba29c501164b52"
+dependencies = [
+ "byteorder",
+ "crunchy",
+ "hex",
+ "static_assertions",
+]
+
+[[package]]
+name = "uint"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "909988d098b2f738727b161a106cfc7cab00c539c2687a8836f8e565976fb53e"
 dependencies = [
  "byteorder",
  "crunchy",

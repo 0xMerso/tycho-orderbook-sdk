@@ -1,15 +1,14 @@
 use std::collections::HashMap;
+use tycho_simulation::evm::protocol::filters::{balancer_pool_filter, curve_pool_filter, uniswap_v4_pool_with_hook_filter};
 use tycho_simulation::models::Token;
 use tycho_simulation::tycho_client::stream::StreamError;
 
-use tycho_simulation::evm::protocol::filters::curve_pool_filter;
-use tycho_simulation::evm::protocol::filters::uniswap_v4_pool_with_hook_filter;
 use tycho_simulation::evm::protocol::uniswap_v3::state::UniswapV3State;
 use tycho_simulation::evm::protocol::uniswap_v4::state::UniswapV4State;
 
 use tycho_simulation::evm::{
     engine_db::tycho_db::PreCachedDB,
-    protocol::{filters::balancer_pool_filter, uniswap_v2::state::UniswapV2State, vm::state::EVMPoolState},
+    protocol::{uniswap_v2::state::UniswapV2State, vm::state::EVMPoolState},
     stream::ProtocolStreamBuilder,
 };
 

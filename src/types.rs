@@ -57,6 +57,8 @@ pub struct Network {
     #[schema(example = "4242")]
     pub port: u64,
     #[schema(example = "0x")]
+    pub router: String,
+    #[schema(example = "0x")]
     pub permit2: String,
 }
 
@@ -152,7 +154,7 @@ pub struct ExecutionRequest {
     pub input: SrzToken,
     pub output: SrzToken,
     pub amount: f64,
-    pub expected_amount_out: Option<f64>,
+    pub expected: f64,
     pub distribution: Vec<f64>, // Percentage distribution per pool (0–100)
     pub components: Vec<SrzProtocolComponent>,
 }
@@ -252,16 +254,16 @@ use tycho_simulation::evm::decoder::StreamDecodeError;
 use tycho_simulation::evm::stream::ProtocolStreamBuilder;
 
 /// Due to library conflicts, we need to redefine the Chain type depending the use case, hence the following aliases.
-pub type ChainCore = tycho_core::dto::Chain;
+pub type ChainCommon = tycho_common::dto::Chain;
 pub type ChainSimCore = tycho_simulation::tycho_core::dto::Chain;
 pub type ChainSimu = tycho_simulation::evm::tycho_models::Chain;
 
 /// Return the chains types for a given network name
-pub fn chain(name: String) -> Option<(ChainCore, ChainSimCore, ChainSimu)> {
+pub fn chain(name: String) -> Option<(ChainCommon, ChainSimCore, ChainSimu)> {
     match name.as_str() {
-        "ethereum" => Some((ChainCore::Ethereum, ChainSimCore::Ethereum, ChainSimu::Ethereum)),
-        "arbitrum" => Some((ChainCore::Arbitrum, ChainSimCore::Arbitrum, ChainSimu::Arbitrum)),
-        "base" => Some((ChainCore::Base, ChainSimCore::Base, ChainSimu::Base)),
+        "ethereum" => Some((ChainCommon::Ethereum, ChainSimCore::Ethereum, ChainSimu::Ethereum)),
+        "arbitrum" => Some((ChainCommon::Arbitrum, ChainSimCore::Arbitrum, ChainSimu::Arbitrum)),
+        "base" => Some((ChainCommon::Base, ChainSimCore::Base, ChainSimu::Base)),
         _ => {
             tracing::error!("Unknown chain: {}", name);
             None
@@ -332,9 +334,13 @@ pub struct TradeResult {
     #[schema(example = "2000.0")]
     pub output: f64,
 
-    // Percentage distribution per pool (0–100)
+    // Percentage distribution (amount in) per pool (0–100)
     #[schema(example = "[0.42, 0.37, 0.21]")]
     pub distribution: Vec<f64>,
+
+    // Percentage received per pool
+    #[schema(example = "[0.42, 0.37, 0.21]")]
+    pub distributed: Vec<f64>,
 
     // Gas units used
     #[schema(example = "[42000, 37000, 77000]")]
@@ -347,6 +353,10 @@ pub struct TradeResult {
     // output per unit input (human–readable)
     #[schema(example = "0.0005")]
     pub average_sell_price: f64,
+
+    // Price impact of the trade (0–1). In absolute value, bc cannot be positive.
+    #[schema(example = "0.05")]
+    pub price_impact: f64,
 }
 
 /// Orderbook data used to compute spread, and other metrics
@@ -359,6 +369,7 @@ pub struct MidPriceData {
     pub spread_pct: f64,
     // For Exec|Testing purpose
     pub amount: f64,
+    pub received: f64,
     pub distribution: Vec<f64>,
 }
 
@@ -426,7 +437,8 @@ impl Default for OrderbookProviderConfig {
 
 #[derive(Clone)]
 pub struct OrderbookBuilderConfig {
-    pub filter: tycho_client::feed::component_tracker::ComponentFilter,
+    pub filter: tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter,
+    // pub filter: tycho_client::feed::component_tracker::ComponentFilter,
 }
 
 /// Struct used to build the orderbook functions in order to customize the orderbook construction

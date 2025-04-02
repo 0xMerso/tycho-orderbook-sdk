@@ -1,7 +1,7 @@
 use crate::{
     data::fmt::SrzToken,
     types::{ProtoTychoState, TradeResult},
-    utils::r#static::maths::{FRACTION_REALLOC, MAX_ITERATIONS},
+    utils::r#static::maths::{BPD, FRACTION_REALLOC, MAX_ITERATIONS, ONE_HD},
 };
 use num_bigint::BigUint;
 use num_traits::{ToPrimitive, Zero};
@@ -16,6 +16,7 @@ pub fn gradient(
     tkoutput: SrzToken,
     eth_usd: f64,       // ETH price in USD
     gas_price: u128,    // Gas price in wei (or converted to wei)
+    spot_price: f64,    // Spot price (e.g. 0.0005 for USDC/ETH or 2000 for ETH/USDC)
     out_eth_worth: f64, // How much is one unit of tkoutput worth in ETH (e.g. 1.0 for ETH, 0.0005 for USDC)
 ) -> TradeResult {
     let tkinput = Token::from(tkinput.clone());
@@ -123,6 +124,7 @@ pub fn gradient(
     // ------- Compute total net output (raw) and distribution -------
     let mut total_net_output: f64 = 0.0;
     let mut distribution: Vec<f64> = Vec::with_capacity(num_pools);
+    let mut distributed: Vec<f64> = Vec::with_capacity(num_pools);
     let mut gas_costs_unit: Vec<u128> = Vec::with_capacity(num_pools);
     let mut gas_costs_usd: Vec<f64> = Vec::with_capacity(num_pools);
     let mut gas_costs_output: Vec<f64> = Vec::with_capacity(num_pools);
@@ -149,10 +151,12 @@ pub fn gradient(
                 // Also record distribution (as percentage of the total input).
                 let alloc_f64 = alloc.to_f64().unwrap_or(0.0);
                 let total_input_f = amountpow.to_f64().unwrap_or(1.0);
-                let percent = (alloc_f64 * 100.0) / total_input_f;
-                distribution.push((percent * 100.).round() / 100.);
+                let percent = (alloc_f64 * ONE_HD) / total_input_f;
+                distribution.push((percent * ONE_HD).round() / ONE_HD);
+                distributed.push(net_output);
             } else {
                 distribution.push(0.);
+                distributed.push(0.);
                 gas_costs_unit.push(0);
                 gas_costs_usd.push(0.);
                 gas_costs_output.push(0.);
@@ -160,6 +164,7 @@ pub fn gradient(
         } else {
             // If the allocation is zero.
             distribution.push(0.);
+            distributed.push(0.);
             gas_costs_unit.push(0);
             gas_costs_usd.push(0.);
             gas_costs_output.push(0.);
@@ -176,13 +181,19 @@ pub fn gradient(
     // Note that amountpow is the total input (in smallest units), so we first convert it to f64:
     let input_f = amountpow.to_f64().unwrap_or(1.0);
     let average_sell_price = ((total_net_output * tkinput_multiplier) / input_f) / tkoutput_multiplier;
+    let delta = (average_sell_price - spot_price).min(0.); // In theory it should never be < 0
+    let price_impact = (((delta / spot_price) * BPD).round() / BPD).abs(); // In basis points
 
+    let sum_distributed = distributed.iter().sum::<f64>();
+    let distributed_base_bps = distributed.iter().map(|&x| (((x * ONE_HD) / sum_distributed) * ONE_HD).round() / ONE_HD).collect::<Vec<f64>>();
     TradeResult {
         amount,
         output,
         distribution,
+        distributed: distributed_base_bps,
         gas_costs: gas_costs_unit,
         gas_costs_usd,
         average_sell_price,
+        price_impact,
     }
 }

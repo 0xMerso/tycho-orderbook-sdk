@@ -6,7 +6,7 @@ use crate::{
     data::fmt::{SrzProtocolComponent, SrzToken},
     maths::{self, steps::exponential},
     types::{MidPriceData, Network, Orderbook, OrderbookFunctions, OrderbookRequestParams, ProtoTychoState, TradeResult},
-    utils::{self},
+    utils::{self, r#static::maths::ONE_HD},
 };
 use rayon::prelude::*;
 use std::{collections::HashMap, time::Instant}; // Ensure Rayon is in your dependencies.
@@ -228,7 +228,7 @@ pub fn optimize(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_pric
             let sum_distribution = result.distribution.iter().sum::<f64>();
             let sum_distributed = result.distributed.iter().sum::<f64>();
             tracing::trace!(
-                " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {:.7} (vs spot_price {:.7}) | Price impact: {:.4} | Gas cost {:.5}$ | Distribution: {:?} on {:.3} | Distributed: {:?} on {:.3} | JTook: {} ms",
+                " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at price {:.7} (vs spot_price {:.7}) | Price impact %: {:.4} | Gas cost {:.5}$ | Distribution: {:?} on {:.3} | Distributed: {:?} on {:.3} | Took: {} ms",
                 x,
                 result.amount,
                 from.symbol,
@@ -236,7 +236,7 @@ pub fn optimize(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_pric
                 to.symbol,
                 result.average_sell_price,
                 spot_price,
-                result.price_impact,
+                result.price_impact * ONE_HD,
                 gas_cost,
                 result.distribution,
                 sum_distribution,
@@ -322,7 +322,7 @@ pub fn remove_decreasing_price(items: &[TradeResult]) -> (Vec<TradeResult>, usiz
     for item in items.iter().skip(1) {
         // Append the item only if its price_impact is not strictly lower
         // than the last item kept.
-        if item.average_sell_price >= filtered.last().unwrap().average_sell_price {
+        if item.average_sell_price < filtered.last().unwrap().average_sell_price {
             filtered.push(item.clone());
         }
     }

@@ -1,6 +1,7 @@
 use crate::types::Network;
 
 /// Static data for the networks
+/// https://docs.propellerheads.xyz/tycho/for-solvers/execution/contract-addresses
 pub fn networks() -> Vec<Network> {
     vec![
         Network {
@@ -11,6 +12,7 @@ pub fn networks() -> Vec<Network> {
             exp: "https://etherscan.io/".to_string(),
             tycho: "tycho-beta.propellerheads.xyz".to_string(),
             permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3".to_string(),
+            router: "0x0178f471f219737c51d6005556d2f44de011a08a".to_string(),
             port: 42001,
         },
         Network {
@@ -21,7 +23,19 @@ pub fn networks() -> Vec<Network> {
             exp: "https://basescan.io/".to_string(),
             tycho: "tycho-base-beta.propellerheads.xyz".to_string(),
             permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3".to_string(),
+            router: "0xC2C23b0199525DE070D126860133dc3badaD2EEb".to_string(),
             port: 42003,
+        },
+        Network {
+            chainid: 130,
+            name: "unichain".to_string(),
+            eth: "0x4200000000000000000000000000000000000006".to_string(),
+            rpc: "https://unichain.drpc.org".to_string(),
+            exp: "https://unichain.blockscout.com/".to_string(),
+            tycho: "tycho-unichain-beta.propellerheads.xyz".to_string(),
+            permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3".to_string(),
+            router: "0x9bdc3be75440dbe563527cb39bb11cfbd1e21b09".to_string(),
+            port: 42004,
         },
     ]
 }
@@ -29,6 +43,7 @@ pub fn networks() -> Vec<Network> {
 pub mod maths {
 
     pub static UNISWAP_Q96: u128 = 1 << 96;
+    pub static ONE_HD: f64 = 100.0;
     pub static BPD: f64 = 10_000.0;
     pub static TEN_MILLIONS: f64 = 10_000_000.0;
     pub static ONE_PERCENT_IN_MN: f64 = 10_000.; // 1% in millionths
