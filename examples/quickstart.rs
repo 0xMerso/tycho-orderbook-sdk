@@ -104,7 +104,7 @@ async fn main() {
                                 .get_orderbook(
                                     OrderbookRequestParams {
                                         tag: key.clone().to_lowercase(),
-                                        sps: None,
+                                        point: None,
                                     },
                                     Some(simufns),
                                 )
@@ -142,7 +142,7 @@ async fn main() {
                                     optimize: book::optimize,
                                     steps: exponential,
                                 };
-                                if let Ok(book) = obp.get_orderbook(OrderbookRequestParams { tag: key.clone(), sps: None }, Some(simufns)).await {
+                                if let Ok(book) = obp.get_orderbook(OrderbookRequestParams { tag: key.clone(), point: None }, Some(simufns)).await {
                                     let symtag = format!("{}-{}", book.base.symbol, book.quote.symbol);
                                     tracing::info!("OBP Event: Orderbook {} has been updated", symtag);
                                     tracked.insert(key.clone(), Some(book.clone()));

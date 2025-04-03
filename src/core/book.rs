@@ -159,12 +159,12 @@ pub async fn simulate(
         base_worth_eth,
         quote_worth_eth,
     };
-    match body.sps {
-        Some(spsq) => {
-            tracing::trace!(" 🎯 Partial Optimisation: input: {} and amount: {}", spsq.input, spsq.amount);
-            if spsq.input.to_lowercase() == base.address.to_lowercase() {
+    match body.point {
+        Some(point) => {
+            tracing::trace!(" 🎯 Partial Optimisation: input: {} and amount: {}", point.input, point.amount);
+            if point.input.to_lowercase() == base.address.to_lowercase() {
                 result.bids = vec![maths::opti::gradient(
-                    spsq.amount,
+                    point.amount,
                     &pcsdata,
                     base.clone(),
                     quote.clone(),
@@ -173,9 +173,9 @@ pub async fn simulate(
                     price_base_to_quote,
                     quote_worth_eth,
                 )];
-            } else if spsq.input.to_lowercase() == quote.address.to_lowercase() {
+            } else if point.input.to_lowercase() == quote.address.to_lowercase() {
                 result.asks = vec![maths::opti::gradient(
-                    spsq.amount,
+                    point.amount,
                     &pcsdata,
                     quote.clone(),
                     base.clone(),

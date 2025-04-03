@@ -316,7 +316,7 @@ pub struct OrderbookRequestParams {
     /// - Ask = sell orders for the base asset (ETH) priced in USDC.
     pub tag: String,
     /// Optional single point simulation, used to simulate 1 trade only
-    pub sps: Option<SinglePointSimulation>,
+    pub point: Option<SinglePointSimulation>,
 }
 
 /// Orderbook query, but for one point (= 1 trade = 1 amount in)

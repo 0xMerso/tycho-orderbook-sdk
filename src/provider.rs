@@ -150,7 +150,7 @@ impl OrderbookProvider {
 
     /// Compute the orderbook for the given pair by simulating trades on the components matching the requested pair
     pub async fn get_orderbook(&self, params: OrderbookRequestParams, simufns: Option<OrderbookFunctions>) -> Result<Orderbook, anyhow::Error> {
-        let single = params.sps.is_some();
+        let single = params.point.is_some();
         let mtx = self.state.read().await;
         let comp = mtx.components.clone();
         let acps = comp.iter().map(|x| SrzProtocolComponent::from(x.1.clone())).collect::<Vec<SrzProtocolComponent>>(); // Not efficient at all
@@ -255,6 +255,6 @@ impl OrderbookProvider {
                 iterations += 1;
             }
         }
-        OrderbookRequestParams { tag, sps: None }
+        OrderbookRequestParams { tag, point: None }
     }
 }
