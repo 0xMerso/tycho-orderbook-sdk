@@ -50,7 +50,7 @@ pub fn get_alloy_chain(network: String) -> Result<NamedChain, String> {
         "arbitrum" => Ok(NamedChain::Arbitrum),
         _ => {
             tracing::error!("Unsupported network: {}", network);
-            return Err("Unsupported network".to_string());
+            Err("Unsupported network".to_string())
         }
     }
 }

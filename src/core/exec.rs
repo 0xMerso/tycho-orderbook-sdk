@@ -1,19 +1,16 @@
-use std::{collections::HashMap, hash::Hash, str::FromStr, sync::LazyLock};
+use std::{hash::Hash, str::FromStr};
 
 use alloy::{
     primitives::{Address, B256},
-    providers::{Provider, ProviderBuilder, ReqwestProvider},
+    providers::{Provider, ProviderBuilder},
     rpc::types::{
         simulate::{SimBlock, SimulatePayload},
-        TransactionInput, TransactionReceipt, TransactionRequest,
+        TransactionInput, TransactionRequest,
     },
     signers::local::PrivateKeySigner,
     sol_types::SolValue,
-    transports::http::Http,
 };
-use alloy_chains::NamedChain;
 use num_bigint::BigUint;
-use reqwest::Client;
 use tycho_execution::encoding::{
     evm::encoder_builder::EVMEncoderBuilder,
     models::{Solution, Transaction},
@@ -24,8 +21,7 @@ use alloy_primitives::{Bytes as AlloyBytes, U256};
 use tycho_simulation::protocol::models::ProtocolComponent;
 
 use crate::{
-    data::fmt::SrzProtocolComponent,
-    types::{self, ChainSimu, EnvConfig, ExecutedPayload, ExecutionRequest, Network, PayloadToExecute, SrzTransactionRequest},
+    types::{self, ExecutedPayload, ExecutionRequest, Network, PayloadToExecute},
     utils::r#static::{execution, maths::BPD},
 };
 
@@ -137,7 +133,7 @@ pub async fn solution(_network: Network, request: ExecutionRequest, components: 
     let expected = request.expected * 10f64.powi(request.output.decimals as i32);
     let expected_bg = BigUint::from(expected as u128);
     let slippage = execution::EXEC_DEFAULT_SLIPPAGE;
-    let checked_amount = expected.clone() * (1.0 - slippage);
+    let checked_amount = expected * (1.0 - slippage);
     let checked_amount_bg = BigUint::from(checked_amount as u128);
     tracing::debug!("Expected: {} of {} | Checked: {}", expected, request.output.symbol.clone(), checked_amount);
     let solution: Solution = Solution {
@@ -175,7 +171,7 @@ pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Opt
     let wallet = PrivateKeySigner::from_bytes(&B256::from_str(&pk).expect("Failed to convert swapper pk to B256")).expect("Failed to private key signer");
     let signer = alloy::network::EthereumWallet::from(wallet.clone());
     let provider = ProviderBuilder::new().with_chain(alloy_chain).wallet(signer.clone()).on_http(network.rpc.parse().unwrap());
-    let sender = transactions.swap.from.clone().unwrap_or_default().to_string().to_lowercase();
+    let sender = transactions.swap.from.unwrap_or_default().to_string().to_lowercase();
     let matching = wallet.address().to_string().eq_ignore_ascii_case(sender.clone().as_str());
     tracing::trace!(
         "Signer imported via pk: {:?} | Request sender: {:?} | Match = {}",
@@ -203,7 +199,7 @@ pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Opt
                 tracing::trace!("Simulated Block {}:", block.inner.header.number);
                 for (x, tx) in block.calls.iter().enumerate() {
                     tracing::trace!("  Tx #{}: Gas: {} | Simulation status: {}", x, tx.gas_used, tx.status);
-                    if tx.status == false {
+                    if !tx.status {
                         tracing::error!("Simulation failed for tx #{}. No broadcast.", x);
                         green = false;
                     }

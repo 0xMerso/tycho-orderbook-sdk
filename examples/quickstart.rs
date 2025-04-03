@@ -1,5 +1,4 @@
-use chrono::format;
-use std::{collections::HashMap, process::exit, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tycho_orderbook::{
     adapters::default::DefaultOrderBookAdapter,
@@ -61,7 +60,7 @@ async fn main() {
 
     // Create the OBP provider from the protocol stream builder and shared state.
     let mut attempt = 0;
-    let mut executed = false;
+    let executed = false;
     let filter = ComponentFilter::with_tvl_range(REMOVE_TVL_THRESHOLD, ADD_TVL_THRESHOLD);
     let builder_config = OrderbookBuilderConfig { filter };
     let provider_config = OrderbookProviderConfig { capacity: 100 };
@@ -179,7 +178,7 @@ async fn main() {
                                         let originals = get_original_components(originals, book.pools.clone());
                                         match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
                                             Ok(payload) => {
-                                                if executed == false {
+                                                if !executed {
                                                     // let _ = book.send(network.clone(), payload, Some(env.pvkey.clone())).await;
                                                     // executed = true;
                                                 }
