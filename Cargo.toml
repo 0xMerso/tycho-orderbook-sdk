@@ -3,6 +3,17 @@ name = "tycho-orderbook"
 version = "0.1.0"
 edition = "2021"
 
+description = "Transposes onchain liquidity from AMMs into a familiar orderbook format with Tycho"
+license = "MIT" 
+readme = "README.md"
+repository = "https://github.com/0xMerso/tycho-orderbook-sdkk"
+homepage = "https://github.com/0xMerso/tycho-orderbook-sdk"
+
+keywords = ["blockchain", "ethereum", "orderbook", "streaming", "tycho", "defi", "amm", "cex", "binance", "liquidity", "swap", "crypto"]
+
+authors = ["Merso merso.eth@gmail.com"] 
+documentation = "https://tycho-orderbook.gitbook.io/docs"
+
 # ======================================================================================================================================================================================================
 
 [dependencies]
@@ -13,10 +24,14 @@ futures = "0.3.31"
 num-bigint = "0.4.6"
 
 
-tycho-common = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-common", tag = "0.64.2" }
-tycho-client = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-client" , tag = "0.64.2"}
-tycho-execution = { git = "https://github.com/propeller-heads/tycho-execution.git", package = "tycho-execution", tag = "0.73.0",  features = ["evm"] }
-tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", branch = "main", features = ["evm"]  }
+# tycho-common = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-common", tag = "0.64.2" }
+# tycho-client = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-client" , tag = "0.64.2"}
+# tycho-execution = { git = "https://github.com/propeller-heads/tycho-execution.git", package = "tycho-execution", tag = "0.73.0",  features = ["evm"] }
+
+tycho-common = { version = "0.64.2" }
+tycho-client = { version = "0.64.2" }
+tycho-execution = { version = "0.73.0",  features = ["evm"] }
+tycho-simulation = "0.91.1" # Patched below
 
 toml = "0.8.12"
 serde = { version = "1.0.104", features = ["derive"] }
@@ -61,6 +76,9 @@ axum-macros = "0.5.0"
 rayon = "1.10.0"
 async-trait = "0.1.88"
 tracing-subscriber = "0.3"
+
+[patch.crates-io]
+tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", branch = "main" }
 
 # ======================================================================================================================================================================================================
 
