@@ -4,3 +4,4 @@ dump.rdb
 .env.prod
 rustfmt.toml
 docs/build
+examples/.env.qs

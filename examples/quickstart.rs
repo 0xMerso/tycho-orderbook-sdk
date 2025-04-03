@@ -5,15 +5,11 @@ use tycho_orderbook::{
     core::{book, exec::get_original_components, rpc},
     maths::steps::exponential,
     types::{
-        EnvConfig, ExecutionRequest, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState,
-        TychoStreamState,
+        ExecutionRequest, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState,
     },
     utils::r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
 };
 use tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter;
-
-pub static REAL_EXEC: bool = false;
-pub static SENDER: &str = "0xC0F7d041defAE1045e11A6101284AbA4BCc3770f";
 
 #[tokio::main]
 async fn main() {
@@ -21,10 +17,28 @@ async fn main() {
     tracing_subscriber::fmt().with_env_filter(filter).init(); // <--- Set the tracing level here
     tracing::info!("--- --- --- Launching Quickstart Tycho Orderbook --- --- ---");
     // tracing::info!("Gm"); tracing::debug!("Gm"); tracing::trace!("Gm");
-    dotenv::from_filename(".env.prod").ok(); // Use .env.ex for testing
-    let env = EnvConfig::new();
+    dotenv::from_filename("examples/.env.qs.ex").ok(); // Use .env.ex for testing
+    let real_exec = std::env::var("REAL_EXEC").expect("Variable 'REAL_EXEC' not found in environment") == "true";
+    let tycho_api_key = std::env::var("TYCHO_API_KEY").expect("Variable 'TYCHO_API_KEY' not found in environment");
+    let network_name = std::env::var("NETWORK").expect("Variable 'NETWORK' not found in environment");
+    let sender = std::env::var("SENDER").expect("Variable 'SENDER' not found in environment");
+    let pk = match std::env::var("PV_KEY") {
+        Ok(v) => {
+            tracing::info!("Private key found in environment variables");
+            Some(v)
+        }
+        Err(_) => {
+            tracing::warn!("Private key not found in environment variables. Continuing without executing any transaction.");
+            None
+        }
+    };
+    tracing::info!("Tycho API Key: {}", tycho_api_key);
+    tracing::info!("Network: {}", network_name);
+    tracing::info!("Sender: {}", sender);
+    tracing::info!("Real Execution: {}", real_exec);
+
     let networks = tycho_orderbook::utils::r#static::networks();
-    let network = networks.clone().into_iter().find(|x| x.name == env.network).expect("Network not found");
+    let network = networks.clone().into_iter().find(|x| x.name == network_name).expect("Network not found");
     tracing::debug!("Tycho Stream for '{}' network", network.name.clone());
     // Create cross/shared state for the protocol stream
     let xstate: SharedTychoStreamState = Arc::new(RwLock::new(TychoStreamState {
@@ -32,7 +46,7 @@ async fn main() {
         components: HashMap::new(),
         initialised: false,
     }));
-    let tokens = match rpc::tokens(&network, env.tycho_api_key.clone()).await {
+    let tokens = match rpc::tokens(&network, tycho_api_key.clone()).await {
         Some(t) => t,
         None => {
             tracing::error!("Failed to get tokens. Something anormal, make sure Tycho endpoint is operational. Exiting.");
@@ -60,13 +74,13 @@ async fn main() {
 
     // Create the OBP provider from the protocol stream builder and shared state.
     let mut attempt = 0;
-    let executed = false;
+    let mut executed = false; // Flag to check if the transaction has been executed, to keep one execution only
     let filter = ComponentFilter::with_tvl_range(REMOVE_TVL_THRESHOLD, ADD_TVL_THRESHOLD);
     let builder_config = OrderbookBuilderConfig { filter };
     let provider_config = OrderbookProviderConfig { capacity: 100 };
     let obp = loop {
         attempt += 1;
-        let builder = OrderbookBuilder::new(network.clone(), env.tycho_api_key.clone(), builder_config.clone(), Some(tokens.clone())).await;
+        let builder = OrderbookBuilder::new(network.clone(), tycho_api_key.clone(), builder_config.clone(), Some(tokens.clone())).await;
         match builder.build(provider_config.clone(), xstate.clone()).await {
             Ok(obp) => {
                 tracing::info!("Successfully built OBP after {} attempts", attempt);
@@ -162,7 +176,7 @@ async fn main() {
                                         // let amount = book.mpd_base_to_quote.
                                         let way = book.mpd_base_to_quote.clone();
                                         let request = ExecutionRequest {
-                                            sender: SENDER.to_string().clone(),
+                                            sender: sender.to_string().clone(),
                                             tag: book.tag.clone(),
                                             input: book.base.clone(),
                                             output: book.quote.clone(),
@@ -180,10 +194,10 @@ async fn main() {
                                         // match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
                                         match book.create(network.clone(), request, originals.clone(), None).await {
                                             Ok(payload) => {
-                                                if REAL_EXEC {
+                                                if real_exec {
                                                     if !executed {
-                                                        // let _ = book.send(network.clone(), payload, Some(env.pvkey.clone())).await;
-                                                        // executed = true;
+                                                        let _ = book.send(network.clone(), payload, pk.clone()).await;
+                                                        executed = true;
                                                     } else {
                                                         tracing::info!("Tx already executed, not executing again: {}", symtag);
                                                     }

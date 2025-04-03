@@ -1,30 +1,5 @@
 use alloy_chains::NamedChain;
 
-use crate::types::EnvConfig;
-
-/**
- * Default implementation for Env
- */
-impl Default for EnvConfig {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EnvConfig {
-    /**
-     * Create a new EnvConfig
-     */
-    pub fn new() -> Self {
-        EnvConfig {
-            testing: get("TESTING") == "true",
-            tycho_api_key: get("TYCHO_API_KEY"),
-            network: get("NETWORK"),
-            pvkey: get("PV_KEY"),
-        }
-    }
-}
-
 /**
  * Get an environment variable
  */

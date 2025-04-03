@@ -27,19 +27,6 @@ alloy::sol!(
     "src/utils/abis/Balancer2Vault.json"
 );
 
-/// Environment configuration expected
-#[derive(Debug, Clone, utoipa::ToSchema)]
-pub struct EnvConfig {
-    // True if testing mode, simplify some operations
-    pub testing: bool,
-    // API key for Tycho, faster synchronization
-    pub tycho_api_key: String,
-    // Network name to filter the networks.json file
-    pub network: String,
-    // Fake private key for testing
-    pub pvkey: String,
-}
-
 #[derive(Default, Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Network {
     #[schema(example = "ethereum")]
