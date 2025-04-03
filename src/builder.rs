@@ -15,7 +15,6 @@ use tycho_simulation::evm::{
 use crate::core::rpc;
 use crate::data::fmt::SrzToken;
 use crate::types;
-use crate::types::EnvConfig;
 use crate::types::Network;
 use crate::types::OrderbookBuilder;
 use crate::types::OrderbookBuilderConfig;

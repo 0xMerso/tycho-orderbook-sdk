@@ -1,9 +1,8 @@
-use std::{collections::HashMap, f64::consts::E, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tycho_orderbook::{
     adapters::default::DefaultOrderBookAdapter,
     core::{book, exec::get_original_components, rpc},
-    data::fmt::SrzProtocolComponent,
     maths::steps::exponential,
     types::{
         EnvConfig, ExecutionRequest, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState,
@@ -11,7 +10,7 @@ use tycho_orderbook::{
     },
     utils::r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
 };
-use tycho_simulation::{protocol::models::ProtocolComponent, tycho_client::feed::component_tracker::ComponentFilter};
+use tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter;
 
 pub static REAL_EXEC: bool = false;
 pub static SENDER: &str = "0xC0F7d041defAE1045e11A6101284AbA4BCc3770f";
