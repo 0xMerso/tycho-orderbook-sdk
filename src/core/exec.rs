@@ -5,7 +5,7 @@ use alloy::{
     providers::{Provider, ProviderBuilder, ReqwestProvider},
     rpc::types::{
         simulate::{SimBlock, SimulatePayload},
-        TransactionInput, TransactionRequest,
+        TransactionInput, TransactionReceipt, TransactionRequest,
     },
     signers::local::PrivateKeySigner,
     sol_types::SolValue,
@@ -25,7 +25,7 @@ use tycho_simulation::protocol::models::ProtocolComponent;
 
 use crate::{
     data::fmt::SrzProtocolComponent,
-    types::{self, ChainSimu, EnvConfig, ExecutionPayload, ExecutionRequest, Network, SrzTransactionRequest},
+    types::{self, ChainSimu, EnvConfig, ExecutedPayload, ExecutionRequest, Network, PayloadToExecute, SrzTransactionRequest},
     utils::r#static::{execution, maths::BPD},
 };
 
@@ -160,13 +160,14 @@ pub async fn solution(_network: Network, request: ExecutionRequest, components: 
 }
 
 /// Broadcast the given transactions to the network
-pub async fn broadcast(network: Network, transactions: ExecutionPayload, pk: Option<String>) -> bool {
+pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Option<String>) -> ExecutedPayload {
+    let mut br = ExecutedPayload::default();
     // --- Assert private key is provided ---
     let pk = match pk.clone() {
         Some(pk) => pk,
         None => {
             tracing::error!("Private key not provided");
-            return false;
+            return br;
         }
     };
     // --- Build provider and signer ---
@@ -174,7 +175,6 @@ pub async fn broadcast(network: Network, transactions: ExecutionPayload, pk: Opt
     let wallet = PrivateKeySigner::from_bytes(&B256::from_str(&pk).expect("Failed to convert swapper pk to B256")).expect("Failed to private key signer");
     let signer = alloy::network::EthereumWallet::from(wallet.clone());
     let provider = ProviderBuilder::new().with_chain(alloy_chain).wallet(signer.clone()).on_http(network.rpc.parse().unwrap());
-
     let sender = transactions.swap.from.clone().unwrap_or_default().to_string().to_lowercase();
     let matching = wallet.address().to_string().eq_ignore_ascii_case(sender.clone().as_str());
     tracing::trace!(
@@ -195,75 +195,90 @@ pub async fn broadcast(network: Network, transactions: ExecutionPayload, pk: Opt
         validation: true,
         return_full_transactions: true,
     };
+
     match provider.simulate(&payload).await {
         Ok(output) => {
+            let mut green = true;
             for block in output.iter() {
                 tracing::trace!("Simulated Block {}:", block.inner.header.number);
                 for (x, tx) in block.calls.iter().enumerate() {
                     tracing::trace!("  Tx #{}: Gas: {} | Simulation status: {}", x, tx.gas_used, tx.status);
-                }
-            }
-
-            tracing::debug!("Broadcasting to RPC URL: {}", network.rpc);
-            //  --- Broadcast Approval ---
-            match provider.send_transaction(transactions.approve).await {
-                Ok(approve) => {
-                    tracing::debug!("Waiting for receipt on approval tx: {:?}", approve.tx_hash());
-                    tracing::debug!("Explorer: {}tx/{}", network.exp, approve.tx_hash());
-                    match approve.get_receipt().await {
-                        Ok(receipt) => {
-                            tracing::debug!("Approval receipt: status: {:?}", receipt.status());
-                            if receipt.status() {
-                                tracing::debug!("Approval transaction succeeded");
-                                // --- Broadcast Swap ---
-                                match provider.send_transaction(transactions.swap).await {
-                                    Ok(swap) => {
-                                        tracing::debug!("Waiting for receipt on swap tx: {:?}", swap.tx_hash());
-                                        tracing::debug!("Explorer: {}tx/{}", network.exp, swap.tx_hash());
-                                        match swap.get_receipt().await {
-                                            Ok(receipt) => {
-                                                tracing::debug!("Swap receipt: status: {:?}", receipt.status());
-                                                if receipt.status() {
-                                                    tracing::debug!("Swap transaction succeeded");
-                                                    return true;
-                                                } else {
-                                                    tracing::error!("Swap transaction failed");
-                                                }
-                                            }
-                                            Err(e) => {
-                                                tracing::error!("Failed to wait for swap transaction: {:?}", e);
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("Failed to send swap transaction: {:?}", e);
-                                    }
-                                }
-                            } else {
-                                tracing::error!("Approval transaction failed");
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to wait for approval transaction: {:?}", e);
-                        }
+                    if tx.status == false {
+                        tracing::error!("Simulation failed for tx #{}. No broadcast.", x);
+                        green = false;
                     }
                 }
-                Err(e) => {
-                    tracing::error!("Failed to send approval transaction: {:?}", e);
+            }
+            if green {
+                tracing::debug!("Broadcasting to RPC URL: {}", network.rpc);
+                //  --- Broadcast Approval ---
+                match provider.send_transaction(transactions.approve).await {
+                    Ok(approve) => {
+                        br.approve.sent = true;
+                        tracing::debug!("Waiting for receipt on approval tx: {:?}", approve.tx_hash());
+                        br.approve.hash = approve.tx_hash().to_string();
+                        tracing::debug!("Explorer: {}tx/{}", network.exp, approve.tx_hash());
+                        match approve.get_receipt().await {
+                            Ok(receipt) => {
+                                tracing::debug!("Approval receipt: status: {:?}", receipt.status());
+                                br.approve.status = receipt.status();
+                                if receipt.status() {
+                                    tracing::debug!("Approval transaction succeeded");
+                                    // --- Broadcast Swap ---
+                                    br.swap.sent = true;
+                                    match provider.send_transaction(transactions.swap).await {
+                                        Ok(swap) => {
+                                            br.swap.hash = swap.tx_hash().to_string();
+                                            tracing::debug!("Waiting for receipt on swap tx: {:?}", swap.tx_hash());
+                                            tracing::debug!("Explorer: {}tx/{}", network.exp, swap.tx_hash());
+                                            match swap.get_receipt().await {
+                                                Ok(receipt) => {
+                                                    tracing::debug!("Swap receipt: status: {:?}", receipt.status());
+                                                    br.swap.status = receipt.status();
+                                                    if receipt.status() {
+                                                        tracing::debug!("Swap transaction succeeded");
+                                                    } else {
+                                                        tracing::error!("Swap transaction failed");
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    tracing::error!("Failed to wait for swap transaction: {:?}", e);
+                                                    br.swap.error = Some(e.to_string());
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::error!("Failed to send swap transaction: {:?}", e);
+                                            br.swap.error = Some(e.to_string());
+                                        }
+                                    }
+                                } else {
+                                    tracing::error!("Approval transaction failed");
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to wait for approval transaction: {:?}", e);
+                                br.approve.error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to send approval transaction: {:?}", e);
+                        br.approve.error = Some(e.to_string());
+                    }
                 }
             }
-            // Broadcast and wait swap
         }
         Err(e) => {
             tracing::error!("Failed to simulate: {:?}", e);
         }
     };
-    false
+    br
 }
 
 /// Build swap transactions on the specified network for the given request.
 /// Some example: https://github.com/propeller-heads/tycho-execution/blob/main/examples/encoding-example/main.rs
-pub async fn build(network: Network, request: ExecutionRequest, native: Vec<ProtocolComponent>, pk: Option<String>) -> Result<ExecutionPayload, String> {
+pub async fn build(network: Network, request: ExecutionRequest, native: Vec<ProtocolComponent>, pk: Option<String>) -> Result<PayloadToExecute, String> {
     let (_, _, chain) = types::chain(network.name.clone()).unwrap();
     let tokens = vec![request.input.clone().address, request.output.clone().address];
     let achain = crate::utils::misc::get_alloy_chain(network.name.clone()).expect("Failed to get alloy chain");
@@ -301,7 +316,7 @@ pub async fn build(network: Network, request: ExecutionRequest, native: Vec<Prot
                         let encoded_tx = encoded_tx[0].clone();
                         match prepare(network.clone(), solution.clone(), encoded_tx.clone(), header, nonce) {
                             Some((approval, swap)) => {
-                                let ep = ExecutionPayload {
+                                let ep = PayloadToExecute {
                                     approve: approval.clone(),
                                     swap: swap.clone(),
                                 };

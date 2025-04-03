@@ -1,6 +1,6 @@
 use crate::{
     core::exec,
-    types::{ExchangeInfo, ExecutionPayload, ExecutionRequest, Network, Orderbook, OrderbookDepth},
+    types::{ExchangeInfo, ExecutedPayload, ExecutionRequest, Network, Orderbook, OrderbookDepth, PayloadToExecute},
 };
 use async_trait::async_trait;
 use std::cmp::min;
@@ -24,11 +24,11 @@ pub trait DefaultOrderBookAdapter: Send + Sync {
     /// Returns static metadata (e.g., name, symbols, fees).
     fn info(&self) -> ExchangeInfo;
 
-    /// Executes a real trade (or sends the order to the exchange).
-    async fn execute(&self, network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<ExecutionPayload, String>; // (&mut self, side: Side, quantity: f64, price: f64);
+    /// Create a trade payload (or sends the order to the exchange).
+    async fn create(&self, network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<PayloadToExecute, String>; // (&mut self, side: Side, quantity: f64, price: f64);
 
-    /// Simulates a trade against the current orderbook.
-    async fn simulate(&self) -> u64; // (&self, side: Side, quantity: f64) -> TradeSimulationResult;
+    /// Sends the payload of transactions (approve, swap, )
+    async fn send(&self, network: Network, payload: PayloadToExecute, pk: Option<String>) -> ExecutedPayload;
 }
 
 #[async_trait]
@@ -83,13 +83,10 @@ impl DefaultOrderBookAdapter for Orderbook {
     }
 
     /// POST /api/v3/order
-    async fn execute(&self, network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<ExecutionPayload, String> {
+    async fn create(&self, network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<PayloadToExecute, String> {
         // Todo Need Binance interfacing
         match exec::build(network.clone(), request.clone(), components.clone(), pk.clone()).await {
-            Ok(payload) => {
-                let _ = exec::broadcast(network.clone(), payload.clone(), pk.clone()).await;
-                Ok(payload)
-            }
+            Ok(payload) => Ok(payload),
             Err(e) => {
                 tracing::error!("Error executing order: {}", e);
                 Err(e)
@@ -97,9 +94,8 @@ impl DefaultOrderBookAdapter for Orderbook {
         }
     }
 
-    /// POST /api/v3/order/test
-    async fn simulate(&self) -> u64 {
-        tracing::debug!("simulate");
-        0
+    /// Send the payload of transactions
+    async fn send(&self, network: Network, payload: PayloadToExecute, pk: Option<String>) -> ExecutedPayload {
+        exec::broadcast(network.clone(), payload.clone(), pk).await
     }
 }

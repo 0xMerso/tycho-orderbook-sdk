@@ -161,7 +161,7 @@ pub struct ExecutionRequest {
 
 /// Result of the execution
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutionPayload {
+pub struct PayloadToExecute {
     pub approve: TransactionRequest,
     pub swap: TransactionRequest,
 }
@@ -501,4 +501,18 @@ pub struct ExchangeInfo {
     pub quote: SrzToken,
     pub order_types: Vec<String>,
     pub components: Vec<SrzProtocolComponent>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ExecTxResult {
+    pub sent: bool,
+    pub status: bool,
+    pub hash: String,
+    pub error: Option<String>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ExecutedPayload {
+    pub approve: ExecTxResult,
+    pub swap: ExecTxResult,
 }

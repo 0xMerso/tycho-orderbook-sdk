@@ -177,12 +177,11 @@ async fn main() {
                                         let originals = mtx.components.clone();
                                         drop(mtx);
                                         let originals = get_original_components(originals, book.pools.clone());
-                                        match book.execute(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
+                                        match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
                                             Ok(payload) => {
                                                 if executed == false {
-                                                    if tycho_orderbook::core::exec::broadcast(network.clone(), payload.clone(), Some(env.pvkey.clone())).await {
-                                                        executed = true;
-                                                    }
+                                                    // let _ = book.send(network.clone(), payload, Some(env.pvkey.clone())).await;
+                                                    // executed = true;
                                                 }
                                             }
                                             Err(err) => {
