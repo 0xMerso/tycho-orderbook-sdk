@@ -84,7 +84,6 @@ impl DefaultOrderBookAdapter for Orderbook {
 
     /// POST /api/v3/order
     async fn create(&self, network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<PayloadToExecute, String> {
-        // Todo Need Binance interfacing
         match exec::build(network.clone(), request.clone(), components.clone(), pk.clone()).await {
             Ok(payload) => Ok(payload),
             Err(e) => {
