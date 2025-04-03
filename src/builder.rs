@@ -30,7 +30,7 @@ impl OrderbookBuilder {
      * Default logic to create a ProtocolStreamBuilder, used to build a OrderbookProvider
      * For more advanced use-cases, you can create your own ProtocolStreamBuilder and pass it to custom() fn
      */
-    pub async fn new(network: Network, env: EnvConfig, config: OrderbookBuilderConfig, tokens: Option<Vec<Token>>) -> Self {
+    pub async fn new(network: Network, api_key: String, config: OrderbookBuilderConfig, tokens: Option<Vec<Token>>) -> Self {
         let (_, _, chain) = types::chain(network.name.clone()).expect("Invalid chain");
         let u4 = uniswap_v4_pool_with_hook_filter;
         let balancer = balancer_pool_filter;
@@ -38,7 +38,7 @@ impl OrderbookBuilder {
         let filter = config.filter.clone();
         let tokens = match tokens {
             Some(t) => t,
-            None => rpc::tokens(&network, &env).await.unwrap(),
+            None => rpc::tokens(&network, api_key.clone()).await.unwrap(),
         };
         let mut hmt = HashMap::new();
         let mut srzt = vec![];
@@ -51,7 +51,7 @@ impl OrderbookBuilder {
             .exchange::<UniswapV2State>(TychoSupportedProtocol::UniswapV2.to_string().as_str(), filter.clone(), None)
             .exchange::<UniswapV3State>(TychoSupportedProtocol::UniswapV3.to_string().as_str(), filter.clone(), None)
             .exchange::<UniswapV4State>(TychoSupportedProtocol::UniswapV4.to_string().as_str(), filter.clone(), Some(u4))
-            .auth_key(Some(env.tycho_api_key.clone()))
+            .auth_key(Some(api_key.clone()))
             .skip_state_decode_failures(true)
             .set_tokens(hmt.clone()) // ALL Tokens
             .await;
@@ -68,7 +68,7 @@ impl OrderbookBuilder {
             network,
             psb,
             tokens: srzt,
-            apikey: Some(env.tycho_api_key.clone()),
+            apikey: Some(api_key.clone()),
         }
     }
 

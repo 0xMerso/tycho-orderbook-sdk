@@ -32,7 +32,7 @@ async fn main() {
         components: HashMap::new(),
         initialised: false,
     }));
-    let tokens = match rpc::tokens(&network, &env).await {
+    let tokens = match rpc::tokens(&network, env.tycho_api_key.clone()).await {
         Some(t) => t,
         None => {
             tracing::error!("Failed to get tokens. Something anormal, make sure Tycho endpoint is operational. Exiting.");
@@ -66,7 +66,7 @@ async fn main() {
     let provider_config = OrderbookProviderConfig { capacity: 100 };
     let obp = loop {
         attempt += 1;
-        let builder = OrderbookBuilder::new(network.clone(), env.clone(), builder_config.clone(), Some(tokens.clone())).await;
+        let builder = OrderbookBuilder::new(network.clone(), env.tycho_api_key.clone(), builder_config.clone(), Some(tokens.clone())).await;
         match builder.build(provider_config.clone(), xstate.clone()).await {
             Ok(obp) => {
                 tracing::info!("Successfully built OBP after {} attempts", attempt);

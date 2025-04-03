@@ -59,8 +59,8 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
 
 /// Get the tokens from the Tycho API
 /// Filters are hardcoded for now.
-pub async fn tokens(network: &Network, config: &EnvConfig) -> Option<Vec<Token>> {
-    match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(&config.tycho_api_key)) {
+pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
+    match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(apikey.as_str())) {
         Ok(client) => {
             let time = std::time::SystemTime::now();
             let (chain, _, _) = types::chain(network.name.clone()).expect("Invalid chain");
