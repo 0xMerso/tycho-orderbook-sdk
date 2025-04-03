@@ -177,7 +177,9 @@ async fn main() {
                                         let originals = mtx.components.clone();
                                         drop(mtx);
                                         let originals = get_original_components(originals, book.pools.clone());
-                                        match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
+
+                                        // match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
+                                        match book.create(network.clone(), request, originals.clone(), None).await {
                                             Ok(payload) => {
                                                 if REAL_EXEC {
                                                     if !executed {

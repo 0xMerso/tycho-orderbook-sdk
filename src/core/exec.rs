@@ -312,6 +312,7 @@ pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Opt
 /// Build swap transactions on the specified network for the given request.
 /// Some example: https://github.com/propeller-heads/tycho-execution/blob/main/examples/encoding-example/main.rs
 pub async fn build(network: Network, request: ExecutionRequest, native: Vec<ProtocolComponent>, pk: Option<String>) -> Result<PayloadToExecute, String> {
+    tracing::debug!("Building transactions for request: {:?} | Private key provided: {}", request, pk.is_some());
     let (_, _, chain) = types::chain(network.name.clone()).unwrap();
     let tokens = vec![request.input.clone().address, request.output.clone().address];
     let achain = crate::utils::misc::get_alloy_chain(network.name.clone()).expect("Failed to get alloy chain");
@@ -336,49 +337,54 @@ pub async fn build(network: Network, request: ExecutionRequest, native: Vec<Prot
     if let Some(solution) = solution(network.clone(), request.clone(), native.clone()).await {
         let header: alloy::rpc::types::Block = provider.get_block_by_number(alloy::eips::BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
         let nonce = provider.get_transaction_count(solution.sender.to_string().parse().unwrap()).await.unwrap();
-        match pk {
-            Some(pk) => {
-                std::env::set_var("RPC_URL", network.rpc.clone());
-                let encoder = EVMEncoderBuilder::new()
-                    .chain(chain)
-                    .initialize_tycho_router_with_permit2(pk.clone())
-                    .expect("Failed to create encoder builder");
-                // Need a strategy, else we get: FatalError("Please set the chain and strategy before building the encoder")
+        std::env::set_var("RPC_URL", network.rpc.clone());
+        // Need a strategy, else we get: FatalError("Please set the chain and strategy before building the encoder")
+        let encoder = match pk {
+            Some(pk) => EVMEncoderBuilder::new().chain(chain).initialize_tycho_router_with_permit2(pk.clone()),
+            None => EVMEncoderBuilder::new().chain(chain).initialize_tycho_router(),
+        };
+        match encoder {
+            Ok(encoder) => {
                 match encoder.build() {
                     Ok(encoder) => {
-                        let encoded_tx = encoder.encode_router_calldata(vec![solution.clone()]).expect("Failed to encode router calldata");
-                        let encoded_tx = encoded_tx[0].clone();
-                        match prepare(network.clone(), solution.clone(), encoded_tx.clone(), header, nonce) {
-                            Some((approval, swap)) => {
-                                let ep = PayloadToExecute {
-                                    approve: approval.clone(),
-                                    swap: swap.clone(),
+                        match encoder.encode_router_calldata(vec![solution.clone()]) {
+                            Ok(encoded_tx) => {
+                                let encoded_tx = encoded_tx[0].clone();
+                                match prepare(network.clone(), solution.clone(), encoded_tx.clone(), header, nonce) {
+                                    Some((approval, swap)) => {
+                                        let ep = PayloadToExecute {
+                                            approve: approval.clone(),
+                                            swap: swap.clone(),
+                                        };
+                                        // --- Logs ---
+                                        // tracing::debug!("--- Raw Transactions ---");
+                                        // tracing::debug!("Approval: {:?}", approval.clone());
+                                        // tracing::debug!("Swap: {:?}", swap.clone());
+                                        // tracing::debug!("--- Formatted Transactions ---");
+                                        // tracing::debug!("Approval: {:?}", ep.approve);
+                                        // tracing::debug!("Swap: {:?}", ep.swap);
+                                        // tracing::debug!("--- End of Transactions ---");
+                                        return Ok(ep);
+                                    }
+                                    None => {
+                                        tracing::error!("Failed to prepare transactions");
+                                    }
                                 };
-                                return Ok(ep);
-                                // --- Logs ---
-                                // tracing::debug!("--- Raw Transactions ---");
-                                // tracing::debug!("Approval: {:?}", approval.clone());
-                                // tracing::debug!("Swap: {:?}", swap.clone());
-                                // tracing::debug!("--- Formatted Transactions ---");
-                                // tracing::debug!("Approval: {:?}", ep.approve);
-                                // tracing::debug!("Swap: {:?}", ep.swap);
-                                // tracing::debug!("--- End of Transactions ---");
                             }
-                            None => {
-                                tracing::error!("Failed to prepare transactions");
+                            Err(e) => {
+                                tracing::error!("Failed to encode router calldata: {:?}", e);
                             }
-                        };
+                        }
                     }
                     Err(e) => {
                         tracing::error!("Failed to build EVMEncoder: {:?}", e);
                     }
                 }
             }
-            None => {
-                tracing::debug!("Private key not provided. Building transactions data only");
-                let encoder = EVMEncoderBuilder::new().chain(chain);
+            Err(e) => {
+                tracing::error!("Failed to build EVMEncoder: {:?}", e);
             }
-        }
+        };
     }
 
     Err("Failed to build transactions".to_string())
