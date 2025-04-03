@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, f64::consts::E, sync::Arc};
 use tokio::sync::RwLock;
 use tycho_orderbook::{
     adapters::default::DefaultOrderBookAdapter,
-    core::{book, rpc},
+    core::{book, exec::get_original_components, rpc},
     data::fmt::SrzProtocolComponent,
     maths::steps::exponential,
     types::{
@@ -13,6 +13,7 @@ use tycho_orderbook::{
 };
 use tycho_simulation::{protocol::models::ProtocolComponent, tycho_client::feed::component_tracker::ComponentFilter};
 
+pub static REAL_EXEC: bool = false;
 pub static SENDER: &str = "0xC0F7d041defAE1045e11A6101284AbA4BCc3770f";
 
 #[tokio::main]
@@ -178,9 +179,13 @@ async fn main() {
                                         let originals = get_original_components(originals, book.pools.clone());
                                         match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
                                             Ok(payload) => {
-                                                if !executed {
-                                                    // let _ = book.send(network.clone(), payload, Some(env.pvkey.clone())).await;
-                                                    // executed = true;
+                                                if REAL_EXEC {
+                                                    if !executed {
+                                                        // let _ = book.send(network.clone(), payload, Some(env.pvkey.clone())).await;
+                                                        // executed = true;
+                                                    } else {
+                                                        tracing::info!("Tx already executed, not executing again: {}", symtag);
+                                                    }
                                                 }
                                             }
                                             Err(err) => {
@@ -226,40 +231,4 @@ async fn main() {
             }
         }
     }
-}
-
-/// Get the original components from the list of components
-/// Used when Tycho packages require the exact components
-/// Conversion from:: SrzProtocolComponent to ProtocolComponent doesn't work. Idk why.
-pub fn get_original_components(originals: HashMap<String, ProtocolComponent>, targets: Vec<SrzProtocolComponent>) -> Vec<ProtocolComponent> {
-    let mut filtered = Vec::with_capacity(targets.len());
-    for cp in targets.clone().iter().enumerate() {
-        let tgt = cp.1.id.to_string().to_lowercase();
-        if let Some(original) = originals.get(&tgt) {
-            filtered.push(original.clone());
-        } else {
-            tracing::warn!("OBP Event: Error: Component {} not found in the original list, anormal !", tgt);
-        }
-    }
-    if filtered.len() != targets.len() {
-        tracing::error!("Execution error: not all components found in the original list, anormal !");
-    }
-    let order: HashMap<String, usize> = targets.iter().enumerate().map(|(i, item)| (item.id.to_string().to_lowercase(), i)).collect();
-    filtered.sort_by_key(|item| order.get(&item.id.to_string().to_lowercase()).copied().unwrap_or(usize::MAX));
-    // --- Tmp Debug ---
-    // for o in filtered.iter() {
-    //     tracing::trace!(" - originals : {}", o.id);
-    //     let attributes = o.static_attributes.clone();
-    //     for a in attributes.iter() {
-    //         tracing::trace!("   - {}: {}", a.0, a.1);
-    //     }
-    // }
-    // for t in targets.iter() {
-    //     tracing::trace!(" - targets   : {}", t.id);
-    //     let attributes = t.static_attributes.clone();
-    //     for a in attributes.iter() {
-    //         tracing::trace!("   - {}: {}", a.0, a.1);
-    //     }
-    // }
-    filtered
 }

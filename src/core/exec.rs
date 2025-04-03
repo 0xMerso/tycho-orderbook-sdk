@@ -1,4 +1,4 @@
-use std::{hash::Hash, str::FromStr};
+use std::{collections::HashMap, hash::Hash, str::FromStr};
 
 use alloy::{
     primitives::{Address, B256},
@@ -21,9 +21,46 @@ use alloy_primitives::{Bytes as AlloyBytes, U256};
 use tycho_simulation::protocol::models::ProtocolComponent;
 
 use crate::{
+    data::fmt::SrzProtocolComponent,
     types::{self, ExecutedPayload, ExecutionRequest, Network, PayloadToExecute},
     utils::r#static::{execution, maths::BPD},
 };
+
+/// Get the original components from the list of components
+/// Used when Tycho packages require the exact components
+/// Conversion from:: SrzProtocolComponent to ProtocolComponent doesn't work. Idk why.
+pub fn get_original_components(originals: HashMap<String, ProtocolComponent>, targets: Vec<SrzProtocolComponent>) -> Vec<ProtocolComponent> {
+    let mut filtered = Vec::with_capacity(targets.len());
+    for cp in targets.clone().iter().enumerate() {
+        let tgt = cp.1.id.to_string().to_lowercase();
+        if let Some(original) = originals.get(&tgt) {
+            filtered.push(original.clone());
+        } else {
+            tracing::warn!("OBP Event: Error: Component {} not found in the original list, anormal !", tgt);
+        }
+    }
+    if filtered.len() != targets.len() {
+        tracing::error!("Execution error: not all components found in the original list, anormal !");
+    }
+    let order: HashMap<String, usize> = targets.iter().enumerate().map(|(i, item)| (item.id.to_string().to_lowercase(), i)).collect();
+    filtered.sort_by_key(|item| order.get(&item.id.to_string().to_lowercase()).copied().unwrap_or(usize::MAX));
+    // --- Tmp Debug ---
+    // for o in filtered.iter() {
+    //     tracing::trace!(" - originals : {}", o.id);
+    //     let attributes = o.static_attributes.clone();
+    //     for a in attributes.iter() {
+    //         tracing::trace!("   - {}: {}", a.0, a.1);
+    //     }
+    // }
+    // for t in targets.iter() {
+    //     tracing::trace!(" - targets   : {}", t.id);
+    //     let attributes = t.static_attributes.clone();
+    //     for a in attributes.iter() {
+    //         tracing::trace!("   - {}: {}", a.0, a.1);
+    //     }
+    // }
+    filtered
+}
 
 /// Build 2 transactions for the given solution:
 /// 1. Approve the given token to the router address.
@@ -306,6 +343,7 @@ pub async fn build(network: Network, request: ExecutionRequest, native: Vec<Prot
                     .chain(chain)
                     .initialize_tycho_router_with_permit2(pk.clone())
                     .expect("Failed to create encoder builder");
+                // Need a strategy, else we get: FatalError("Please set the chain and strategy before building the encoder")
                 match encoder.build() {
                     Ok(encoder) => {
                         let encoded_tx = encoder.encode_router_calldata(vec![solution.clone()]).expect("Failed to encode router calldata");
