@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr, sync::LazyLock};
+use std::{collections::HashMap, hash::Hash, str::FromStr, sync::LazyLock};
 
 use alloy::{
     primitives::{Address, B256},
@@ -78,22 +78,20 @@ pub fn prepare(network: Network, solution: Solution, encoded: Transaction, block
 }
 
 /// Build a swap solution Tycho structure
-pub async fn solution(network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>) -> Option<Solution> {
-    tracing::debug!("Preparing swap. Request: {:?}", request);
-    let router = network.router;
+pub async fn solution(_network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>) -> Option<Solution> {
+    tracing::debug!("Preparing swap. Sender: {} | Orderbook: {:?}", request.sender, request.tag);
     let sum = request.distribution.iter().fold(0., |acc, x| acc + x);
     if !(99. ..=101.).contains(&sum) {
         tracing::debug!("Invalid distribution: {:?}, sum = {}", request.distribution, sum);
         return None;
     }
-
-    // Failed to encode router calldata: InvalidInput("Split percentage must be less than 1 (100%), got 1")
-    // Couting distribution > 0.0
-    let single_swap = request.distribution.iter().filter(|&&x| x > 0.0).count() == 1;
+    // Multiple checks are performed by the Tycho encoder, including
+    // - Failed to encode router calldata: InvalidInput("Split percentage must be less than 1 (100%), got 1")
+    let single_swap = request.distribution.iter().filter(|&&x| x > 0.0).count() == 1; // Couting distribution > 0.0
     let single_swap_index = request.distribution.iter().position(|&x| x > 0.0).unwrap_or(0);
-
     tracing::debug!("Single swap: {} | single_swap_index = {}", single_swap, single_swap_index);
-    // ! To test
+
+    // Multi (= splitted, not multi hop) trade
     let distributions: Vec<f64> = request
         .distribution
         .clone()
@@ -101,10 +99,10 @@ pub async fn solution(network: Network, request: ExecutionRequest, components: V
         .map(|&x| {
             let value = x * BPD;
             let adjusted = match single_swap {
-                true => 0.0, // Single swap must have 0% split for the token Bytes(0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2)
+                true => 0.0, // Single swap must have 0% split, the 100% remaining is considered as the swap amount
                 false => {
                     if value > 0.0 {
-                        value - 1.0
+                        value - 1.0 // Just to make sure it never exceeds 100%
                     } else {
                         value
                     }
@@ -114,13 +112,17 @@ pub async fn solution(network: Network, request: ExecutionRequest, components: V
         })
         .collect();
 
-    tracing::debug!("Distribution: {}. Must be < 100. Adjusted distribution = {:?} (0 if single swap)", sum, distributions.clone());
+    tracing::debug!(
+        "Initial distribution sum: {} (should be close to 100). Adjusted distribution = {:?} (full 0 if single swap)",
+        sum,
+        distributions.clone()
+    );
+    // Prepare the swaps, adding a swap for each distribution > 0
+    // Exact ProtocolComponent structure is needed for the Tycho encoder, it doesn't work to partially convert a SrzProtocolComponent to ProtocolComponent
     let mut swaps = vec![];
     for (x, dist) in distributions.iter().enumerate() {
-        log::trace!("Distribution #{}: {}", x, dist);
-        // let cp = request.components[x].clone(); // get
+        // log::trace!("Distribution #{}: {}", x, dist);
         let original = components[x].clone(); // get
-                                              // let original = SrzProtocolComponent::original(cp.clone(), chain);
         let input = tycho_simulation::tycho_core::Bytes::from_str(request.input.clone().address.to_lowercase().as_str()).unwrap();
         let output = tycho_simulation::tycho_core::Bytes::from_str(request.output.clone().address.to_lowercase().as_str()).unwrap();
         if single_swap && x == single_swap_index {
@@ -131,12 +133,13 @@ pub async fn solution(network: Network, request: ExecutionRequest, components: V
         }
     }
     let amount_in = BigUint::from((request.amount * 10f64.powi(request.input.decimals as i32)) as u128);
-    tracing::debug!("Amount in: {} (pow = {}) of {}", request.amount, amount_in, request.input.symbol.clone());
+    tracing::debug!("Req.Amount: {} (pow = {}) of {}", request.amount, amount_in, request.input.symbol.clone());
     let expected = request.expected * 10f64.powi(request.output.decimals as i32);
     let expected_bg = BigUint::from(expected as u128);
     let slippage = execution::EXEC_DEFAULT_SLIPPAGE;
     let checked_amount = expected.clone() * (1.0 - slippage);
     let checked_amount_bg = BigUint::from(checked_amount as u128);
+    tracing::debug!("Expected: {} of {} | Checked: {}", expected, request.output.symbol.clone(), checked_amount);
     let solution: Solution = Solution {
         // Addresses
         sender: tycho_simulation::tycho_core::Bytes::from_str(request.sender.to_lowercase().as_str()).unwrap(),
@@ -150,37 +153,36 @@ pub async fn solution(network: Network, request: ExecutionRequest, components: V
         expected_amount: Some(expected_bg),
         checked_amount: Some(checked_amount_bg), // The amount out will not be checked in execution
         swaps: swaps.clone(),
-        // router_address: router, //! wtf ?
-        ..Default::default() // native_action => ?
+        ..Default::default()
     };
-    tracing::debug!("Solution: {:?}", solution);
+    // tracing::trace!("Solution: {:?}", solution);
     Some(solution)
 }
 
 /// Broadcast the given transactions to the network
-pub async fn broadcast(network: Network, transactions: ExecutionPayload, pk: Option<String>) {
-    // Assert private key is provided
+pub async fn broadcast(network: Network, transactions: ExecutionPayload, pk: Option<String>) -> bool {
+    // --- Assert private key is provided ---
     let pk = match pk.clone() {
         Some(pk) => pk,
         None => {
             tracing::error!("Private key not provided");
-            return;
+            return false;
         }
     };
-    // Build provider and signer
+    // --- Build provider and signer ---
     let alloy_chain = crate::utils::misc::get_alloy_chain(network.name.clone()).expect("Failed to get alloy chain");
     let wallet = PrivateKeySigner::from_bytes(&B256::from_str(&pk).expect("Failed to convert swapper pk to B256")).expect("Failed to private key signer");
     let signer = alloy::network::EthereumWallet::from(wallet.clone());
     let provider = ProviderBuilder::new().with_chain(alloy_chain).wallet(signer.clone()).on_http(network.rpc.parse().unwrap());
-    // Approval
-    match provider.estimate_gas(&transactions.approve.clone()).await {
-        Ok(gas) => {
-            tracing::debug!("Approval gas: {:?}", gas);
-        }
-        Err(e) => {
-            tracing::error!("Failed to estimate gas for approval: {:?}", e);
-        }
-    }
+
+    let sender = transactions.swap.from.clone().unwrap_or_default().to_string().to_lowercase();
+    let matching = wallet.address().to_string().eq_ignore_ascii_case(sender.clone().as_str());
+    tracing::trace!(
+        "Signer imported via pk: {:?} | Request sender: {:?} | Match = {}",
+        wallet.address(),
+        transactions.swap.from.clone(),
+        matching
+    );
 
     // --- Simulate ---
     let payload = SimulatePayload {
@@ -196,120 +198,139 @@ pub async fn broadcast(network: Network, transactions: ExecutionPayload, pk: Opt
     match provider.simulate(&payload).await {
         Ok(output) => {
             for block in output.iter() {
-                tracing::debug!("Simulated Block {}:", block.inner.header.number);
-                for (j, transaction) in block.calls.iter().enumerate() {
-                    // tracing::debug!("  Transaction {}: Status: {:?}, Gas Used: {}", j + 1, transaction.status, transaction.gas_used);
-                    tracing::debug!("  transaction: {:?}", transaction);
+                tracing::trace!("Simulated Block {}:", block.inner.header.number);
+                for (x, tx) in block.calls.iter().enumerate() {
+                    tracing::trace!("  Tx #{}: Gas: {} | Simulation status: {}", x, tx.gas_used, tx.status);
                 }
             }
+
+            tracing::debug!("Broadcasting to RPC URL: {}", network.rpc);
+            //  --- Broadcast Approval ---
+            match provider.send_transaction(transactions.approve).await {
+                Ok(approve) => {
+                    tracing::debug!("Waiting for receipt on approval tx: {:?}", approve.tx_hash());
+                    tracing::debug!("Explorer: {}tx/{}", network.exp, approve.tx_hash());
+                    match approve.get_receipt().await {
+                        Ok(receipt) => {
+                            tracing::debug!("Approval receipt: status: {:?}", receipt.status());
+                            if receipt.status() {
+                                tracing::debug!("Approval transaction succeeded");
+                                // --- Broadcast Swap ---
+                                match provider.send_transaction(transactions.swap).await {
+                                    Ok(swap) => {
+                                        tracing::debug!("Waiting for receipt on swap tx: {:?}", swap.tx_hash());
+                                        tracing::debug!("Explorer: {}tx/{}", network.exp, swap.tx_hash());
+                                        match swap.get_receipt().await {
+                                            Ok(receipt) => {
+                                                tracing::debug!("Swap receipt: status: {:?}", receipt.status());
+                                                if receipt.status() {
+                                                    tracing::debug!("Swap transaction succeeded");
+                                                    return true;
+                                                } else {
+                                                    tracing::error!("Swap transaction failed");
+                                                }
+                                            }
+                                            Err(e) => {
+                                                tracing::error!("Failed to wait for swap transaction: {:?}", e);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Failed to send swap transaction: {:?}", e);
+                                    }
+                                }
+                            } else {
+                                tracing::error!("Approval transaction failed");
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to wait for approval transaction: {:?}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to send approval transaction: {:?}", e);
+                }
+            }
+            // Broadcast and wait swap
         }
         Err(e) => {
             tracing::error!("Failed to simulate: {:?}", e);
         }
     };
+    false
 }
 
 /// Build swap transactions on the specified network for the given request.
 /// Some example: https://github.com/propeller-heads/tycho-execution/blob/main/examples/encoding-example/main.rs
-pub async fn build(network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<ExecutionPayload, String> {
+pub async fn build(network: Network, request: ExecutionRequest, native: Vec<ProtocolComponent>, pk: Option<String>) -> Result<ExecutionPayload, String> {
     let (_, _, chain) = types::chain(network.name.clone()).unwrap();
     let tokens = vec![request.input.clone().address, request.output.clone().address];
-    let alloy_chain = crate::utils::misc::get_alloy_chain(network.name.clone()).expect("Failed to get alloy chain");
-    let provider = ProviderBuilder::new().with_chain(alloy_chain).on_http(network.rpc.parse().expect("Failed to parse RPC_URL"));
+    let achain = crate::utils::misc::get_alloy_chain(network.name.clone()).expect("Failed to get alloy chain");
+    let provider = ProviderBuilder::new().with_chain(achain).on_http(network.rpc.parse().expect("Failed to parse RPC_URL"));
+
+    // --- Check if the sender has enough balance of input token ---
     match super::rpc::erc20b(&provider, request.sender.clone(), tokens.clone()).await {
         Ok(balances) => {
-            tracing::debug!("Building swap calldata and transactions ...");
-            if let Some(solution) = solution(network.clone(), request.clone(), components.clone()).await {
-                let header: alloy::rpc::types::Block = provider.get_block_by_number(alloy::eips::BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
-                let nonce = provider.get_transaction_count(solution.sender.to_string().parse().unwrap()).await.unwrap();
-
-                match pk {
-                    Some(pk) => {
-                        let wallet = PrivateKeySigner::from_bytes(&B256::from_str(&pk).expect("Failed to convert swapper pk to B256")).expect("Failed to private key signer");
-                        let matching = wallet.address().to_string().eq_ignore_ascii_case(request.sender.clone().as_str());
-                        tracing::debug!("Signer imported via pk: {:?} | Request sender: {} | Match = {}", wallet.address(), request.sender.clone(), matching);
-                        tracing::debug!("Balances of sender {} => input token: {} and output tokens {}", request.sender, balances[0], balances[1]);
-                        std::env::set_var("RPC_URL", network.rpc.clone());
-                        let encoder = EVMEncoderBuilder::new()
-                            .chain(chain)
-                            .initialize_tycho_router_with_permit2(pk.clone())
-                            .expect("Failed to create encoder builder");
-                        match encoder.build() {
-                            Ok(encoder) => {
-                                let encoded_tx = encoder.encode_router_calldata(vec![solution.clone()]).expect("Failed to encode router calldata");
-                                let encoded_tx = encoded_tx[0].clone();
-                                // let (approval, swap) = prepare(network.clone(), solution.clone(), transaction.clone(), header, nonce).unwrap();
-                                // Tycho requires this
-                                match prepare(network.clone(), solution.clone(), encoded_tx.clone(), header, nonce) {
-                                    Some((approval, swap)) => {
-                                        // --- Logs ---
-                                        tracing::debug!("--- Raw Transactions ---");
-                                        tracing::debug!("Approval: {:?}", approval.clone());
-                                        tracing::debug!("Swap: {:?}", swap.clone());
-                                        tracing::debug!("--- Formatted Transactions ---");
-                                        let ep = ExecutionPayload {
-                                            approve: approval.clone(),
-                                            swap: swap.clone(),
-                                            srz_swap: SrzTransactionRequest::from(swap.clone()),
-                                            srz_approve: SrzTransactionRequest::from(approval.clone()),
-                                        };
-                                        tracing::debug!("Approval: {:?}", ep.approve);
-                                        tracing::debug!("Swap: {:?}", ep.swap);
-                                        tracing::debug!("--- End of Transactions ---");
-                                        return Ok(ep);
-                                    }
-                                    None => {
-                                        tracing::error!("Failed to build transactions");
-                                    }
-                                };
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to build EVMEncoder: {:?}", e);
-                            }
-                        }
-                    }
-                    None => {
-                        tracing::error!("Private key not provided");
-                    }
-                }
+            tracing::debug!("Balances of sender {}: Input: {} | Output: {}", request.sender, balances[0], balances[1]);
+            let amount = (request.amount * 10f64.powi(request.input.decimals as i32)) as u128;
+            if amount > balances[0] {
+                tracing::error!("Not enough balance for input token: need {} but sender has {}", amount, balances[0]);
+                return Err("Not enough balance for input token".to_string());
             }
         }
         Err(e) => {
             tracing::error!("Failed to get balances of sender: {:?}", e);
         }
     };
+
+    tracing::debug!("Building swap calldata and transactions ...");
+    if let Some(solution) = solution(network.clone(), request.clone(), native.clone()).await {
+        let header: alloy::rpc::types::Block = provider.get_block_by_number(alloy::eips::BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+        let nonce = provider.get_transaction_count(solution.sender.to_string().parse().unwrap()).await.unwrap();
+        match pk {
+            Some(pk) => {
+                std::env::set_var("RPC_URL", network.rpc.clone());
+                let encoder = EVMEncoderBuilder::new()
+                    .chain(chain)
+                    .initialize_tycho_router_with_permit2(pk.clone())
+                    .expect("Failed to create encoder builder");
+                match encoder.build() {
+                    Ok(encoder) => {
+                        let encoded_tx = encoder.encode_router_calldata(vec![solution.clone()]).expect("Failed to encode router calldata");
+                        let encoded_tx = encoded_tx[0].clone();
+                        match prepare(network.clone(), solution.clone(), encoded_tx.clone(), header, nonce) {
+                            Some((approval, swap)) => {
+                                let ep = ExecutionPayload {
+                                    approve: approval.clone(),
+                                    swap: swap.clone(),
+                                };
+                                return Ok(ep);
+                                // --- Logs ---
+                                // tracing::debug!("--- Raw Transactions ---");
+                                // tracing::debug!("Approval: {:?}", approval.clone());
+                                // tracing::debug!("Swap: {:?}", swap.clone());
+                                // tracing::debug!("--- Formatted Transactions ---");
+                                // tracing::debug!("Approval: {:?}", ep.approve);
+                                // tracing::debug!("Swap: {:?}", ep.swap);
+                                // tracing::debug!("--- End of Transactions ---");
+                            }
+                            None => {
+                                tracing::error!("Failed to prepare transactions");
+                            }
+                        };
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to build EVMEncoder: {:?}", e);
+                    }
+                }
+            }
+            None => {
+                tracing::debug!("Private key not provided. Building transactions data only");
+                let encoder = EVMEncoderBuilder::new().chain(chain);
+            }
+        }
+    }
+
     Err("Failed to build transactions".to_string())
 }
-
-// Simulate the given transactions
-// pub async fn simu(network: Network, nchain: NamedChain, config: EnvConfig, approve: TransactionRequest, swap: TransactionRequest) -> Result<String, String> {
-//     let wallet = PrivateKeySigner::from_bytes(&B256::from_str(&config.pvkey).expect("Failed to convert swapper pk to B256")).expect("Failed to private key signer");
-//     let signer = alloy::network::EthereumWallet::from(wallet.clone());
-//     let prvdww = ProviderBuilder::new().with_chain(nchain).wallet(signer.clone()).on_http(network.rpc.parse().unwrap());
-//     let payload = SimulatePayload {
-//         block_state_calls: vec![SimBlock {
-//             block_overrides: None,
-//             state_overrides: None,
-//             calls: vec![approve, swap],
-//         }],
-//         trace_transfers: true,
-//         validation: true,
-//         return_full_transactions: true,
-//     };
-//     // For some unknown reason, using an async function after initializing EVMEncoderBuilder cause a compiling error
-//     // So we can't use the following code for now
-//     match prvdww.simulate(&payload).await {
-//         Ok(output) => {
-//             for block in output.iter() {
-//                 println!("Simulated Block {}:", block.inner.header.number);
-//                 for (j, transaction) in block.calls.iter().enumerate() {
-//                     println!("  Transaction {}: Status: {:?}, Gas Used: {}", j + 1, transaction.status, transaction.gas_used);
-//                 }
-//             }
-//         }
-//         Err(e) => {
-//             log::error!("Failed to simulate: {:?}", e);
-//         }
-//     };
-//     Ok("Simulation successful".to_string())
-// }

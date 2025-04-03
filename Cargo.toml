@@ -38,7 +38,16 @@ dotenv = "0.15.0"
 dotenv_codegen = "0.15.0"
 reqwest = "0.12.4"
 redis = { version = "0.26.1", features = ["tokio-comp"] }
-alloy = { version = "0.5.4", features = ["full", "node-bindings", "json-rpc", "rpc-client", "providers", "signer-local", "rpc-types-eth"] }
+alloy = { version = "0.5.4", features = [
+    "full", "node-bindings", "json-rpc", "rpc-client", "providers", "signer-local", "rpc-types-eth", "consensus","rpc",
+    "rpc-types-mev",
+    "network",
+    "providers",
+    "transports",
+    "transport-http",
+    "signers",
+    ] }
+
 num-traits = "0.2.19"
 alloy-chains = "0.1.63"
 axum = { version = "0.8.1", features = ["macros"] }

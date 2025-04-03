@@ -164,8 +164,12 @@ pub struct ExecutionRequest {
 pub struct ExecutionPayload {
     pub approve: TransactionRequest,
     pub swap: TransactionRequest,
-    pub srz_approve: SrzTransactionRequest,
-    pub srz_swap: SrzTransactionRequest,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SrzExecutionPayload {
+    pub swap: SrzTransactionRequest,
+    pub approve: SrzTransactionRequest,
 }
 
 /// Transaction request, serialized for the client (srz = serialized)

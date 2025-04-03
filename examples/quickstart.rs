@@ -1,4 +1,5 @@
-use std::{collections::HashMap, sync::Arc};
+use chrono::format;
+use std::{collections::HashMap, process::exit, sync::Arc};
 use tokio::sync::RwLock;
 use tycho_orderbook::{
     adapters::default::DefaultOrderBookAdapter,
@@ -60,6 +61,7 @@ async fn main() {
 
     // Create the OBP provider from the protocol stream builder and shared state.
     let mut attempt = 0;
+    let mut executed = false;
     let filter = ComponentFilter::with_tvl_range(REMOVE_TVL_THRESHOLD, ADD_TVL_THRESHOLD);
     let builder_config = OrderbookBuilderConfig { filter };
     let provider_config = OrderbookProviderConfig { capacity: 100 };
@@ -141,21 +143,22 @@ async fn main() {
                                     steps: exponential,
                                 };
                                 if let Ok(book) = obp.get_orderbook(OrderbookRequestParams { tag: key.clone(), sps: None }, Some(simufns)).await {
-                                    tracing::info!("OBP Event: Orderbook {}-{} has been updated", current.base.symbol, current.quote.symbol);
+                                    let symtag = format!("{}-{}", book.base.symbol, book.quote.symbol);
+                                    tracing::info!("OBP Event: Orderbook {} has been updated", symtag);
                                     tracked.insert(key.clone(), Some(book.clone()));
 
                                     let depth = book.depth(None);
-                                    tracing::info!("Bids ({})", depth.bids.len());
+                                    tracing::debug!("Bids ({})", depth.bids.len());
                                     for d in depth.bids {
-                                        tracing::info!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
+                                        tracing::trace!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
                                     }
-                                    tracing::info!("Asks ({})", depth.asks.len());
+                                    tracing::debug!("Asks ({})", depth.asks.len());
                                     for d in depth.asks {
-                                        tracing::info!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
+                                        tracing::trace!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
                                     }
 
                                     if book.tag.clone().eq_ignore_ascii_case(obtag.as_str()) {
-                                        tracing::debug!("OBP Event: Orderbook {}-{} is the one we want to execute a trade on.", current.base.symbol, current.quote.symbol);
+                                        tracing::debug!("OBP Event: Orderbook {} is the one we want to execute a trade on.", symtag);
                                         // Execution
                                         // let amount = book.mpd_base_to_quote.
                                         let way = book.mpd_base_to_quote.clone();
@@ -174,15 +177,20 @@ async fn main() {
                                         let originals = mtx.components.clone();
                                         drop(mtx);
                                         let originals = get_original_components(originals, book.pools.clone());
-
                                         match book.execute(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
                                             Ok(payload) => {
-                                                let _ = tycho_orderbook::core::exec::broadcast(network.clone(), payload.clone(), Some(env.pvkey.clone())).await;
+                                                if executed == false {
+                                                    if tycho_orderbook::core::exec::broadcast(network.clone(), payload.clone(), Some(env.pvkey.clone())).await {
+                                                        executed = true;
+                                                    }
+                                                }
                                             }
-                                            Err(err) => {}
+                                            Err(err) => {
+                                                tracing::error!("OBP Event: Error executing orderbook {}: {:?}", symtag, err);
+                                            }
                                         }
                                     } else {
-                                        tracing::debug!("OBP Event: Orderbook {}-{} is not the one we want to execute a trade on.", current.base.symbol, current.quote.symbol);
+                                        tracing::debug!("OBP Event: Orderbook {} is not the one we want to execute a trade on.", symtag);
                                     }
                                 } else {
                                     tracing::error!("OBP Event: Error updating orderbook");
@@ -222,6 +230,9 @@ async fn main() {
     }
 }
 
+/// Get the original components from the list of components
+/// Used when Tycho packages require the exact components
+/// Conversion from:: SrzProtocolComponent to ProtocolComponent doesn't work. Idk why.
 pub fn get_original_components(originals: HashMap<String, ProtocolComponent>, targets: Vec<SrzProtocolComponent>) -> Vec<ProtocolComponent> {
     let mut filtered = Vec::with_capacity(targets.len());
     for cp in targets.clone().iter().enumerate() {
@@ -237,21 +248,20 @@ pub fn get_original_components(originals: HashMap<String, ProtocolComponent>, ta
     }
     let order: HashMap<String, usize> = targets.iter().enumerate().map(|(i, item)| (item.id.to_string().to_lowercase(), i)).collect();
     filtered.sort_by_key(|item| order.get(&item.id.to_string().to_lowercase()).copied().unwrap_or(usize::MAX));
-
-    for o in filtered.iter() {
-        tracing::info!(" - originals : {}", o.id);
-        let attributes = o.static_attributes.clone();
-        for a in attributes.iter() {
-            tracing::info!("   - {}: {}", a.0, a.1);
-        }
-    }
-    for t in targets.iter() {
-        tracing::info!(" - targets   : {}", t.id);
-        let attributes = t.static_attributes.clone();
-        for a in attributes.iter() {
-            tracing::info!("   - {}: {}", a.0, a.1);
-        }
-    }
-
+    // --- Tmp Debug ---
+    // for o in filtered.iter() {
+    //     tracing::trace!(" - originals : {}", o.id);
+    //     let attributes = o.static_attributes.clone();
+    //     for a in attributes.iter() {
+    //         tracing::trace!("   - {}: {}", a.0, a.1);
+    //     }
+    // }
+    // for t in targets.iter() {
+    //     tracing::trace!(" - targets   : {}", t.id);
+    //     let attributes = t.static_attributes.clone();
+    //     for a in attributes.iter() {
+    //         tracing::trace!("   - {}: {}", a.0, a.1);
+    //     }
+    // }
     filtered
 }

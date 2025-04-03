@@ -671,6 +671,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-engine",
  "alloy-rpc-types-eth 0.5.4",
+ "alloy-rpc-types-mev",
  "alloy-serde 0.5.4",
  "serde",
 ]
@@ -764,6 +765,19 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.12",
+]
+
+[[package]]
+name = "alloy-rpc-types-mev"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3246948dfa5f5060a9abe04233d741ea656ef076b12958f3242416ce9f375058"
+dependencies = [
+ "alloy-eips 0.5.4",
+ "alloy-primitives",
+ "alloy-serde 0.5.4",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
