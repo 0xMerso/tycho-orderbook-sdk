@@ -47,6 +47,8 @@ pub struct Network {
     pub router: String,
     #[schema(example = "0x")]
     pub permit2: String,
+    #[schema(example = "Symbol")]
+    pub tag: String,
 }
 
 /// Tycho protocol, used to configure ProtocolStreamBuilder

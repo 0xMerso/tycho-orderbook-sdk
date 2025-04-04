@@ -57,6 +57,11 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
     }
 }
 
+/// Filter out invalid strings from a vector of strings.
+pub fn filter_valid_strings(input: Vec<Token>) -> Vec<Token> {
+    input.into_iter().filter(|s| !s.symbol.chars().any(|c| c.is_control())).collect()
+}
+
 /// Get the tokens from the Tycho API
 /// Filters are hardcoded for now.
 pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
@@ -79,8 +84,10 @@ pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
                             gas: BigUint::from(g),
                         });
                     }
+                    tokens = filter_valid_strings(tokens);
                     let elasped = time.elapsed().unwrap().as_millis();
                     tracing::debug!("Took {:?} ms to get {} tokens on {}", elasped, tokens.len(), network.name);
+
                     Some(tokens)
                 }
                 Err(e) => {
