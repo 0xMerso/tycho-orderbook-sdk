@@ -40,12 +40,13 @@ async fn main() {
     let networks = tycho_orderbook::utils::r#static::networks();
     let network = networks.clone().into_iter().find(|x| x.name == network_name).expect("Network not found");
     tracing::debug!("Tycho Stream for '{}' network", network.name.clone());
-    // Create cross/shared state for the protocol stream
+    // --- Create cross/shared state for the protocol stream ---
     let xstate: SharedTychoStreamState = Arc::new(RwLock::new(TychoStreamState {
         protosims: HashMap::new(),
         components: HashMap::new(),
         initialised: false,
     }));
+    // --- Token list ---
     let tokens = match rpc::tokens(&network, tycho_api_key.clone()).await {
         Some(t) => t,
         None => {
@@ -58,23 +59,23 @@ async fn main() {
         hmt.insert(t.address.clone(), t.clone());
     });
 
-    // --- Adjust as needed --- Mainnet here
+    // --- Adjust as needed --- Mainnet
     let eth = network.eth.clone().to_lowercase();
     let usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string().to_lowercase(); // base: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
     let btc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599".to_string().to_lowercase(); // base: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
-    let btcusdc = format!("{}-{}", btc, usdc); // "0xBTC" "0xUSDC"
-    let btc_eth = format!("{}-{}", btc, eth); // "0xBTC" "0xETH"
-    let eth_usdc = format!("{}-{}", eth, usdc); // "0xETH" "0xUSDC"
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
-    // tracked.insert(btcusdc.clone(), None);
-    // tracked.insert(btc_eth.clone(), None);
-    tracked.insert(eth_usdc.clone(), None);
-    let obtag = eth_usdc; // Orderbook tag on which we want to execute a trade for demo
+    let _btcusdc = format!("{}-{}", btc, usdc); // "0xBTC" "0xUSDC"
+    let _btceth = format!("{}-{}", btc, eth); // "0xBTC" "0xETH"
+    let ethusdc = format!("{}-{}", eth, usdc); // "0xETH" "0xUSDC"
+    tracked.insert(ethusdc.clone(), None);
+
+    // --- Quickstart Config ---
+    let mut attempt = 0;
+    let obtag = ethusdc; // Orderbook tag on which we want to execute a trade for demo
+    let mut executed = false; // Flag to check if the transaction has been executed, to keep one execution only
     tracing::debug!("Execution on obtag: {:?}", obtag);
 
-    // Create the OBP provider from the protocol stream builder and shared state.
-    let mut attempt = 0;
-    let mut executed = false; // Flag to check if the transaction has been executed, to keep one execution only
+    // --- Create the OBP provider from the protocol stream builder and shared state ---
     let filter = ComponentFilter::with_tvl_range(REMOVE_TVL_THRESHOLD, ADD_TVL_THRESHOLD);
     let builder_config = OrderbookBuilderConfig { filter };
     let provider_config = OrderbookProviderConfig { capacity: 100 };
