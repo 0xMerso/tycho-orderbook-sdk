@@ -14,8 +14,8 @@ function start() {
     echo "Build successful. Executing..."
     (
         trap - SIGINT
-        # export RUST_LOG="off,tycho_orderbook=trace,quickstart=trace"
-        export RUST_LOG="off,tycho_orderbook=trace,quickstart=trace,tycho_execution=trace"
+        export RUST_LOG="off,tycho_orderbook=trace,quickstart=trace"
+        # export RUST_LOG="off,tycho_orderbook=trace,quickstart=trace,tycho_execution=trace"
         cargo run --bin quickstart -q # 2>/dev/null
     )
     echo "Program has finished or was interrupted. Continuing with the rest of the shell script ..."
@@ -27,3 +27,6 @@ function start() {
 }
 
 start
+
+# --- Or just run the binary directly ---
+# cargo run --bin quickstart

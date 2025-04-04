@@ -23,7 +23,6 @@ chrono = "0.4.23"
 futures = "0.3.31"
 num-bigint = "0.4.6"
 
-
 # tycho-common = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-common", tag = "0.64.2" }
 # tycho-client = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-client" , tag = "0.64.2"}
 # tycho-execution = { git = "https://github.com/propeller-heads/tycho-execution.git", package = "tycho-execution", tag = "0.73.0",  features = ["evm"] }
@@ -31,10 +30,11 @@ num-bigint = "0.4.6"
 tycho-common = { version = "0.64.2" }
 tycho-client = { version = "0.64.2" }
 tycho-execution = { version = "0.73.0",  features = ["evm"] }
-tycho-simulation = "0.91.1" # Patched below
+tycho-simulation = "0.91.1" # Patched below, for now.
 
 toml = "0.8.12"
 serde = { version = "1.0.104", features = ["derive"] }
+tracing-subscriber = "0.3"
 clippy = "0.0.302"
 env_logger = "0.11.3"
 eyre = "0.6.11"
@@ -51,6 +51,8 @@ rand = "0.8.5"
 serde_json = "1.0"
 dotenv = "0.15.0"
 dotenv_codegen = "0.15.0"
+rayon = "1.10.0"
+async-trait = "0.1.88"
 reqwest = "0.12.4"
 redis = { version = "0.26.1", features = ["tokio-comp"] }
 alloy = { version = "0.5.4", features = [
@@ -65,17 +67,11 @@ alloy = { version = "0.5.4", features = [
 
 num-traits = "0.2.19"
 alloy-chains = "0.1.63"
-axum = { version = "0.8.1", features = ["macros"] }
 primitive-types = "0.10.1"
 indicatif = "0.17.11"
-
-utoipa = "5.3.1"
-utoipa-axum = "0.2.0"
 alloy-primitives = "0.8.23"
-axum-macros = "0.5.0"
-rayon = "1.10.0"
-async-trait = "0.1.88"
-tracing-subscriber = "0.3"
+# Struct doc (swagger) when SDK is used with an API, SDK struct will be added to schema
+utoipa = "5.3.1"
 
 [patch.crates-io]
 tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", branch = "main" }

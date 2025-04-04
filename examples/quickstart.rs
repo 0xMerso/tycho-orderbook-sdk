@@ -18,9 +18,9 @@ async fn main() {
     tracing::info!("--- --- --- Launching Quickstart Tycho Orderbook --- --- ---");
     // tracing::info!("Gm"); tracing::debug!("Gm"); tracing::trace!("Gm");
     dotenv::from_filename("examples/.env.qs.ex").ok(); // Use .env.ex for testing
+    let network_name = std::env::var("NETWORK").expect("Variable 'NETWORK' not found in environment");
     let real_exec = std::env::var("REAL_EXEC").expect("Variable 'REAL_EXEC' not found in environment") == "true";
     let tycho_api_key = std::env::var("TYCHO_API_KEY").expect("Variable 'TYCHO_API_KEY' not found in environment");
-    let network_name = std::env::var("NETWORK").expect("Variable 'NETWORK' not found in environment");
     let sender = std::env::var("SENDER").expect("Variable 'SENDER' not found in environment");
     let pk = match std::env::var("PV_KEY") {
         Ok(v) => {
