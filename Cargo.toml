@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/0xMerso/tycho-orderbook-sdkk"
 homepage = "https://github.com/0xMerso/tycho-orderbook-sdk"
 
-keywords = ["blockchain", "ethereum", "orderbook", "streaming", "tycho", "defi", "amm", "cex", "binance", "liquidity", "swap", "crypto"]
+keywords = ["blockchain", "ethereum", "orderbook", "tycho", "defi", "amm", "cex", "binance", "liquidity", "swap", "crypto"]
 
 authors = ["Merso merso.eth@gmail.com"] 
 documentation = "https://tycho-orderbook.gitbook.io/docs"
