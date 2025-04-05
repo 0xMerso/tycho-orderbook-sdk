@@ -9,15 +9,15 @@ readme = "README.md"
 repository = "https://github.com/0xMerso/tycho-orderbook-sdkk"
 homepage = "https://github.com/0xMerso/tycho-orderbook-sdk"
 
-keywords = ["blockchain", "ethereum", "orderbook", "tycho", "defi", "amm", "cex", "binance", "liquidity", "swap", "crypto"]
-
+keywords = [ "dex", "mev", "blockchain", "ethereum", "orderbook", "tycho", "defi", "amm", "cex", "binance", "liquidity", "swap", "crypto", "solver"]
+categories = ["finance", "cryptography::cryptocurrencies"]
 authors = ["Merso merso.eth@gmail.com"] 
 documentation = "https://tycho-orderbook.gitbook.io/docs"
 
 # ======================================================================================================================================================================================================
 
 [patch.crates-io]
-tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", branch = "main" }
+tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", tag = "0.91.1" }
 
 [dependencies]
 
@@ -73,7 +73,7 @@ alloy-chains = "0.1.63"
 primitive-types = "0.10.1"
 indicatif = "0.17.11"
 alloy-primitives = "0.8.23"
-# Struct doc (swagger) when SDK is used with an API, SDK struct will be added to schema
+# Struct doc (swagger) when SDK is used with an external API, SDK struct will be added to schema
 utoipa = "5.3.1"
 
 
