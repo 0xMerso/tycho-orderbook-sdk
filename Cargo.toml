@@ -31,8 +31,8 @@ num-bigint = "0.4.6"
 tycho-common = { version = "0.64.2" }
 tycho-client = { version = "0.64.2" }
 tycho-execution = { version = "0.73.0",  features = ["evm"] }
-tycho-simulation = "0.91.1" # Patched below, for now.
-# tycho-simulation = { version = "*", package = "tycho-simulation" }
+# tycho-simulation = "0.91.1" # Patched below, for now.
+tycho-simulation = { version = "*", package = "tycho-simulation" }
 
 toml = "0.8.12"
 serde = { version = "1.0.104", features = ["derive"] }
