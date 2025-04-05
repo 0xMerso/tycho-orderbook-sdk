@@ -16,6 +16,9 @@ documentation = "https://tycho-orderbook.gitbook.io/docs"
 
 # ======================================================================================================================================================================================================
 
+[patch.crates-io]
+tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", branch = "main" }
+
 [dependencies]
 
 tokio = { version = "1.28", features = ["full"] }
@@ -73,8 +76,6 @@ alloy-primitives = "0.8.23"
 # Struct doc (swagger) when SDK is used with an API, SDK struct will be added to schema
 utoipa = "5.3.1"
 
-[patch.crates-io]
-tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", branch = "main" }
 
 # ======================================================================================================================================================================================================
 
