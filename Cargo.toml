@@ -32,10 +32,8 @@ tycho-common = { version = "0.64.2" }
 tycho-client = { version = "0.64.2" }
 tycho-execution = { version = "0.73.0",  features = ["evm"] }
 
-# [patch.crates-io]
-# tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", tag = "0.91.1" }
-tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", version = "0.92.0" }
-# tycho-simulation = "0.92" # Patched below, for now.
+
+tycho-simulation = "0.92" # Patched below, for now.
 
 toml = "0.8.12"
 serde = { version = "1.0.104", features = ["derive"] }
@@ -77,6 +75,9 @@ indicatif = "0.17.11"
 alloy-primitives = "0.8.23"
 # Struct doc (swagger) when SDK is used with an external API, SDK struct will be added to schema
 utoipa = "5.3.1"
+
+[patch.crates-io]
+tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", version = "0.92.0" }
 
 # ======================================================================================================================================================================================================
 
