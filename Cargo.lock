@@ -8282,7 +8282,7 @@ dependencies = [
 [[package]]
 name = "tycho-simulation"
 version = "0.91.1"
-source = "git+https://github.com/0xMerso/tycho-simulation.git?tag=0.91.1#a5cff8d11b6753a14d3e080c0470adc221cc2847"
+source = "git+https://github.com/0xMerso/tycho-simulation.git#a5cff8d11b6753a14d3e080c0470adc221cc2847"
 dependencies = [
  "alloy 0.5.4",
  "alloy-primitives",
