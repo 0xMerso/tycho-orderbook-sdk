@@ -66,7 +66,7 @@ pub fn filter_valid_strings(input: Vec<Token>) -> Vec<Token> {
         s.symbol.chars().all(|c| c.is_ascii_graphic()) && 
         !s.symbol.chars().any(|c| c.is_control()) &&
         // Check that the address looks valid (e.g., starts with "0x" and is the correct length)
-        s.address.to_string().starts_with("0x") && s.address.len() == 42
+        s.address.to_string().starts_with("0x")
     })
     .collect()
 }
