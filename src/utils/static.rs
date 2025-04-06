@@ -57,9 +57,9 @@ pub mod maths {
 
     pub mod simu {
         // Config for incrementing amountIn
-        pub static COUNT: usize = 50;
+        pub static COUNT: usize = 15;
         pub static START_MULTIPLIER: f64 = 1.;
-        pub static END_MULTIPLIER: f64 = 2_500_000.; // 25% of TEN_MILLIONS
+        pub static END_MULTIPLIER: f64 = 1_000_000.; // 10% of TEN_MILLIONS
 
         // pub static MIN_EXP_DELTA: f64 = 15.; Instead of hardcoding it, we use a % of the end multiplier
         pub static MIN_EXP_DELTA_PCT: f64 = 0.0001; // To ensure distance between points

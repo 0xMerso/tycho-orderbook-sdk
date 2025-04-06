@@ -59,7 +59,16 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
 
 /// Filter out invalid strings from a vector of strings.
 pub fn filter_valid_strings(input: Vec<Token>) -> Vec<Token> {
-    input.into_iter().filter(|s| !s.symbol.chars().any(|c| c.is_control())).collect()
+    // input.into_iter().filter(|s| !s.symbol.chars().any(|c| c.is_control())).collect()
+    input.into_iter()
+    .filter(|s| {
+        // Ensure the symbol has no control characters and meets any other symbol criteria
+        s.symbol.chars().all(|c| c.is_ascii_graphic()) && 
+        !s.symbol.chars().any(|c| c.is_control()) &&
+        // Check that the address looks valid (e.g., starts with "0x" and is the correct length)
+        s.address.to_string().starts_with("0x") && s.address.len() == 42
+    })
+    .collect()
 }
 
 /// Get the tokens from the Tycho API

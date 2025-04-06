@@ -303,7 +303,11 @@ pub struct OrderbookRequestParams {
     /// Example: ETH/USDC
     /// - Bid = buy orders for the base asset (ETH) priced in USDC
     /// - Ask = sell orders for the base asset (ETH) priced in USDC.
+    #[schema(example = "0xETH-0xUSDC")]
     pub tag: String,
+    // /// Number of points to simulate. Default is 15
+    // #[schema(example = "25")]
+    // pub depth: Option<u64>,
     /// Optional single point simulation, used to simulate 1 trade only
     pub point: Option<SinglePointSimulation>,
 }
@@ -312,8 +316,10 @@ pub struct OrderbookRequestParams {
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct SinglePointSimulation {
     // Address of the input token
+    #[schema(example = "0xETH")]
     pub input: String,
     // Divided by input decimals
+    #[schema(example = "10")]
     pub amount: f64,
 }
 

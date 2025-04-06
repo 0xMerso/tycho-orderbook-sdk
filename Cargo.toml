@@ -16,25 +16,29 @@ documentation = "https://tycho-orderbook.gitbook.io/docs"
 
 # ======================================================================================================================================================================================================
 
+[patch.crates-io] # Used only locally
+# tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", version = "0.92.0" }
+tycho-simulation = { git = "https://github.com/propeller-heads/tycho-simulation.git", rev = "662c37fd2cc7cff65407e3534584860aab184d69" }
 
 [dependencies]
+
+# KO
+# tycho-simulation = "0.92" # Patched below, for now.
+tycho-simulation = { git = "https://github.com/propeller-heads/tycho-simulation.git", rev = "662c37fd2cc7cff65407e3534584860aab184d69" }
+# tycho-simulation = {  git = "https://github.com/propeller-heads/tycho-simulation.git", package = "tycho-simulation", version = "0.92.0", rev = "662c37fd2cc7cff65407e3534584860aab184d69" }
+# tycho-simulation = { git = "https://github.com/propeller-heads/tycho-simulation.git", version = "0.92.0",features = ["evm"] }
+
+# tycho-common = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-common", tag = "0.64.2" }
+# tycho-client = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-client" , tag = "0.64.2"}
+# tycho-execution = { git = "https://github.com/propeller-heads/tycho-execution.git", package = "tycho-execution", tag = "0.73.0",  features = ["evm"] }
+tycho-common = { version = "0.64.2" }
+tycho-client = { version = "0.64.2" }
+tycho-execution = { version = "0.73.0",  features = ["evm"] }
 
 tokio = { version = "1.28", features = ["full"] }
 chrono = "0.4.23"
 futures = "0.3.31"
 num-bigint = "0.4.6"
-
-# tycho-common = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-common", tag = "0.64.2" }
-# tycho-client = { git = "https://github.com/propeller-heads/tycho-indexer.git", package = "tycho-client" , tag = "0.64.2"}
-# tycho-execution = { git = "https://github.com/propeller-heads/tycho-execution.git", package = "tycho-execution", tag = "0.73.0",  features = ["evm"] }
-
-tycho-common = { version = "0.64.2" }
-tycho-client = { version = "0.64.2" }
-tycho-execution = { version = "0.73.0",  features = ["evm"] }
-
-
-tycho-simulation = "0.92" # Patched below, for now.
-
 toml = "0.8.12"
 serde = { version = "1.0.104", features = ["derive"] }
 tracing-subscriber = "0.3"
@@ -75,9 +79,6 @@ indicatif = "0.17.11"
 alloy-primitives = "0.8.23"
 # Struct doc (swagger) when SDK is used with an external API, SDK struct will be added to schema
 utoipa = "5.3.1"
-
-[patch.crates-io]
-tycho-simulation = { git = "https://github.com/0xMerso/tycho-simulation.git", version = "0.92.0" }
 
 # ======================================================================================================================================================================================================
 
