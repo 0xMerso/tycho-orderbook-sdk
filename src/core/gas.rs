@@ -51,6 +51,7 @@ pub async fn eth_usd() -> f64 {
     price
 }
 
+/// Find the best path and price between tokens
 pub fn pricing(network: Network, ptss: Vec<ProtoTychoState>, atks: Vec<SrzToken>, input: String) -> Option<(f64, Vec<String>)> {
     let mut graph: std::collections::HashMap<String, Vec<(String, f64)>> = std::collections::HashMap::new();
     for state in ptss {

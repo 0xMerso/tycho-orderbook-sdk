@@ -404,9 +404,9 @@ pub struct Orderbook {
     pub bids: Vec<TradeResult>,
     /// Array of resulat for the optimal single hop route
     pub asks: Vec<TradeResult>,
-    /// Cumulated liquidity for token0, always divided by decimals, combining all pools/components
+    /// Cumulated liquidity for base, always divided by decimals, combining all pools/components
     pub base_lqdty: Vec<f64>,
-    /// Cumulated liquidity for token0, always divided by decimals, combining all pools/components
+    /// Cumulated liquidity for quote, always divided by decimals, combining all pools/components
     pub quote_lqdty: Vec<f64>,
     /// All components used to build the orderbook (= pools that include both token0 and token1)
     pub pools: Vec<SrzProtocolComponent>,

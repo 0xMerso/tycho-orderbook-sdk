@@ -63,6 +63,10 @@ pub async fn build(
             tmpb.insert(srzt0.address.clone(), base_bal);
             tmpb.insert(srzt1.address.clone(), quote_bal);
             balances.insert(pdata.component.id.clone().to_lowercase(), tmpb);
+        } else {
+            base_lqdty.push(0f64);
+            quote_lqdty.push(0f64);
+            balances.insert(pdata.component.id.clone().to_lowercase(), HashMap::new());
         }
     }
     let cps: Vec<SrzProtocolComponent> = pools.clone().iter().map(|p| p.component.clone()).collect();
