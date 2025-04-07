@@ -15,6 +15,8 @@ use tycho_common::dto::VersionParam;
 use tycho_simulation::models::Token;
 
 /// Get the balances of the component in the specified protocol system.
+/// Returns a HashMap of component addresses and their balances.
+/// Balance is returned as a u128, with decimals.
 pub async fn get_component_balances(network: Network, cp: String, protosys: String, api_token: Option<String>) -> Option<HashMap<String, u128>> {
     let key: &str = match &api_token {
         Some(t) => t.as_str(),

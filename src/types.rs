@@ -420,6 +420,10 @@ pub struct Orderbook {
     pub base_worth_eth: f64,
     /// One unit, multi-hop spot_price, needed to value the TVL and other stuff
     pub quote_worth_eth: f64,
+    // The TVL value in USD for the base token
+    pub aggregated_balance_base_worth_usd: f64,
+    // The TVL value in USD for the quote token
+    pub aggregated_balance_quote_worth_usd: f64,
 }
 
 /// Orderbook Provider Event
