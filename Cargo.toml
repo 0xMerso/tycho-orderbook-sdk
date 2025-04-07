@@ -3,6 +3,8 @@ name = "tycho-orderbook"
 version = "0.1.0"
 edition = "2021"
 
+# Repo name just has the suffix -sdk for clarity.
+
 description = "Transposes onchain liquidity from AMMs into a familiar orderbook format with Tycho"
 license = "MIT" 
 readme = "README.md"

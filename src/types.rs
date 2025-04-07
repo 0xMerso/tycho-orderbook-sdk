@@ -53,11 +53,13 @@ pub struct Network {
 
 /// Tycho protocol, used to configure ProtocolStreamBuilder
 pub enum TychoSupportedProtocol {
-    Pancakeswap,
+    PancakeswapV2,
+    PancakeswapV3,
     Sushiswap,
     UniswapV2,
     UniswapV3,
     UniswapV4,
+    EkuboV2,
     BalancerV2,
     Curve,
 }
@@ -66,11 +68,13 @@ pub enum TychoSupportedProtocol {
 impl ToString for TychoSupportedProtocol {
     fn to_string(&self) -> String {
         match self {
-            TychoSupportedProtocol::Pancakeswap => "pancakeswap_v2".to_string(),
+            TychoSupportedProtocol::PancakeswapV2 => "pancakeswap_v2".to_string(),
+            TychoSupportedProtocol::PancakeswapV3 => "pancakeswap_v3".to_string(),
             TychoSupportedProtocol::Sushiswap => "sushiswap_v2".to_string(),
             TychoSupportedProtocol::UniswapV2 => "uniswap_v2".to_string(),
             TychoSupportedProtocol::UniswapV3 => "uniswap_v3".to_string(),
             TychoSupportedProtocol::UniswapV4 => "uniswap_v4".to_string(),
+            TychoSupportedProtocol::EkuboV2 => "ekubo_v2".to_string(),
             TychoSupportedProtocol::BalancerV2 => "vm:balancer_v2".to_string(),
             TychoSupportedProtocol::Curve => "vm:curve".to_string(),
         }
@@ -81,11 +85,13 @@ impl ToString for TychoSupportedProtocol {
 impl TychoSupportedProtocol {
     pub fn vectorize() -> Vec<String> {
         vec![
-            TychoSupportedProtocol::Pancakeswap.to_string(),
+            TychoSupportedProtocol::PancakeswapV2.to_string(),
+            TychoSupportedProtocol::PancakeswapV3.to_string(),
             TychoSupportedProtocol::Sushiswap.to_string(),
             TychoSupportedProtocol::UniswapV2.to_string(),
             TychoSupportedProtocol::UniswapV3.to_string(),
             TychoSupportedProtocol::UniswapV4.to_string(),
+            TychoSupportedProtocol::EkuboV2.to_string(),
             TychoSupportedProtocol::BalancerV2.to_string(),
             TychoSupportedProtocol::Curve.to_string(),
         ]
@@ -94,11 +100,13 @@ impl TychoSupportedProtocol {
 
 /// Tycho Protocol type name, used to add exchanges
 pub enum AmmType {
-    Pancakeswap,
+    PancakeswapV2,
+    PancakeswapV3,
     Sushiswap,
     UniswapV2,
     UniswapV3,
     UniswapV4,
+    EkuboV2,
     Balancer,
     Curve,
 }
@@ -107,11 +115,13 @@ pub enum AmmType {
 impl ToString for AmmType {
     fn to_string(&self) -> String {
         match self {
-            AmmType::Pancakeswap => "pancakeswap_v2_pool".to_string(),
+            AmmType::PancakeswapV2 => "pancakeswap_v2_pool".to_string(),
+            AmmType::PancakeswapV3 => "pancakeswap_v3_pool".to_string(),
             AmmType::Sushiswap => "sushiswap_v2_pool".to_string(),
             AmmType::UniswapV2 => "uniswap_v2_pool".to_string(),
             AmmType::UniswapV3 => "uniswap_v3_pool".to_string(),
             AmmType::UniswapV4 => "uniswap_v4_pool".to_string(),
+            AmmType::EkuboV2 => "ekubo_v2_pool".to_string(),
             AmmType::Balancer => "balancer_v2_pool".to_string(),
             AmmType::Curve => "curve_pool".to_string(), // ?
         }
@@ -121,13 +131,15 @@ impl ToString for AmmType {
 impl From<&str> for AmmType {
     fn from(s: &str) -> Self {
         match s {
-            "pancakeswap_v2_pool" => AmmType::Pancakeswap,
+            "pancakeswap_v2_pool" => AmmType::PancakeswapV2,
+            "pancakeswap_v3_pool" => AmmType::PancakeswapV3,
             "sushiswap_v2_pool" => AmmType::Sushiswap,
             "uniswap_v2_pool" => AmmType::UniswapV2,
             "uniswap_v3_pool" => AmmType::UniswapV3,
             "uniswap_v4_pool" => AmmType::UniswapV4,
             "balancer_v2_pool" => AmmType::Balancer,
-            "curve_pool" => AmmType::Curve, // ?
+            "curve_pool" => AmmType::Curve,      // ?
+            "ekubo_v2_pool" => AmmType::EkuboV2, // ?
             _ => panic!("Unknown AMM type"),
         }
     }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
+use tycho_simulation::evm::protocol::ekubo::state::EkuboState;
 use tycho_simulation::evm::protocol::utils::uniswap::tick_list::TickList;
 
 use alloy::primitives::ruint::aliases::U256;
@@ -206,6 +207,24 @@ impl From<(UniswapV3State, String)> for SrzUniswapV3State {
             tick: state.tick,
             ticks: SrzTickList::from(state.ticks), // ! TODO: sort by index
         }
+    }
+}
+
+// =======> Ekubo <=======
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SrzEkuboState {
+    pub id: String,
+    pub liquidity: u128,
+    pub sqrt_price: U256,
+    pub fee: i32,
+    pub tick: i32,
+    pub ticks: SrzTickList,
+}
+
+impl From<(EkuboState, String)> for SrzEkuboState {
+    fn from((_state, _id): (EkuboState, String)) -> Self {
+        todo!()
     }
 }
 

@@ -64,16 +64,18 @@ async fn main() {
     let usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string().to_lowercase(); // base: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
     let btc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599".to_string().to_lowercase(); // base: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
-    let _btcusdc = format!("{}-{}", btc, usdc); // "0xBTC" "0xUSDC"
-    let _btceth = format!("{}-{}", btc, eth); // "0xBTC" "0xETH"
+    let btcusdc = format!("{}-{}", btc, usdc); // "0xBTC" "0xUSDC"
+    let btceth = format!("{}-{}", btc, eth); // "0xBTC" "0xETH"
     let ethusdc = format!("{}-{}", eth, usdc); // "0xETH" "0xUSDC"
     tracked.insert(ethusdc.clone(), None);
+    tracked.insert(btcusdc.clone(), None);
+    tracked.insert(btceth.clone(), None);
 
     // --- Quickstart Config ---
     let mut attempt = 0;
     let obtag = ethusdc; // Orderbook tag on which we want to execute a trade for demo
     let mut executed = false; // Flag to check if the transaction has been executed, to keep one execution only
-    tracing::debug!("Execution on obtag: {:?}", obtag);
+    tracing::debug!("Execution on a specific orderbook for quick-start demo: {:?}", obtag);
 
     // --- Create the OBP provider from the protocol stream builder and shared state ---
     let filter = ComponentFilter::with_tvl_range(REMOVE_TVL_THRESHOLD, ADD_TVL_THRESHOLD);

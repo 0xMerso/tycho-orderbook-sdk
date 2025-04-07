@@ -64,6 +64,7 @@ impl OrderbookProvider {
                                     tracing::debug!("First stream (initialised was false). Writing the entire streamed data into the shared struct.");
                                     let mut targets = vec![];
                                     for (_, comp) in msg.new_pairs.iter() {
+                                        // tracing::debug!("Adding new component {} to the shared state: {}", comp.protocol_system.clone(), comp.protocol_type_name.clone());
                                         targets.push(comp.id.to_string().to_lowercase());
                                     }
                                     let mut mtx = taskstate.write().await;
