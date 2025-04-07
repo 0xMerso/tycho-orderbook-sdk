@@ -1,5 +1,5 @@
 
-# tycho-orderbook
+# tycho-orderbook-sdk
 
 Tycho Orderbook is a Rust crate that transposes onchain liquidity from AMMs into a familiar orderbook format, thanks to [Tycho](https://docs.propellerheads.xyz/tycho).  
 
