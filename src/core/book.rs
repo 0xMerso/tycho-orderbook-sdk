@@ -159,10 +159,10 @@ pub async fn simulate(
     let amount_eth = utils::r#static::maths::BEST_BID_ASK_ETH_BPS / utils::r#static::maths::BPD; // 1/100 of ETH = ~2$ (for 2000$ ETH)
     let amount_test_best_base_to_quote = amount_eth / base_worth_eth;
     let amount_test_best_quote_to_base = amount_eth / quote_worth_eth;
-    let best_base_to_quote = best(&pcsdata, eth_usd, gas_price, &base, &quote, amount_test_best_base_to_quote, price_base_to_quote, quote_worth_eth);
-    let best_quote_to_base = best(&pcsdata, eth_usd, gas_price, &quote, &base, amount_test_best_quote_to_base, price_quote_to_base, base_worth_eth);
-    let mpd_base_to_quote = midprice(best_base_to_quote.clone(), best_quote_to_base.clone());
-    let mpd_quote_to_base = midprice(best_quote_to_base.clone(), best_base_to_quote.clone());
+    let best_base_to_quote = compute_best_trade(&pcsdata, eth_usd, gas_price, &base, &quote, amount_test_best_base_to_quote, price_base_to_quote, quote_worth_eth);
+    let best_quote_to_base = compute_best_trade(&pcsdata, eth_usd, gas_price, &quote, &base, amount_test_best_quote_to_base, price_quote_to_base, base_worth_eth);
+    let mpd_base_to_quote = derive_mid_price(best_base_to_quote.clone(), best_quote_to_base.clone());
+    let mpd_quote_to_base = derive_mid_price(best_quote_to_base.clone(), best_base_to_quote.clone());
 
     let tag = format!("{}-{}", base.address.to_lowercase(), quote.address.to_lowercase());
     let mut result = Orderbook {
@@ -291,7 +291,7 @@ pub fn optimize(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_pric
 /// Doing that for 0to1 and 1to0 we have our best bid/ask, then we can compute the mid price
 /// --- --- --- --- ---
 /// Amount out is net of gas cost
-pub fn best(pcs: &[ProtoTychoState], eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, amount: f64, spot_price: f64, output_u_ethworth: f64) -> TradeResult {
+pub fn compute_best_trade(pcs: &[ProtoTychoState], eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, amount: f64, spot_price: f64, output_u_ethworth: f64) -> TradeResult {
     tracing::debug!(" - 🥇 Computing best price for {} (amount in = {})", from.symbol, amount);
     let result = maths::opti::gradient(amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, spot_price, output_u_ethworth);
     tracing::trace!(
@@ -308,7 +308,7 @@ pub fn best(pcs: &[ProtoTychoState], eth_usd: f64, gas_price: u128, from: &SrzTo
 
 /// Computes the mid price for a given token pair using the best bid and ask
 /// ! We assume that => trade_base_to_quote = ask and trade_quote_to_base = bid
-pub fn midprice(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResult) -> MidPriceData {
+pub fn derive_mid_price(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResult) -> MidPriceData {
     let amount = trade_base_to_quote.amount;
     let received = trade_base_to_quote.output;
     let distribution = trade_base_to_quote.distribution.clone();

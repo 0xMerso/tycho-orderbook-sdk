@@ -155,7 +155,7 @@ pub async fn erc20b(provider: &RootProvider<Http<Client>>, owner: String, tokens
 /// Fetch the price of and oracle, in this case of the 'gas_token' of a network
 /// Assume the oracle in under the 'Chainlink' interface
 pub async fn get_eth_usd_chainlink(rpc: String, feed: String) -> Option<f64> {
-    log::info!("Fetching price from chainlink oracle: {}", feed.clone());
+    tracing::debug!("Fetching price from chainlink oracle: {}", feed.clone());
     let pfeed: Address = feed.clone().parse().unwrap();
     let provider = ProviderBuilder::new().on_http(rpc.parse().unwrap());
     let client = Arc::new(provider);
@@ -165,11 +165,12 @@ pub async fn get_eth_usd_chainlink(rpc: String, feed: String) -> Option<f64> {
     match (price, precision) {
         (Ok(price), Ok(precision)) => {
             let power = 10f64.powi(precision._0 as i32);
-            log::info!("Price fetched: {}", price._0.as_u64() as f64 / power);
-            Some(price._0.as_u64() as f64 / power)
+            let price = price._0.as_u64() as f64 / power;
+            tracing::debug!("Price from chainlink oracle: {}", price);
+            Some(price)
         }
         _ => {
-            log::error!("Error fetching price from chainlink oracle");
+            tracing::error!("Error fetching price from chainlink oracle");
             None
         }
     }
