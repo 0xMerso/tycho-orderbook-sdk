@@ -154,6 +154,7 @@ impl OrderbookProvider {
         let single = params.point.is_some();
         let mtx = self.state.read().await;
         let comp = mtx.components.clone();
+        drop(mtx);
         let acps = comp.iter().map(|x| SrzProtocolComponent::from(x.1.clone())).collect::<Vec<SrzProtocolComponent>>(); // Not efficient at all
         let targets = params.tag.clone().split("-").map(|x| x.to_string().to_lowercase()).collect::<Vec<String>>();
         if targets.len() != 2 {
@@ -176,6 +177,7 @@ impl OrderbookProvider {
         let (quote_to_eth_path, quote_to_eth_comps) = maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
         let mut to_eth_ptss: Vec<ProtoTychoState> = vec![];
         let mut ptss: Vec<ProtoTychoState> = vec![];
+        let mtx = self.state.read().await;
         for cp in acps.clone() {
             if base_to_eth_comps.contains(&cp.id.to_lowercase()) || quote_to_eth_comps.contains(&cp.id.to_lowercase()) {
                 if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
