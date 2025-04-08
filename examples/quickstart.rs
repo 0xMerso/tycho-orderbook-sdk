@@ -17,7 +17,7 @@ async fn main() {
     tracing_subscriber::fmt().with_env_filter(filter).init(); // <--- Set the tracing level here
     tracing::info!("--- --- --- Launching Quickstart Tycho Orderbook --- --- ---");
     // tracing::info!("Gm"); tracing::debug!("Gm"); tracing::trace!("Gm");
-    dotenv::from_filename("examples/.env.qs.ex").ok(); // Use .env.ex for testing
+    dotenv::from_filename("examples/.env.quickstart.ex").ok(); // Use .env.ex for testing
     let network_name = std::env::var("NETWORK").expect("Variable 'NETWORK' not found in environment");
     let real_exec = std::env::var("REAL_EXEC").expect("Variable 'REAL_EXEC' not found in environment") == "true";
     let tycho_api_key = std::env::var("TYCHO_API_KEY").expect("Variable 'TYCHO_API_KEY' not found in environment");
@@ -64,14 +64,14 @@ async fn main() {
     let usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string().to_lowercase(); // base: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
     let btc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599".to_string().to_lowercase(); // base: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
-    let btcusdc = format!("{}-{}", btc, usdc); // "0xBTC" "0xUSDC"
-    let btceth = format!("{}-{}", btc, eth); // "0xBTC" "0xETH"
+    let _btcusdc = format!("{}-{}", btc, usdc); // "0xBTC" "0xUSDC"
+    let _btceth = format!("{}-{}", btc, eth); // "0xBTC" "0xETH"
     let ethusdc = format!("{}-{}", eth, usdc); // "0xETH" "0xUSDC"
     tracked.insert(ethusdc.clone(), None);
-    tracked.insert(btcusdc.clone(), None);
-    tracked.insert(btceth.clone(), None);
+    // tracked.insert(btcusdc.clone(), None);
+    // tracked.insert(btceth.clone(), None);
 
-    // --- Quickstart Config ---
+    // --- Quickstart Config --- Target orderbook: ETH-USDC
     let mut attempt = 0;
     let obtag = ethusdc; // Orderbook tag on which we want to execute a trade for demo
     let mut executed = false; // Flag to check if the transaction has been executed, to keep one execution only

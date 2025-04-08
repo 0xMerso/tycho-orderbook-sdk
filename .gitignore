@@ -5,3 +5,4 @@ dump.rdb
 rustfmt.toml
 docs/build
 examples/.env.qs
+examples/.env.quickstart

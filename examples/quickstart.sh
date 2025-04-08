@@ -1,3 +1,5 @@
+#!/bin/bash
+
 RED='\033[0;31m'
 NC='\033[0m'
 NETWORK="$1"
@@ -8,8 +10,8 @@ NETWORK="$1"
 
 function start() {
     trap '' SIGINT
-    echo "Building Quickstart"
     export NETWORK=$NETWORK
+    echo "Building Quickstart for {$NETWORK} ..."
     cargo build --bin quickstart -q 2>/dev/null
     echo "Build successful. Executing..."
     (
