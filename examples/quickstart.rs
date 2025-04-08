@@ -36,7 +36,6 @@ async fn main() {
     tracing::info!("Network: {}", network_name);
     tracing::info!("Sender: {}", sender);
     tracing::info!("Real Execution: {}", real_exec);
-
     let networks = tycho_orderbook::utils::r#static::networks();
     let network = networks.clone().into_iter().find(|x| x.name == network_name).expect("Network not found");
     tracing::debug!("Tycho Stream for '{}' network", network.name.clone());
