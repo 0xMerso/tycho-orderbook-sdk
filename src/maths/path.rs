@@ -4,26 +4,12 @@ use crate::{
     data::fmt::{SrzProtocolComponent, SrzToken},
     types::ProtoTychoState,
 };
-use serde::Deserialize;
 use tycho_simulation::models::Token;
 
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-struct CoinGeckoResponse {
-    pub ethereum: CryptoPrice,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-struct CryptoPrice {
-    pub usd: f64,
-}
-/**
- * DFS graph traversal method that explores as far as possible along each branch before backtracking
- * Used to price any token to ETH equivalent value, to reflect gas cost
- * But can be used to price any token to any other token
- * Only return the path, not the price
- */
+/// DFS graph traversal method that explores as far as possible along each branch before backtracking
+/// Used to price any token to ETH equivalent value, to reflect gas cost
+/// But can be used to price any token to any other token
+/// Only return the path, not the price
 pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) -> Option<(Vec<String>, Vec<String>)> {
     // (destination token address, component id that provides this conversion)
     let mut graph: HashMap<String, Vec<(String, String)>> = HashMap::new();
@@ -72,11 +58,9 @@ pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) ->
     None
 }
 
-/**
- * Quote a path of tokens, using components and protosim Tycho functions
- * Used to calculate the price of a path of tokens, mostly to ETH
- */
-pub fn quote(ptss: Vec<ProtoTychoState>, atks: Vec<SrzToken>, path: Vec<String>) -> Option<f64> {
+/// Quote a path of tokens, using components and protosim Tycho functions
+/// Used to calculate the price of a path of tokens, mostly to ETH
+pub fn quote(pts: Vec<ProtoTychoState>, atks: Vec<SrzToken>, path: Vec<String>) -> Option<f64> {
     // If ETH, return 1. Else, if the path is empty, return None.
     if path.len() == 1 {
         tracing::warn!(" - Path is just ETH. Returning quote of 1.0");
@@ -93,7 +77,7 @@ pub fn quote(ptss: Vec<ProtoTychoState>, atks: Vec<SrzToken>, path: Vec<String>)
         // log::info!("Calculating conversion from {} to {}", token_in, token_out);
         // Find a protocol state that can convert token_in to token_out.
         let mut found = false;
-        for state in &ptss {
+        for state in &pts {
             // Extract the component's token addresses.
             let comp_tokens: Vec<String> = state.component.tokens.iter().map(|t| t.address.to_lowercase()).collect();
             if comp_tokens.contains(&token_in) && comp_tokens.contains(&token_out) {

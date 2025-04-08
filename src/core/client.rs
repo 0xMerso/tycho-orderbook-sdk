@@ -2,8 +2,11 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use alloy::providers::Provider;
+use alloy::providers::ProviderBuilder;
 use alloy::providers::RootProvider;
 use alloy::transports::http::Http;
+use alloy_primitives::Address;
 use num_bigint::BigUint;
 use reqwest::Client;
 use tycho_client::rpc::HttpRPCClient;
@@ -13,6 +16,16 @@ use tycho_common::dto::PaginationParams;
 use tycho_common::dto::ProtocolStateRequestBody;
 use tycho_common::dto::VersionParam;
 use tycho_simulation::models::Token;
+
+use crate::types;
+use crate::types::CoinGeckoResponse;
+use crate::types::IChainLinkPF;
+use crate::types::Network;
+use crate::types::IERC20;
+use crate::utils::misc::filter_valid_strings;
+use crate::utils::r#static::endpoints::COINGECKO_ETH_USD;
+
+/// ========================================================================================= Tycho Client =============================================================================================
 
 /// Get the balances of the component in the specified protocol system.
 /// Returns a HashMap of component addresses and their balances.
@@ -59,20 +72,6 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
     }
 }
 
-/// Filter out invalid strings from a vector of strings.
-pub fn filter_valid_strings(input: Vec<Token>) -> Vec<Token> {
-    // input.into_iter().filter(|s| !s.symbol.chars().any(|c| c.is_control())).collect()
-    input.into_iter()
-    .filter(|s| {
-        // Ensure the symbol has no control characters and meets any other symbol criteria
-        s.symbol.chars().all(|c| c.is_ascii_graphic()) && 
-        !s.symbol.chars().any(|c| c.is_control()) &&
-        // Check that the address looks valid (e.g., starts with "0x" and is the correct length)
-        s.address.to_string().starts_with("0x")
-    })
-    .collect()
-}
-
 /// Get the tokens from the Tycho API
 /// Filters are hardcoded for now.
 pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
@@ -114,6 +113,25 @@ pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
     }
 }
 
+/// =========================================================================================== HTTP Provider/RPC ======================================================================================
+
+/// Retrieve eth usd price
+pub async fn coingecko() -> Option<f64> {
+    match reqwest::get(COINGECKO_ETH_USD).await {
+        Ok(response) => match response.json::<CoinGeckoResponse>().await {
+            Ok(data) => Some(data.ethereum.usd),
+            Err(_) => None,
+        },
+        Err(_) => None,
+    }
+}
+
+/// Used to retrieve the block number
+pub async fn get_latest_block(provider: String) -> u64 {
+    let provider = ProviderBuilder::new().on_http(provider.parse().unwrap());
+    provider.get_block_number().await.unwrap_or_default()
+}
+
 /// Get the balance of the owner for the specified tokens.
 pub async fn erc20b(provider: &RootProvider<Http<Client>>, owner: String, tokens: Vec<String>) -> Result<Vec<u128>, String> {
     let mut balances = vec![];
@@ -134,27 +152,25 @@ pub async fn erc20b(provider: &RootProvider<Http<Client>>, owner: String, tokens
     Ok(balances)
 }
 
-use crate::types;
-use crate::types::AmmType;
-use crate::types::Network;
-use crate::types::IERC20;
-use crate::utils::r#static::maths::BPD;
-
-/// Converts a native fee (as a hex string) into a byte vector representing fee in basis points.
-/// The conversion depends on the protocol type:
-/// - uniswap_v2_pool: fee is already in basis points (e.g., "0x1e" → 30)
-/// - uniswap_v3_pool or uniswap_v4_pool: fee is stored on a 1e6 scale (so 3000 → 30 bps, i.e. divide by 100)
-/// - curve: fee is stored on a pow10 scale (e.g., 4000000 becomes 4 bps, so divide by 1_000_000)
-/// - balancer_v2_pool: fee is stored on a pow18 scale (e.g., 1*10^15 becomes 10 bps, so divide by 1e14)
-pub fn feebps(protocol: String, _id: String, value: String) -> u128 {
-    let fee = value.trim_start_matches("0x");
-    let fee = u128::from_str_radix(fee, 16).unwrap_or(0);
-    let fee = match AmmType::from(protocol.as_str()) {
-        AmmType::PancakeswapV2 | AmmType::Sushiswap | AmmType::UniswapV2 => fee, // Already in bps
-        AmmType::PancakeswapV3 | AmmType::UniswapV3 | AmmType::UniswapV4 => fee * (BPD as u128) / 1_000_000,
-        AmmType::Curve => 4, // Not implemented, assuming 4 bps by default
-        AmmType::EkuboV2 => 0, // Not implemented, assuming 0 bps by default
-        AmmType::Balancer => (fee * (BPD as u128)) / 1e18 as u128,
-    };
-    fee
+/// Fetch the price of and oracle, in this case of the 'gas_token' of a network
+/// Assume the oracle in under the 'Chainlink' interface
+pub async fn get_eth_usd_chainlink(rpc: String, feed: String) -> Option<f64> {
+    log::info!("Fetching price from chainlink oracle: {}", feed.clone());
+    let pfeed: Address = feed.clone().parse().unwrap();
+    let provider = ProviderBuilder::new().on_http(rpc.parse().unwrap());
+    let client = Arc::new(provider);
+    let oracle = IChainLinkPF::new(pfeed, client.clone());
+    let price = oracle.latestAnswer().call().await;
+    let precision = oracle.decimals().call().await;
+    match (price, precision) {
+        (Ok(price), Ok(precision)) => {
+            let power = 10f64.powi(precision._0 as i32);
+            log::info!("Price fetched: {}", price._0.as_u64() as f64 / power);
+            Some(price._0.as_u64() as f64 / power)
+        }
+        _ => {
+            log::error!("Error fetching price from chainlink oracle");
+            None
+        }
+    }
 }

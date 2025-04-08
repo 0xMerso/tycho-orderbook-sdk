@@ -13,7 +13,7 @@ use tycho_simulation::evm::{
     stream::ProtocolStreamBuilder,
 };
 
-use crate::core::rpc;
+use crate::core::client;
 use crate::data::fmt::SrzToken;
 use crate::types;
 use crate::types::Network;
@@ -26,10 +26,8 @@ use crate::types::TychoSupportedProtocol;
 
 /// OrderbookBuilder is a struct that allows the creation of an OrderbookProvider instance, using a default or custom ProtocolStreamBuilder from Tycho.
 impl OrderbookBuilder {
-    /**
-     * Default logic to create a ProtocolStreamBuilder, used to build a OrderbookProvider
-     * For more advanced use-cases, you can create your own ProtocolStreamBuilder and pass it to custom() fn
-     */
+    /// Default logic to create a ProtocolStreamBuilder, used to build a OrderbookProvider
+    /// For more advanced use-cases, you can create your own ProtocolStreamBuilder and pass it to custom() fn
     pub async fn new(network: Network, api_key: String, config: OrderbookBuilderConfig, tokens: Option<Vec<Token>>) -> Self {
         let (_, _, chain) = types::chain(network.name.clone()).expect("Invalid chain");
         let u4 = uniswap_v4_pool_with_hook_filter;
@@ -38,7 +36,7 @@ impl OrderbookBuilder {
         let filter = config.filter.clone();
         let tokens = match tokens {
             Some(t) => t,
-            None => rpc::tokens(&network, api_key.clone()).await.unwrap(),
+            None => client::tokens(&network, api_key.clone()).await.unwrap(),
         };
         let mut hmt = HashMap::new();
         let mut srzt = vec![];

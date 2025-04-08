@@ -1,8 +1,7 @@
 use alloy_chains::NamedChain;
+use tycho_simulation::models::Token;
 
-/**
- * Get an environment variable
- */
+/// Get an environment variable
 pub fn get(key: &str) -> String {
     match std::env::var(key) {
         Ok(x) => x,
@@ -28,4 +27,18 @@ pub fn get_alloy_chain(network: String) -> Result<NamedChain, String> {
             Err("Unsupported network".to_string())
         }
     }
+}
+
+/// Filter out invalid strings from a vector of strings, that are not ASCII
+pub fn filter_valid_strings(input: Vec<Token>) -> Vec<Token> {
+    // input.into_iter().filter(|s| !s.symbol.chars().any(|c| c.is_control())).collect()
+    input.into_iter()
+    .filter(|s| {
+        // Ensure the symbol has no control characters and meets any other symbol criteria
+        s.symbol.chars().all(|c| c.is_ascii_graphic()) && 
+        !s.symbol.chars().any(|c| c.is_control()) &&
+        // Check that the address looks valid (e.g., starts with "0x" and is the correct length)
+        s.address.to_string().starts_with("0x")
+    })
+    .collect()
 }

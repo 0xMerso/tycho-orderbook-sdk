@@ -6,11 +6,23 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use utoipa::ToSchema;
 
+use tokio::sync::mpsc;
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+use tycho_simulation::evm::decoder::StreamDecodeError;
+use tycho_simulation::evm::stream::ProtocolStreamBuilder;
+
 use super::{
     core::book::QuoteFn,
     data::fmt::{SrzProtocolComponent, SrzToken},
 };
 use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
+
+use crate::{
+    core::book::optimize,
+    maths::steps::{exponential, AmountStepsFn},
+};
+
 pub type SharedTychoStreamState = Arc<RwLock<TychoStreamState>>;
 
 alloy::sol!(
@@ -25,6 +37,13 @@ alloy::sol!(
     #[sol(rpc)]
     IBalancer2Vault,
     "src/utils/abis/Balancer2Vault.json"
+);
+
+alloy::sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    IChainLinkPF,
+    "src/utils/abis/Chainlink.json"
 );
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -49,6 +68,8 @@ pub struct Network {
     pub permit2: String,
     #[schema(example = "Symbol")]
     pub tag: String,
+    #[schema(example = "0x")]
+    pub chainlink: String,
 }
 
 /// Tycho protocol, used to configure ProtocolStreamBuilder
@@ -147,6 +168,27 @@ impl From<&str> for AmmType {
 
 // =================================================================================== EXECUTION =======================================================================================================
 
+#[derive(Default, Debug, Clone)]
+pub struct ExecTxResult {
+    pub sent: bool,
+    pub status: bool,
+    pub hash: String,
+    pub error: Option<String>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ExecutedPayload {
+    pub approve: ExecTxResult,
+    pub swap: ExecTxResult,
+}
+
+/// Result of the execution
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct PayloadToExecute {
+    pub approve: TransactionRequest,
+    pub swap: TransactionRequest,
+}
+
 /// Execution request, used to simulate a trade
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ExecutionRequest {
@@ -158,13 +200,6 @@ pub struct ExecutionRequest {
     pub expected: f64,
     pub distribution: Vec<f64>, // Percentage distribution per pool (0–100)
     pub components: Vec<SrzProtocolComponent>,
-}
-
-/// Result of the execution
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct PayloadToExecute {
-    pub approve: TransactionRequest,
-    pub swap: TransactionRequest,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -217,6 +252,8 @@ impl From<TransactionRequest> for SrzTransactionRequest {
     }
 }
 
+// =================================================================================== Liquidity types =======================================================================================================
+
 #[derive(Debug, Clone)]
 pub struct TickDataRange {
     pub tick_lower: i32,
@@ -252,11 +289,7 @@ pub struct PairSimuIncrementConfig {
     pub segments: Vec<IncrementationSegment>,
 }
 
-use tokio::sync::mpsc;
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
-use tycho_simulation::evm::decoder::StreamDecodeError;
-use tycho_simulation::evm::stream::ProtocolStreamBuilder;
+// =================================================================================== Tycho & Protocols State =======================================================================================================
 
 /// Due to library conflicts, we need to redefine the Chain type depending the use case, hence the following aliases.
 pub type ChainCommon = tycho_common::dto::Chain;
@@ -291,6 +324,75 @@ pub fn chain_timing(name: String) -> u64 {
     }
 }
 
+// =================================================================================== Core SDK =======================================================================================================
+
+/// Orderbook Provider Event
+#[derive(Debug)]
+pub enum OBPEvent {
+    /// Event when the stream is initialised = connected to Tycho
+    Initialised(u64),
+    /// Emited when a new header is received, with components ID that have changed
+    NewHeader(u64, Vec<String>),
+    /// Stream Error
+    Error(StreamDecodeError),
+}
+
+/// Orderbook Provider Configuration
+#[derive(Clone)]
+pub struct OrderbookProviderConfig {
+    // The capacity of the channel used to send OBPEvents.
+    pub capacity: usize,
+}
+
+impl Default for OrderbookProviderConfig {
+    fn default() -> Self {
+        OrderbookProviderConfig { capacity: 100 }
+    }
+}
+
+#[derive(Clone)]
+pub struct OrderbookBuilderConfig {
+    pub filter: tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter,
+    // pub filter: tycho_client::feed::component_tracker::ComponentFilter,
+}
+
+/// Struct used to build the orderbook functions in order to customize the orderbook construction
+/// If None, default simple and naive optimization is used, including gas costs.
+pub struct OrderbookFunctions {
+    pub optimize: QuoteFn,    // Custom optimization function, ideally a DEX aggregator algorithm
+    pub steps: AmountStepsFn, // Simulated amount/steps (returning for instance: 0.2 ETH, 2 ETH, 20 ETH, etc.). By default, it's an exponential curve based, up to 25% of total onchain liquidity
+}
+
+impl Default for OrderbookFunctions {
+    fn default() -> Self {
+        OrderbookFunctions { optimize, steps: exponential }
+    }
+}
+
+/// SDK prderbook provider (OBP) that wraps a ProtocolStreamBuistrlder stream
+pub struct OrderbookProvider {
+    /// The spawned task handle is stored to ensure the task remains running.
+    pub _handle: JoinHandle<()>,
+    /// Tokens given by Tycho
+    pub tokens: Vec<SrzToken>,
+    /// The network used
+    pub network: Network,
+    /// Receiver side of the channel where OBPEvents are sent.
+    pub stream: Mutex<mpsc::Receiver<OBPEvent>>, // mpsc::Receiver<OBPEvent>,
+    /// The shared state, accessible both to the internal task and the client.
+    pub state: SharedTychoStreamState,
+    /// The API token used to facilitate the Tycho queries
+    pub apikey: Option<String>,
+}
+
+/// Orderbook builder, used to create the OBP
+pub struct OrderbookBuilder {
+    pub network: Network,
+    pub psb: ProtocolStreamBuilder,
+    pub tokens: Vec<SrzToken>,
+    pub apikey: Option<String>,
+}
+
 /// Tycho Stream Data, stored in a Mutex/Arc for shared access between the SDK stream and the client or API.
 pub struct TychoStreamState {
     // ProtocolSim instances, indexed by their unique identifier. Impossible to store elsewhere than memory
@@ -317,9 +419,6 @@ pub struct OrderbookRequestParams {
     /// - Ask = sell orders for the base asset (ETH) priced in USDC.
     #[schema(example = "0xETH-0xUSDC")]
     pub tag: String,
-    // /// Number of points to simulate. Default is 15
-    // #[schema(example = "25")]
-    // pub depth: Option<u64>,
     /// Optional single point simulation, used to simulate 1 trade only
     pub point: Option<SinglePointSimulation>,
 }
@@ -378,7 +477,6 @@ pub struct MidPriceData {
     pub mid: f64,
     pub spread: f64,
     pub spread_pct: f64,
-    // For Exec|Testing purpose
     pub amount: f64,
     pub received: f64,
     pub distribution: Vec<f64>,
@@ -426,78 +524,6 @@ pub struct Orderbook {
     pub aggregated_balance_quote_worth_usd: f64,
 }
 
-/// Orderbook Provider Event
-#[derive(Debug)]
-pub enum OBPEvent {
-    /// Event when the stream is initialised = connected to Tycho
-    Initialised(u64),
-    /// Emited when a new header is received, with components ID that have changed
-    NewHeader(u64, Vec<String>),
-    /// Stream Error
-    Error(StreamDecodeError),
-}
-
-/// Orderbook Provider Configuration
-#[derive(Clone)]
-pub struct OrderbookProviderConfig {
-    // The capacity of the channel used to send OBPEvents.
-    pub capacity: usize,
-}
-
-impl Default for OrderbookProviderConfig {
-    fn default() -> Self {
-        OrderbookProviderConfig { capacity: 100 }
-    }
-}
-
-#[derive(Clone)]
-pub struct OrderbookBuilderConfig {
-    pub filter: tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter,
-    // pub filter: tycho_client::feed::component_tracker::ComponentFilter,
-}
-
-/// Struct used to build the orderbook functions in order to customize the orderbook construction
-/// If None, default simple and naive optimization is used, including gas costs.
-pub struct OrderbookFunctions {
-    pub optimize: QuoteFn,    // Custom optimization function, ideally a DEX aggregator algorithm
-    pub steps: AmountStepsFn, // Simulated amount/steps (returning for instance: 0.2 ETH, 2 ETH, 20 ETH, etc.). By default, it's an exponential curve based, up to 25% of total onchain liquidity
-}
-
-use crate::{
-    core::book::optimize,
-    maths::steps::{exponential, AmountStepsFn},
-};
-
-impl Default for OrderbookFunctions {
-    fn default() -> Self {
-        OrderbookFunctions { optimize, steps: exponential }
-    }
-}
-
-/// SDK prderbook provider (OBP) that wraps a ProtocolStreamBuistrlder stream
-pub struct OrderbookProvider {
-    /// The spawned task handle is stored to ensure the task remains running.
-    pub _handle: JoinHandle<()>,
-    /// Tokens given by Tycho
-    pub tokens: Vec<SrzToken>,
-    /// The network used
-    pub network: Network,
-    /// Receiver side of the channel where OBPEvents are sent.
-    pub stream: Mutex<mpsc::Receiver<OBPEvent>>, // mpsc::Receiver<OBPEvent>,
-    /// The shared state, accessible both to the internal task and the client.
-    pub state: SharedTychoStreamState,
-    /// The API token used to facilitate the Tycho queries
-    pub apikey: Option<String>,
-}
-
-/// Orderbook builder, used to create the OBP
-pub struct OrderbookBuilder {
-    pub network: Network,
-    pub psb: ProtocolStreamBuilder,
-    pub tokens: Vec<SrzToken>,
-    pub apikey: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderbookDepth {
     pub last_update_id: u64,
@@ -513,17 +539,16 @@ pub struct ExchangeInfo {
     pub order_types: Vec<String>,
     pub components: Vec<SrzProtocolComponent>,
 }
+/// ================================================================================= External =======================================================================================================
 
-#[derive(Default, Debug, Clone)]
-pub struct ExecTxResult {
-    pub sent: bool,
-    pub status: bool,
-    pub hash: String,
-    pub error: Option<String>,
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct CoinGeckoResponse {
+    pub ethereum: CryptoPrice,
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct ExecutedPayload {
-    pub approve: ExecTxResult,
-    pub swap: ExecTxResult,
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct CryptoPrice {
+    pub usd: f64,
 }

@@ -1,15 +1,12 @@
 use std::collections::HashMap;
 
-
 use crate::{
     data::fmt::{SrzProtocolComponent, SrzToken},
     utils::{self},
 };
 
-/**
- * Sum the total liquidity of a pair of tokens.
- * @dev components Every similar components (= matching a pair)
- */
+/// Sum the total liquidity of a pair of tokens.
+/// @dev components Every similar components (= matching a pair)
 pub fn depth(components: Vec<SrzProtocolComponent>, targets: Vec<SrzToken>, data: HashMap<String, HashMap<String, f64>>) -> HashMap<String, f64> {
     let mut cumulated = HashMap::new();
     targets.iter().for_each(|t| {

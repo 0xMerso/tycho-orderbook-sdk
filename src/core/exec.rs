@@ -319,7 +319,7 @@ pub async fn build(network: Network, request: ExecutionRequest, native: Vec<Prot
     let provider = ProviderBuilder::new().with_chain(achain).on_http(network.rpc.parse().expect("Failed to parse RPC_URL"));
 
     // --- Check if the sender has enough balance of input token ---
-    match super::rpc::erc20b(&provider, request.sender.clone(), tokens.clone()).await {
+    match super::client::erc20b(&provider, request.sender.clone(), tokens.clone()).await {
         Ok(balances) => {
             tracing::debug!("Balances of sender {}: Input: {} | Output: {}", request.sender, balances[0], balances[1]);
             let amount = (request.amount * 10f64.powi(request.input.decimals as i32)) as u128;

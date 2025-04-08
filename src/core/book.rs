@@ -1,7 +1,7 @@
 use tycho_simulation::models::Token;
 
 use crate::{
-    core::{gas, rpc},
+    core::{client, gas},
     data::fmt::{SrzProtocolComponent, SrzToken},
     maths::{self, steps::exponential},
     types::{MidPriceData, Network, Orderbook, OrderbookFunctions, OrderbookRequestParams, ProtoTychoState, TradeResult},
@@ -14,15 +14,15 @@ use std::{collections::HashMap, time::Instant}; // Ensure Rayon is in your depen
 #[allow(clippy::too_many_arguments)]
 pub async fn build(
     network: Network,
-    api_token: Option<String>,
-    ptss: Vec<ProtoTychoState>,
+    tycho_token_api: Option<String>,
+    state: Vec<ProtoTychoState>,
     tokens: Vec<SrzToken>,
     query: OrderbookRequestParams,
     simufns: Option<OrderbookFunctions>,
     base_worth_eth: f64,
     quote_worth_eth: f64,
 ) -> Orderbook {
-    tracing::debug!("Building orderbook ... Got {} pools to compute for pair: '{}'", ptss.len(), query.tag);
+    tracing::debug!("Building orderbook ... Got {} pools to compute for pair: '{}'", state.len(), query.tag);
     let mut pools = Vec::new();
     let mut prices_base_to_quote = vec![];
     let mut prices_quote_to_base = vec![];
@@ -35,7 +35,7 @@ pub async fn build(
     let mut base_lqdty = vec![];
     let mut quote_lqdty = vec![];
     let mut balances = HashMap::new();
-    for pdata in ptss.clone() {
+    for pdata in state.clone() {
         pools.push(pdata.clone());
         let proto = pdata.protosim.clone();
         let price_base_to_quote = proto.spot_price(&base, &quote).unwrap_or_default();
@@ -52,7 +52,7 @@ pub async fn build(
             price_quote_to_base,
             pdata.component.fee
         );
-        if let Some(cpbs) = rpc::get_component_balances(network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone(), api_token.clone()).await {
+        if let Some(cpbs) = client::get_component_balances(network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone(), tycho_token_api.clone()).await {
             let base_bal = cpbs.get(&srzt0.address.to_lowercase()).unwrap_or(&0u128);
             let base_bal = *base_bal as f64 / 10f64.powi(srzt0.decimals as i32);
             base_lqdty.push(base_bal);
@@ -95,12 +95,10 @@ pub async fn build(
     pso
 }
 
-/**
- * Optimizes a trade for a given pair of tokens and a set of pools.
- * The function generates a set of test amounts for ETH and USDC, then runs the optimizer for each amount.
- * The optimizer uses a simple gradient-based approach to move a fixed fraction of the allocation from the pool with the lowest marginal return to the one with the highest.
- * If the query specifies a specific token to sell with a specific amount, the optimizer will only run for that token and amount.
- */
+/// Optimizes a trade for a given pair of tokens and a set of pools.
+/// The function generates a set of test amounts for ETH and USDC, then runs the optimizer for each amount.
+/// The optimizer uses a simple gradient-based approach to move a fixed fraction of the allocation from the pool with the lowest marginal return to the one with the highest.
+/// If the query specifies a specific token to sell with a specific amount, the optimizer will only run for that token and amount.
 #[allow(clippy::too_many_arguments)]
 pub async fn simulate(
     network: Network,
@@ -115,9 +113,9 @@ pub async fn simulate(
     price_quote_to_base: f64,
 ) -> Orderbook {
     let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs();
-    let eth_usd = gas::eth_usd().await;
+    let eth_usd = client::get_eth_usd_chainlink(network.rpc.clone(), network.chainlink.clone()).await.unwrap_or_default();
     let gas_price = gas::gas_price(network.rpc.clone()).await;
-    let latest = gas::get_latest_block(network.rpc.clone()).await;
+    let latest = client::get_latest_block(network.rpc.clone()).await;
     let base = tokens[0].clone();
     let quote = tokens[1].clone();
 
@@ -286,15 +284,13 @@ pub fn optimize(pcs: &[ProtoTychoState], steps: Vec<f64>, eth_usd: f64, gas_pric
     trades
 }
 
-/**
- * Computes the mid price for a given token pair
- * We cannot replicate the logic of a classic orderbook as we don't have best bid/ask exacly
- * In theory it would be : Mid Price = (Best Bid Price + Best Ask Price) / 2
- * Applied to AMM, we choose to use a small amountIn = 1 / TEN_MILLIONS of the aggregated liquidity
- * Doing that for 0to1 and 1to0 we have our best bid/ask, then we can compute the mid price
- * --- --- --- --- ---
- * Amount out is net of gas cost
- */
+/// Computes the mid price for a given token pair
+/// We cannot replicate the logic of a classic orderbook as we don't have best bid/ask exacly
+/// In theory it would be : Mid Price = (Best Bid Price + Best Ask Price) / 2
+/// Applied to AMM, we choose to use a small amountIn = 1 / TEN_MILLIONS of the aggregated liquidity
+/// Doing that for 0to1 and 1to0 we have our best bid/ask, then we can compute the mid price
+/// --- --- --- --- ---
+/// Amount out is net of gas cost
 pub fn best(pcs: &[ProtoTychoState], eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, amount: f64, spot_price: f64, output_u_ethworth: f64) -> TradeResult {
     tracing::debug!(" - 🥇 Computing best price for {} (amount in = {})", from.symbol, amount);
     let result = maths::opti::gradient(amount, pcs, from.clone(), to.clone(), eth_usd, gas_price, spot_price, output_u_ethworth);
@@ -310,10 +306,8 @@ pub fn best(pcs: &[ProtoTychoState], eth_usd: f64, gas_price: u128, from: &SrzTo
     result
 }
 
-/**
- * Computes the mid price for a given token pair using the best bid and ask
- * ! We assume that => trade_base_to_quote = ask and trade_quote_to_base = bid
- */
+/// Computes the mid price for a given token pair using the best bid and ask
+/// ! We assume that => trade_base_to_quote = ask and trade_quote_to_base = bid
 pub fn midprice(trade_base_to_quote: TradeResult, trade_quote_to_base: TradeResult) -> MidPriceData {
     let amount = trade_base_to_quote.amount;
     let received = trade_base_to_quote.output;

@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tycho_orderbook::{
     adapters::default::DefaultOrderBookAdapter,
-    core::{book, exec::get_original_components, rpc},
+    core::{book, client, exec::get_original_components},
     maths::steps::exponential,
     types::{
         ExecutionRequest, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState,
@@ -47,7 +47,7 @@ async fn main() {
         initialised: false,
     }));
     // --- Token list ---
-    let tokens = match rpc::tokens(&network, tycho_api_key.clone()).await {
+    let tokens = match client::tokens(&network, tycho_api_key.clone()).await {
         Some(t) => t,
         None => {
             tracing::error!("Failed to get tokens. Something anormal, make sure Tycho endpoint is operational. Exiting.");

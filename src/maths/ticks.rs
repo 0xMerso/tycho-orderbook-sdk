@@ -23,9 +23,7 @@ pub fn compute_tick_data(tick: i32, tick_spacing: i32) -> TickDataRange {
     }
 }
 
-/**
- * Convert a tick to prices
- */
+///Convert a tick to prices
 pub fn tick_to_prices(tick: i32, decimals_token0: u8, decimals_token1: u8) -> (f64, f64) {
     let raw_price = 1.0001_f64.powi(tick);
     let adjustment = 10_f64.powi((decimals_token0 as i32) - (decimals_token1 as i32));
@@ -34,10 +32,8 @@ pub fn tick_to_prices(tick: i32, decimals_token0: u8, decimals_token1: u8) -> (f
     (price0to1, price1to0)
 }
 
-/**
- * Get the tick at the square root price
- * ! Unsure about float precision
- */
+/// Get the tick at the square root price
+/// ! Unsure about float precision
 fn get_tick_at_sqrt_price(sqrt_price_x96: u128) -> i32 {
     // Here, sqrt_price_x96 is already the raw Q64.96 number.
     let sqrt_price = sqrt_price_x96 as f64 / UNISWAP_Q96 as f64;
@@ -45,13 +41,9 @@ fn get_tick_at_sqrt_price(sqrt_price_x96: u128) -> i32 {
     tick as i32
 }
 
-/**
- * Computes token amounts (in human-readable units) from liquidity given the current √price and tick range.
- * IMPORTANT: The function expects sqrt_price_x96 as f64 representing the raw Q64.96 value (i.e. the on-chain value)
- * and NOT a value computed on a tick boundary. This ensures the current price lies between the boundaries.
- *
- * ! The function might not working as expected
- */
+/// Computes token amounts (in human-readable units) from liquidity given the current √price and tick range.
+/// IMPORTANT: The function expects sqrt_price_x96 as f64 representing the raw Q64.96 value (i.e. the on-chain value)
+/// and NOT a value computed on a tick boundary. This ensures the current price lies between the boundaries.
 pub fn derive(
     liquidity: i128,
     x96: f64, // the raw Q64.96 value as f64
@@ -197,9 +189,7 @@ pub fn ticks_liquidity(active: i128, current_tick: i32, tick_spacing: i32, tick_
     output
 }
 
-/**
- * Filter and classify liquidity ticks
- */
+/// Filter and classify liquidity ticks
 pub fn filter_and_classify_ticks(
     ticks: Vec<LiquidityTickAmounts>,
     current_tick: i32,

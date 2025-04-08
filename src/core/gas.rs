@@ -1,54 +1,14 @@
 use crate::{
     data::fmt::SrzToken,
     types::{Network, ProtoTychoState},
-    utils::r#static::endpoints::COINGECKO_ETH_USD,
 };
 use alloy::providers::{Provider, ProviderBuilder};
-use reqwest;
-use serde::Deserialize;
 use tycho_simulation::models::Token;
 
-#[derive(Debug, Deserialize)]
-struct CoinGeckoResponse {
-    pub ethereum: CryptoPrice,
-}
-
-#[derive(Debug, Deserialize)]
-struct CryptoPrice {
-    pub usd: f64,
-}
-
-/**
- * Used to retrieve gas price
- */
-pub async fn get_latest_block(provider: String) -> u64 {
-    let provider = ProviderBuilder::new().on_http(provider.parse().unwrap());
-    provider.get_block_number().await.unwrap_or_default()
-}
-
-/**
- * Used to retrieve gas price
- */
+/// Used to retrieve gas price
 pub async fn gas_price(provider: String) -> u128 {
     let provider = ProviderBuilder::new().on_http(provider.parse().unwrap());
     provider.get_gas_price().await.unwrap_or_default()
-}
-
-/**
- * Used to retrieve eth usd price
- */
-pub async fn eth_usd() -> f64 {
-    let price = match reqwest::get(COINGECKO_ETH_USD).await {
-        Ok(response) => match response.json::<CoinGeckoResponse>().await {
-            Ok(data) => data.ethereum.usd,
-            Err(_) => 2000.0,
-        },
-        Err(_) => 2000.0,
-    };
-    if price == 0. {
-        tracing::error!("Failed to get ETH price from CoinGecko, returning 2000.");
-    }
-    price
 }
 
 /// Find the best path and price between tokens

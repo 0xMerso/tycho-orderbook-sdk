@@ -17,6 +17,7 @@ use tycho_simulation::protocol::models::ProtocolComponent;
 use tycho_simulation::tycho_core::Bytes;
 use utoipa::ToSchema;
 
+use crate::core::protos::amm_fee_to_bps;
 use crate::utils::misc::current_timestamp;
 
 /// @notice Format of the data that will be read/stored in the database
@@ -136,7 +137,7 @@ impl From<ProtocolComponent> for SrzProtocolComponent {
             static_attributes: pc.static_attributes.into_iter().map(|(k, v)| (k, v.to_string())).collect(),
             creation_tx: pc.creation_tx.to_string(),
             // bck_created_at: pc.created_at, // Backup for reverse ::from
-            fee: crate::core::rpc::feebps(pc.protocol_type_name.to_string().clone(), pc.id.to_string().clone(), fee_value),
+            fee: amm_fee_to_bps(pc.protocol_type_name.to_string().clone(), pc.id.to_string().clone(), fee_value),
             last_updated_at: current_timestamp(),
         }
     }
