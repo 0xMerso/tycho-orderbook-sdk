@@ -229,6 +229,8 @@ pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Opt
         return_full_transactions: true,
     };
 
+    // ToDo @dev: adapt this for Base too
+    // eth_simulateV1 seems not available on Base, you can adjust the RPC to another provider supporting it (eth_simulateV1), or comment the simulate part.
     match provider.simulate(&payload).await {
         Ok(output) => {
             let mut green = true;

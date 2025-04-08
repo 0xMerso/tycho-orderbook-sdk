@@ -4,7 +4,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
 use crate::core::book;
-use crate::types::{self, OBPEvent, OrderbookProvider};
+use crate::types::{self, OrderbookEvent, OrderbookProvider};
 use crate::{data, maths};
 
 use tokio::sync::mpsc;
@@ -33,10 +33,10 @@ impl OrderbookProvider {
         match ob.psb.build().await {
             Ok(stream) => {
                 let (tx, rx) = mpsc::channel(config.capacity);
-                let returned = state.clone();
-                let taskstate = state.clone();
+                let dup = state.clone();
+                let state = state.clone();
                 // Spawn an asynchronous task that processes the protocol stream.
-                // For each message received, update the shared state and send an OBPEvent.
+                // For each message received, update the shared state and send an OrderbookEvent.
                 tracing::debug!("Starting stream processing task.");
 
                 let handle = tokio::spawn(async move {
@@ -48,7 +48,7 @@ impl OrderbookProvider {
                         // - removed_pairs- components no longer tracked (either deleted due to a reorg or no longer meeting filter criteria)
                         // - states- the updated ProtocolSimstates for all components modified in this block
                         // The first message received will contain states for all protocol components registered to. Thereafter, further block updates will only contain data for updated or new components.
-                        let mtx = taskstate.read().await;
+                        let mtx = state.read().await;
                         let initialised = mtx.initialised;
                         drop(mtx);
                         match update {
@@ -67,12 +67,12 @@ impl OrderbookProvider {
                                         // tracing::debug!("Adding new component {} to the shared state: {}", comp.protocol_system.clone(), comp.protocol_type_name.clone());
                                         targets.push(comp.id.to_string().to_lowercase());
                                     }
-                                    let mut mtx = taskstate.write().await;
+                                    let mut mtx = state.write().await;
                                     mtx.protosims = msg.states.clone();
                                     mtx.components = msg.new_pairs.clone();
                                     mtx.initialised = true;
                                     drop(mtx);
-                                    let event = OBPEvent::Initialised(msg.block_number);
+                                    let event = OrderbookEvent::Initialised(msg.block_number);
                                     let _ = tx.send(event).await;
                                 } else {
                                     let mut updated = vec![];
@@ -96,12 +96,12 @@ impl OrderbookProvider {
                                         tracing::debug!("Received {} new pairs, and {} pairs to be removed. Updating Redis ...", msg.new_pairs.len(), msg.removed_pairs.len());
                                         drop(mtx);
                                     }
-                                    let event = OBPEvent::NewHeader(msg.block_number, updated.clone());
+                                    let event = OrderbookEvent::NewHeader(msg.block_number, updated.clone());
                                     let _ = tx.send(event).await;
                                 }
                             }
                             Err(err) => {
-                                let event = OBPEvent::Error(err);
+                                let event = OrderbookEvent::Error(err);
                                 let _ = tx.send(event).await;
                             }
                         }
@@ -110,7 +110,7 @@ impl OrderbookProvider {
 
                 let obp = OrderbookProvider {
                     stream: Mutex::new(rx),
-                    state: returned,
+                    state: dup, // ---> Anormal here, but it works, need to clarify. Arc pointing to the same memory location, it should be ok, but incoherent to need dup
                     _handle: handle,
                     tokens: ob.tokens.clone(),
                     network: ob.network.clone(),

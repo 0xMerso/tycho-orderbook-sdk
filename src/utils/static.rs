@@ -22,7 +22,7 @@ pub fn networks() -> Vec<Network> {
             name: "base".to_string(),
             eth: "0x4200000000000000000000000000000000000006".to_string(),
             chainlink: "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70".to_string(),
-            rpc: "https://mainnet.base.org".to_string(),
+            rpc: "https://base.llamarpc.com".to_string(),
             exp: "https://basescan.io/".to_string(),
             tycho: "tycho-base-beta.propellerheads.xyz".to_string(),
             permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3".to_string(),

@@ -328,7 +328,7 @@ pub fn chain_timing(name: String) -> u64 {
 
 /// Orderbook Provider Event
 #[derive(Debug)]
-pub enum OBPEvent {
+pub enum OrderbookEvent {
     /// Event when the stream is initialised = connected to Tycho
     Initialised(u64),
     /// Emited when a new header is received, with components ID that have changed
@@ -340,7 +340,7 @@ pub enum OBPEvent {
 /// Orderbook Provider Configuration
 #[derive(Clone)]
 pub struct OrderbookProviderConfig {
-    // The capacity of the channel used to send OBPEvents.
+    // The capacity of the channel used to send OrderbookEvents.
     pub capacity: usize,
 }
 
@@ -377,8 +377,9 @@ pub struct OrderbookProvider {
     pub tokens: Vec<SrzToken>,
     /// The network used
     pub network: Network,
-    /// Receiver side of the channel where OBPEvents are sent.
-    pub stream: Mutex<mpsc::Receiver<OBPEvent>>, // mpsc::Receiver<OBPEvent>,
+    /// Receiver side of the channel where OrderbookEvents are sent.
+    pub stream: Mutex<mpsc::Receiver<OrderbookEvent>>, // mpsc::Receiver<OrderbookEvent>,
+    // pub stream: mpsc::Receiver<OrderbookEvent>, // mpsc::Receiver<OrderbookEvent>,
     /// The shared state, accessible both to the internal task and the client.
     pub state: SharedTychoStreamState,
     /// The API token used to facilitate the Tycho queries

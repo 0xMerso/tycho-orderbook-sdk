@@ -5,7 +5,8 @@ use tycho_orderbook::{
     core::{book, client, exec::get_original_components},
     maths::steps::exponential,
     types::{
-        ExecutionRequest, OBPEvent, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState,
+        ExecutionRequest, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookEvent, OrderbookFunctions, OrderbookProviderConfig, OrderbookRequestParams, SharedTychoStreamState,
+        TychoStreamState,
     },
     utils::r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
 };
@@ -60,8 +61,17 @@ async fn main() {
 
     // --- Adjust as needed --- Mainnet
     let eth = network.eth.clone().to_lowercase();
-    let usdc = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string().to_lowercase(); // base: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
-    let btc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599".to_string().to_lowercase(); // base: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
+    let (usdc, btc) = match network.name.as_str() {
+        "ethereum" => (
+            "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string().to_lowercase(),
+            "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599".to_string().to_lowercase(),
+        ),
+        "base" => (
+            "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913".to_string().to_lowercase(),
+            "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf".to_string().to_lowercase(),
+        ),
+        _ => panic!("Network not supported"),
+    };
     let mut tracked: HashMap<String, Option<Orderbook>> = HashMap::new();
     let _btcusdc = format!("{}-{}", btc, usdc); // "0xBTC" "0xUSDC"
     let _btceth = format!("{}-{}", btc, eth); // "0xBTC" "0xETH"
@@ -103,10 +113,10 @@ async fn main() {
         let mut locked = obp.stream.lock().await;
         if let Some(event) = locked.recv().await {
             match event {
-                OBPEvent::Initialised(block) => {
+                OrderbookEvent::Initialised(block) => {
                     tracing::info!("Event: Initialised: : ✅ Initialised at block {}", block);
                 }
-                OBPEvent::NewHeader(block, updated) => {
+                OrderbookEvent::NewHeader(block, updated) => {
                     tracing::info!("Event: NewHeader: #{} with {} components updated", block, updated.len());
                     for (key, value) in tracked.clone().iter() {
                         if value.is_none() {
@@ -175,15 +185,16 @@ async fn main() {
                                     if book.tag.clone().eq_ignore_ascii_case(obtag.as_str()) {
                                         tracing::debug!("OBP Event: Orderbook {} is the one we want to execute a trade on.", symtag);
                                         // Execution
-                                        // let amount = book.mpd_base_to_quote.
                                         let way = book.mpd_base_to_quote.clone();
+                                        let amount = way.amount / 10.; // By default, the simulation algo provide equivalent amount of 0.01 ETH in base token. So /10 = 0.001 ETH
+                                        let expected = way.received / 10.; // Same here
                                         let request = ExecutionRequest {
                                             sender: sender.to_string().clone(),
                                             tag: book.tag.clone(),
                                             input: book.base.clone(),
                                             output: book.quote.clone(),
-                                            amount: way.amount,
-                                            expected: way.received,
+                                            amount,
+                                            expected,
                                             distribution: way.distribution.clone(),
                                             components: book.pools.clone(),
                                         };
@@ -194,7 +205,7 @@ async fn main() {
                                         let originals = get_original_components(originals, book.pools.clone());
 
                                         // match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
-                                        match book.create(network.clone(), request, originals.clone(), None).await {
+                                        match book.create(network.clone(), request, originals.clone(), pk.clone()).await {
                                             Ok(payload) => {
                                                 if real_exec {
                                                     if !executed {
@@ -241,10 +252,10 @@ async fn main() {
                     // };
                     // --- --- --- --- ---
                 }
-                OBPEvent::Error(err) => {
+                OrderbookEvent::Error(err) => {
                     tracing::error!("OBP Event: Error: {:?}", err);
-                } // OBPEvent : OrderbookBuilt(tag)
-                  // OBPEvent : OrderbookUdapted(tag)
+                } // OrderbookEvent : OrderbookBuilt(tag)
+                  // OrderbookEvent : OrderbookUdapted(tag)
             }
         }
     }

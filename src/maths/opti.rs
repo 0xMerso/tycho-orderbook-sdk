@@ -108,7 +108,7 @@ pub fn gradient(
         let (max_index, max_net_marginal) = net_marginals.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap();
         // For the pool to lose allocation, we consider only currently active pools.
         let active_indices: Vec<usize> = allocations.iter().enumerate().filter(|(_, a)| !a.is_zero()).map(|(i, _)| i).collect();
-        let (min_active_index, min_net_marginal) = active_indices.iter().map(|&i| (i, net_marginals[i])).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
+        let (min_active_index, min_net_marginal) = active_indices.iter().map(|&i| (i, net_marginals[i])).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap_or_default();
 
         // If the net marginal difference is negligible, break.
         if (max_net_marginal - min_net_marginal).abs() < 1e-12 {
