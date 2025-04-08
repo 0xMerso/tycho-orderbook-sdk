@@ -81,6 +81,5 @@ pub mod execution {
 }
 
 pub mod endpoints {
-    pub static REDIS_LOCAL: &str = "127.0.0.1:7777";
     pub static COINGECKO_ETH_USD: &str = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd";
 }
