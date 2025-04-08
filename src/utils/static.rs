@@ -64,7 +64,7 @@ pub mod maths {
         pub static END_MULTIPLIER: f64 = 1_000_000.; // 10% of TEN_MILLIONS
 
         // pub static MIN_EXP_DELTA: f64 = 15.; Instead of hardcoding it, we use a % of the end multiplier
-        pub static MIN_EXP_DELTA_PCT: f64 = 0.00001; // To ensure distance between points
+        pub static MIN_EXP_DELTA_PCT: f64 = 0.00005; // To ensure distance between points
     }
 }
 

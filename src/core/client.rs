@@ -44,8 +44,8 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
     };
     let (chain, _, _) = types::chain(network.name.clone()).expect("Invalid chain");
     let body = ProtocolStateRequestBody {
-        protocol_ids: Some(vec![cp]),
-        protocol_system: protosys.to_string(),
+        protocol_ids: Some(vec![cp.clone()]),
+        protocol_system: protosys.to_string(), // Single, so cannot use protocol_ids vec of different protocols ?
         chain,
         include_balances: true,           // We want to include account balances.
         version: VersionParam::default(), // { timestamp: None, block: None },
@@ -66,7 +66,8 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
             Some(result)
         }
         Err(e) => {
-            tracing::error!("Failed to get protocol states: {:?}", e.to_string());
+            let key_short: String = key.chars().take(5).collect();
+            tracing::error!("Failed to get protocol states: {} (with api key: {}...): {:?}", cp.clone(), key_short, e.to_string());
             None
         }
     }
