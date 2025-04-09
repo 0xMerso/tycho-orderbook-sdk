@@ -80,7 +80,7 @@ pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
         Ok(client) => {
             let time = std::time::SystemTime::now();
             let (chain, _, _) = types::chain(network.name.clone()).expect("Invalid chain");
-            match client.get_all_tokens(chain, Some(100), Some(1), 3000).await {
+            match client.get_all_tokens(chain, Some(100), Some(1), 500).await {
                 Ok(result) => {
                     let mut tokens = vec![];
                     for t in result.iter() {
@@ -102,7 +102,7 @@ pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
                     Some(tokens)
                 }
                 Err(e) => {
-                    tracing::error!("Failed to get tokens: {:?}", e.to_string());
+                    tracing::error!("Failed to get tokens on network {}: {:?}", network.name, e.to_string());
                     None
                 }
             }

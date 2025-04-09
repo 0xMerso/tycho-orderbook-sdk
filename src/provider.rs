@@ -175,13 +175,13 @@ impl OrderbookProvider {
         tracing::debug!("Building orderbook for pair {}-{} | Single point: {}", targets[0].symbol.clone(), targets[1].symbol.clone(), single);
         let (base_to_eth_path, base_to_eth_comps) = maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
         let (quote_to_eth_path, quote_to_eth_comps) = maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
-        let mut to_eth_ptss: Vec<ProtoTychoState> = vec![];
-        let mut ptss: Vec<ProtoTychoState> = vec![];
+        let mut to_eth_pts: Vec<ProtoTychoState> = vec![];
+        let mut pts: Vec<ProtoTychoState> = vec![];
         let mtx = self.state.read().await;
         for cp in acps.clone() {
             if base_to_eth_comps.contains(&cp.id.to_lowercase()) || quote_to_eth_comps.contains(&cp.id.to_lowercase()) {
                 if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
-                    to_eth_ptss.push(ProtoTychoState {
+                    to_eth_pts.push(ProtoTychoState {
                         component: cp.clone(),
                         protosim: protosim.clone(),
                     });
@@ -189,7 +189,7 @@ impl OrderbookProvider {
             }
             if book::matchcp(cp.tokens.clone(), targets.clone()) {
                 if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
-                    ptss.push(ProtoTychoState {
+                    pts.push(ProtoTychoState {
                         component: cp.clone(),
                         protosim: protosim.clone(),
                     });
@@ -197,17 +197,17 @@ impl OrderbookProvider {
             }
         }
         drop(mtx);
-        if ptss.is_empty() {
+        if pts.is_empty() {
             return Err(anyhow::anyhow!("No components found for the given pair"));
         }
-        tracing::debug!("Found {} components for the pair. Evaluation t0/t1 ETH value ...", ptss.len());
-        let unit_base_eth_worth = maths::path::quote(to_eth_ptss.clone(), atks.clone(), base_to_eth_path.clone());
-        let unit_quote_eth_worth = maths::path::quote(to_eth_ptss.clone(), atks.clone(), quote_to_eth_path.clone());
+        tracing::debug!("Found {} components for the pair. Evaluation t0/t1 ETH value ...", pts.len());
+        let unit_base_eth_worth = maths::path::quote(to_eth_pts.clone(), atks.clone(), base_to_eth_path.clone());
+        let unit_quote_eth_worth = maths::path::quote(to_eth_pts.clone(), atks.clone(), quote_to_eth_path.clone());
         match (unit_base_eth_worth, unit_quote_eth_worth) {
             (Some(unit_base_eth_worth), Some(unit_quote_eth_worth)) => Ok(book::build(
                 self.network.clone(),
                 self.apikey.clone(),
-                ptss.clone(),
+                pts.clone(),
                 targets.clone(),
                 params.clone(),
                 simufns,
