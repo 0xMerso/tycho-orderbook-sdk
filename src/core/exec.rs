@@ -229,86 +229,95 @@ pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Opt
         return_full_transactions: true,
     };
 
-    // ToDo @dev: adapt this for Base too
+    // ToDo @dev: Adapt this for Base too
     // eth_simulateV1 seems not available on Base, you can adjust the RPC to another provider supporting it (eth_simulateV1), or comment the simulate part.
     // Exemple: https://basescan.org/tx/0xd3a2a8e2d7b752d857298ef280d63975b072f030f811a65355214fb5de616d06
-    match provider.simulate(&payload).await {
-        Ok(output) => {
-            let mut green = true;
-            for block in output.iter() {
-                tracing::trace!("Simulated Block {}:", block.inner.header.number);
-                for (x, tx) in block.calls.iter().enumerate() {
-                    tracing::trace!("  Tx #{}: Gas: {} | Simulation status: {}", x, tx.gas_used, tx.status);
-                    if !tx.status {
-                        tracing::error!("Simulation failed for tx #{}. No broadcast.", x);
-                        green = false;
-                    }
-                }
-            }
-            if green {
-                tracing::debug!("Broadcasting to RPC URL: {}", network.rpc);
-                //  --- Broadcast Approval ---
-                match provider.send_transaction(transactions.approve).await {
-                    Ok(approve) => {
-                        br.approve.sent = true;
-                        tracing::debug!("Waiting for receipt on approval tx: {:?}", approve.tx_hash());
-                        br.approve.hash = approve.tx_hash().to_string();
-                        tracing::debug!("Explorer: {}tx/{}", network.exp, approve.tx_hash());
-                        match approve.get_receipt().await {
-                            Ok(receipt) => {
-                                tracing::debug!("Approval receipt: status: {:?}", receipt.status());
-                                br.approve.status = receipt.status();
-                                if receipt.status() {
-                                    tracing::debug!("Approval transaction succeeded");
-                                    // --- Broadcast Swap ---
-                                    br.swap.sent = true;
-                                    match provider.send_transaction(transactions.swap).await {
-                                        Ok(swap) => {
-                                            br.swap.hash = swap.tx_hash().to_string();
-                                            tracing::debug!("Waiting for receipt on swap tx: {:?}", swap.tx_hash());
-                                            tracing::debug!("Explorer: {}tx/{}", network.exp, swap.tx_hash());
-                                            match swap.get_receipt().await {
-                                                Ok(receipt) => {
-                                                    tracing::debug!("Swap receipt: status: {:?}", receipt.status());
-                                                    br.swap.status = receipt.status();
-                                                    if receipt.status() {
-                                                        tracing::debug!("Swap transaction succeeded");
-                                                    } else {
-                                                        tracing::error!("Swap transaction failed");
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    tracing::error!("Failed to wait for swap transaction: {:?}", e);
-                                                    br.swap.error = Some(e.to_string());
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            tracing::error!("Failed to send swap transaction: {:?}", e);
-                                            br.swap.error = Some(e.to_string());
-                                        }
-                                    }
-                                } else {
-                                    tracing::error!("Approval transaction failed");
-                                }
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to wait for approval transaction: {:?}", e);
-                                br.approve.error = Some(e.to_string());
+    let mut is_simulation_success = true;
+    match network.name.as_str() {
+        "ethereum" => {
+            match provider.simulate(&payload).await {
+                Ok(output) => {
+                    for block in output.iter() {
+                        tracing::trace!("Simulated Block {}:", block.inner.header.number);
+                        for (x, tx) in block.calls.iter().enumerate() {
+                            tracing::trace!("  Tx #{}: Gas: {} | Simulation status: {}", x, tx.gas_used, tx.status);
+                            if !tx.status {
+                                tracing::error!("Simulation failed for tx #{}. No broadcast.", x);
+                                is_simulation_success = false;
                             }
                         }
                     }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to simulate: {:?}", e);
+                }
+            };
+        }
+        "base" => {
+            tracing::debug!("Simulation not supported on Base. Broadcasting directly.");
+        }
+        _ => {}
+    }
+    if is_simulation_success {
+        tracing::debug!("Broadcasting to RPC URL: {}", network.rpc);
+        //  --- Broadcast Approval ---
+        match provider.send_transaction(transactions.approve).await {
+            Ok(approve) => {
+                br.approve.sent = true;
+                tracing::debug!("Waiting for receipt on approval tx: {:?}", approve.tx_hash());
+                br.approve.hash = approve.tx_hash().to_string();
+                tracing::debug!("Explorer: {}tx/{}", network.exp, approve.tx_hash());
+                match approve.get_receipt().await {
+                    Ok(receipt) => {
+                        tracing::debug!("Approval receipt: status: {:?}", receipt.status());
+                        br.approve.status = receipt.status();
+                        if receipt.status() {
+                            tracing::debug!("Approval transaction succeeded");
+                            // --- Broadcast Swap ---
+                            br.swap.sent = true;
+                            match provider.send_transaction(transactions.swap).await {
+                                Ok(swap) => {
+                                    br.swap.hash = swap.tx_hash().to_string();
+                                    tracing::debug!("Waiting for receipt on swap tx: {:?}", swap.tx_hash());
+                                    tracing::debug!("Explorer: {}tx/{}", network.exp, swap.tx_hash());
+                                    match swap.get_receipt().await {
+                                        Ok(receipt) => {
+                                            tracing::debug!("Swap receipt: status: {:?}", receipt.status());
+                                            br.swap.status = receipt.status();
+                                            if receipt.status() {
+                                                tracing::debug!("Swap transaction succeeded");
+                                            } else {
+                                                tracing::error!("Swap transaction failed");
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::error!("Failed to wait for swap transaction: {:?}", e);
+                                            br.swap.error = Some(e.to_string());
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to send swap transaction: {:?}", e);
+                                    br.swap.error = Some(e.to_string());
+                                }
+                            }
+                        } else {
+                            tracing::error!("Approval transaction failed");
+                        }
+                    }
                     Err(e) => {
-                        tracing::error!("Failed to send approval transaction: {:?}", e);
+                        tracing::error!("Failed to wait for approval transaction: {:?}", e);
                         br.approve.error = Some(e.to_string());
                     }
                 }
             }
+            Err(e) => {
+                tracing::error!("Failed to send approval transaction: {:?}", e);
+                br.approve.error = Some(e.to_string());
+            }
         }
-        Err(e) => {
-            tracing::error!("Failed to simulate: {:?}", e);
-        }
-    };
+    }
+
     br
 }
 

@@ -25,11 +25,11 @@ async fn main() {
     let sender = std::env::var("SENDER").expect("Variable 'SENDER' not found in environment");
     let pk = match std::env::var("PV_KEY") {
         Ok(v) => {
-            tracing::info!("Private key found in environment variables");
+            tracing::info!(" 🔑 Private key found in environment variables");
             Some(v)
         }
         Err(_) => {
-            tracing::warn!("Private key not found in environment variables. Continuing without executing any transaction.");
+            tracing::warn!(" 🔑 Private key not found in environment variables. Continuing without executing any transaction.");
             None
         }
     };
