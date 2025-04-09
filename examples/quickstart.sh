@@ -15,7 +15,7 @@ NETWORK="$1"
 function start() {
     trap '' SIGINT
     export NETWORK=$NETWORK
-    echo "Building Quickstart for {$NETWORK} ..."
+    echo "Building Quickstart for {$NETWORK} (might take a few minutes the first time) ..."
     cargo build --bin quickstart -q 2>/dev/null
     echo "Build successful. Executing..."
     (
