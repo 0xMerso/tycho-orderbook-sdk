@@ -3,18 +3,29 @@ use tokio::sync::RwLock;
 use tycho_orderbook::{
     adapters::default::DefaultOrderBookAdapter,
     builder::{OrderbookBuilder, OrderbookBuilderConfig},
-    core::{client, exec::get_original_components, helper::default_protocol_stream_builder, solver::DefaultOrderbookSolver},
+    core::{
+        client,
+        helper::{default_protocol_stream_builder, get_original_components},
+        solver::DefaultOrderbookSolver,
+    },
     types::{ExecutionRequest, Orderbook, OrderbookEvent, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState},
     utils::r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
 };
 use tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter;
+
+/// Quickstart example for Tycho Orderbook
+/// This example demonstrates how to use the Tycho Orderbook library to create an orderbook provider and execute trades on it.
+/// It open a Orderbook stream and listen for events, under the hood, it uses the Tycho protocol stream.
+/// If the env variable REAL_EXEC is set to true, it will execute the trades on the network, with the private key provided in the env variable PV_KEY.
+/// Here, the swap executed is the best bid/ask on the orderbook, it will be worth less than 0.001 ETH (max)
 
 #[tokio::main]
 async fn main() {
     let filter = tracing_subscriber::EnvFilter::from_default_env(); // Read RUST_tracing env variable
     tracing_subscriber::fmt().with_env_filter(filter).init(); // <--- Set the tracing level here
     tracing::info!("--- --- --- Launching Quickstart Tycho Orderbook --- --- ---");
-    // tracing::info!("Gm"); tracing::debug!("Gm"); tracing::trace!("Gm");
+
+    // --- Load environment variables ---
     dotenv::from_filename("examples/.env.quickstart.ex").ok(); // Use .env.ex for testing
     let network_name = std::env::var("NETWORK").expect("Variable 'NETWORK' not found in environment");
     let real_exec = std::env::var("REAL_EXEC").expect("Variable 'REAL_EXEC' not found in environment") == "true";
@@ -103,108 +114,117 @@ async fn main() {
                         OrderbookEvent::NewHeader(block, updated) => {
                             tracing::info!("Event: NewHeader: #{} with {} components updated", block, updated.len());
                             for (key, value) in tracked.clone().iter() {
-                                if value.is_none() {
-                                    tracing::info!("🧱 OBP Event: Orderbook {} isn't build yet, building it ...", key.clone());
-                                    match obp
-                                        .get_orderbook(
-                                            DefaultOrderbookSolver,
-                                            OrderbookRequestParams {
-                                                tag: key.clone().to_lowercase(),
-                                                point: None,
-                                            },
-                                        )
-                                        .await
-                                    {
-                                        Ok(orderbook) => {
-                                            tracing::info!("OBP Event: Orderbook received");
-                                            tracked.insert(key.clone().to_lowercase(), Some(orderbook.clone()));
-                                        }
-                                        Err(err) => {
-                                            tracing::error!("OBP Event: Error: {:?}", err);
-                                        }
-                                    }
-                                } else {
-                                    tracing::debug!("OBP Event: Orderbook already built, checking for update.");
-                                    let current = value.clone().unwrap();
-                                    let cps = current.pools.clone();
-                                    // If one of the components/pools is updated, we need to update the orderbook too.
-                                    let mut refresh = false;
-                                    for (x, cp) in cps.iter().enumerate() {
-                                        if updated.contains(&cp.id.to_lowercase()) {
-                                            tracing::info!(
-                                                " - Component #{x} {} {} for {}-{} orderbook has changed, need to update it",
-                                                cp.id,
-                                                cp.protocol_type_name,
-                                                current.base.symbol,
-                                                current.quote.symbol
-                                            );
-                                            refresh = true;
-                                        }
-                                    }
-                                    if refresh {
-                                        tracing::info!(" ⚖️  Orderbook {}-{} has changed, need to update it", current.base.symbol, current.quote.symbol);
-
-                                        if let Ok(book) = obp.get_orderbook(DefaultOrderbookSolver, OrderbookRequestParams { tag: key.clone(), point: None }).await {
-                                            let symtag = format!("{}-{}", book.base.symbol, book.quote.symbol);
-                                            tracing::info!("OBP Event: Orderbook {} has been updated", symtag);
-                                            tracked.insert(key.clone(), Some(book.clone()));
-
-                                            let depth = book.depth(None);
-                                            tracing::debug!("Bids ({})", depth.bids.len());
-                                            for d in depth.bids {
-                                                tracing::trace!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
+                                match value {
+                                    Some(current) => {
+                                        tracing::debug!("OBP Event: Orderbook already built, checking for update.");
+                                        let cps = current.pools.clone();
+                                        // If one of the components/pools is updated, we need to update the orderbook too.
+                                        let mut refresh = false;
+                                        for (x, cp) in cps.iter().enumerate() {
+                                            if updated.contains(&cp.id.to_lowercase()) {
+                                                tracing::info!(
+                                                    " - Component #{x} {} {} for {}-{} orderbook has changed, need to update it",
+                                                    cp.id,
+                                                    cp.protocol_type_name,
+                                                    current.base.symbol,
+                                                    current.quote.symbol
+                                                );
+                                                refresh = true;
                                             }
-                                            tracing::debug!("Asks ({})", depth.asks.len());
-                                            for d in depth.asks {
-                                                tracing::trace!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
-                                            }
+                                        }
+                                        if refresh {
+                                            tracing::info!(" ⚖️  Orderbook {}-{} has changed, need to update it", current.base.symbol, current.quote.symbol);
 
-                                            if book.tag.clone().eq_ignore_ascii_case(obtag.as_str()) {
-                                                tracing::debug!("OBP Event: Orderbook {} is the one we want to execute a trade on.", symtag);
-                                                // Execution
-                                                let way = book.mpd_base_to_quote.clone();
-                                                let amount = way.amount / 10.; // By default, the simulation algo provide equivalent amount of 0.01 ETH in base token. So /10 = 0.001 ETH
-                                                let expected = way.received / 10.; // Same here
-                                                let request = ExecutionRequest {
-                                                    sender: sender.to_string().clone(),
-                                                    tag: book.tag.clone(),
-                                                    input: book.base.clone(),
-                                                    output: book.quote.clone(),
-                                                    amount,
-                                                    expected,
-                                                    distribution: way.distribution.clone(),
-                                                    components: book.pools.clone(),
-                                                };
+                                            if let Ok(book) = obp.get_orderbook(DefaultOrderbookSolver, OrderbookRequestParams { tag: key.clone(), point: None }).await {
+                                                let symtag = format!("{}-{}", book.base.symbol, book.quote.symbol);
+                                                tracing::info!("OBP Event: Orderbook {} has been updated", symtag);
+                                                tracked.insert(key.clone(), Some(book.clone()));
 
-                                                let mtx = state.read().await;
-                                                let originals = mtx.components.clone();
-                                                drop(mtx);
-                                                let originals = get_original_components(originals, book.pools.clone());
+                                                let depth = book.depth(None);
+                                                tracing::debug!("Bids ({})", depth.bids.len());
+                                                for d in depth.bids {
+                                                    tracing::trace!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
+                                                }
+                                                tracing::debug!("Asks ({})", depth.asks.len());
+                                                for d in depth.asks {
+                                                    tracing::trace!(" - {:.5} {} at a price of {:.5} {} per {}", d.1, current.base.symbol, d.0, current.quote.symbol, current.base.symbol);
+                                                }
 
-                                                // match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
-                                                match book.create(network.clone(), request, originals.clone(), pk.clone()).await {
-                                                    Ok(payload) => {
-                                                        if real_exec {
-                                                            if !executed {
-                                                                let _ = book.send(network.clone(), payload, pk.clone()).await;
-                                                                executed = true;
-                                                            } else {
-                                                                tracing::info!("Tx already executed, not executing again: {}", symtag);
+                                                if book.tag.clone().eq_ignore_ascii_case(obtag.as_str()) {
+                                                    tracing::debug!("OBP Event: Orderbook {} is the one we want to execute a trade on.", symtag);
+                                                    // Execution
+                                                    let way = book.mpd_base_to_quote.clone();
+                                                    let amount = way.amount / 10.; // By default, the simulation algo provide equivalent amount of 0.01 ETH in base token. So /10 = 0.001 ETH
+                                                    let expected = way.received / 10.; // Same here
+                                                    let request = ExecutionRequest {
+                                                        sender: sender.to_string().clone(),
+                                                        tag: book.tag.clone(),
+                                                        input: book.base.clone(),
+                                                        output: book.quote.clone(),
+                                                        amount,
+                                                        expected,
+                                                        distribution: way.distribution.clone(),
+                                                        components: book.pools.clone(),
+                                                    };
+
+                                                    let mtx = state.read().await;
+                                                    let originals = mtx.components.clone();
+                                                    drop(mtx);
+                                                    let originals = get_original_components(originals, book.pools.clone());
+
+                                                    // match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
+                                                    match book.create(network.clone(), request, originals.clone(), pk.clone()).await {
+                                                        Ok(payload) => {
+                                                            if real_exec {
+                                                                if !executed {
+                                                                    match book.send(network.clone(), payload, pk.clone()).await {
+                                                                        Ok(_executed_payload) => {
+                                                                            tracing::info!("Orderbook {} : Executed successfully", symtag);
+                                                                            executed = true;
+                                                                        }
+                                                                        Err(err) => {
+                                                                            tracing::error!("Error executing orderbook {}: {:?}", symtag, err);
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    tracing::info!("Tx already executed, not executing again: {}", symtag);
+                                                                }
                                                             }
                                                         }
+                                                        Err(err) => {
+                                                            tracing::error!("OBP Event: Error executing orderbook {}: {:?}", symtag, err);
+                                                        }
                                                     }
-                                                    Err(err) => {
-                                                        tracing::error!("OBP Event: Error executing orderbook {}: {:?}", symtag, err);
-                                                    }
+                                                } else {
+                                                    tracing::debug!("OBP Event: Orderbook {} is not the one we want to execute a trade on.", symtag);
                                                 }
                                             } else {
-                                                tracing::debug!("OBP Event: Orderbook {} is not the one we want to execute a trade on.", symtag);
+                                                tracing::error!("OBP Event: Error updating orderbook");
                                             }
                                         } else {
-                                            tracing::error!("OBP Event: Error updating orderbook");
+                                            tracing::info!("Orderbook {}-{} hasn't changed, no need to update it", current.base.symbol, current.quote.symbol);
                                         }
-                                    } else {
-                                        tracing::info!("Orderbook {}-{} hasn't changed, no need to update it", current.base.symbol, current.quote.symbol);
+                                    }
+                                    None => {
+                                        tracing::info!("🧱 OBP Event: Orderbook {} isn't build yet, building it ...", key.clone());
+                                        match obp
+                                            .get_orderbook(
+                                                DefaultOrderbookSolver,
+                                                OrderbookRequestParams {
+                                                    tag: key.clone().to_lowercase(),
+                                                    point: None, // If you just need 1 point on the orderbook
+                                                },
+                                            )
+                                            .await
+                                        {
+                                            Ok(orderbook) => {
+                                                tracing::info!("OBP Event: Orderbook received");
+                                                tracked.insert(key.clone().to_lowercase(), Some(orderbook.clone()));
+                                            }
+                                            Err(err) => {
+                                                tracing::error!("OBP Event: Error: {:?}", err);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -214,20 +234,6 @@ async fn main() {
                             let pts = mtx.protosims.len();
                             drop(mtx);
                             tracing::info!("OBP Event: Shared state initialised status: {} | Comp size: {} | Pts size: {}", initialised, cps, pts);
-
-                            // --- Testing|Demo ---
-                            // let params = obp.generate_random_orderbook_params(1).await;
-                            // match obp.get_orderbook(params.clone()).await {
-                            //     Ok(orderbook) => {
-                            //         tracing::info!("OBP Event: Orderbook received");
-                            //         let path = format!("misc/data-obpc/{}.json", params.tag.clone());
-                            //         crate::shd::utils::misc::save1(orderbook.clone(), path.as_str());
-                            //     }
-                            //     Err(err) => {
-                            //         tracing::error!("OBP Event: Error: {:?}", err);
-                            //     }
-                            // };
-                            // --- --- --- --- ---
                         }
                         OrderbookEvent::Error(err) => {
                             tracing::error!("OBP Event: Error: {:?}", err);
