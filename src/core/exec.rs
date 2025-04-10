@@ -321,9 +321,9 @@ pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Opt
     br
 }
 
-/// Build swap transactions on the specified network for the given request.
+/// Create swap transactions on the specified network for the given request.
 /// Some example: https://github.com/propeller-heads/tycho-execution/blob/main/examples/encoding-example/main.rs
-pub async fn build(network: Network, request: ExecutionRequest, native: Vec<ProtocolComponent>, pk: Option<String>) -> Result<PayloadToExecute, String> {
+pub async fn create(network: Network, request: ExecutionRequest, native: Vec<ProtocolComponent>, pk: Option<String>) -> Result<PayloadToExecute, String> {
     tracing::debug!("Building transactions for request. Private key provided: {}", pk.is_some());
     let (_, _, chain) = types::chain(network.name.clone()).unwrap();
     let tokens = vec![request.input.clone().address, request.output.clone().address];

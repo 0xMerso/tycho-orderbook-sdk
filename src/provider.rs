@@ -2,9 +2,12 @@ use futures::StreamExt;
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use tokio::task::JoinHandle;
 
-use crate::core::book;
-use crate::types::{self, OrderbookEvent, OrderbookProvider};
+use crate::core::book::{self, optimize};
+use crate::maths::steps::exponential;
+
+use crate::types::{self, Network, OrderbookEvent};
 use crate::{data, maths};
 
 use tokio::sync::mpsc;
@@ -13,10 +16,46 @@ use tycho_simulation::tycho_client::stream::StreamError;
 
 use data::fmt::SrzProtocolComponent;
 use data::fmt::SrzToken;
+use types::OrderbookRequestParams;
 use types::SharedTychoStreamState;
 use types::{Orderbook, OrderbookBuilder};
 use types::{OrderbookFunctions, ProtoTychoState};
-use types::{OrderbookProviderConfig, OrderbookRequestParams};
+
+/// Orderbook Provider Configuration
+#[derive(Clone)]
+pub struct OrderbookProviderConfig {
+    // The capacity of the channel used to send OrderbookEvents.
+    pub capacity: usize,
+}
+
+impl Default for OrderbookProviderConfig {
+    fn default() -> Self {
+        OrderbookProviderConfig { capacity: 100 }
+    }
+}
+
+impl Default for OrderbookFunctions {
+    fn default() -> Self {
+        OrderbookFunctions { optimize, steps: exponential }
+    }
+}
+
+/// SDK prderbook provider (OBP) that wraps a ProtocolStreamBuistrlder stream
+pub struct OrderbookProvider {
+    /// The spawned task handle is stored to ensure the task remains running.
+    pub _handle: JoinHandle<()>,
+    /// Tokens given by Tycho
+    pub tokens: Vec<SrzToken>,
+    /// The network used
+    pub network: Network,
+    /// Receiver side of the channel where OrderbookEvents are sent.
+    pub stream: Mutex<mpsc::Receiver<OrderbookEvent>>, // mpsc::Receiver<OrderbookEvent>,
+    // pub stream: mpsc::Receiver<OrderbookEvent>, // mpsc::Receiver<OrderbookEvent>,
+    /// The shared state, accessible both to the internal task and the client.
+    pub state: SharedTychoStreamState,
+    /// The API token used to facilitate the Tycho queries
+    pub apikey: Option<String>,
+}
 
 /// OrderbookProvider is a struct that manages the protocol stream and shared state, and provides methods to interact with the stream, build orderbooks, and more.
 impl OrderbookProvider {
@@ -27,18 +66,15 @@ impl OrderbookProvider {
     /// * `state` - A shared state structure that is both updated internally and exposed to the client.
     /// # Returns
     /// * A Result containing the OBP instance or a StreamError if the stream could not be built.
-    pub async fn build(ob: OrderbookBuilder, config: OrderbookProviderConfig, state: SharedTychoStreamState) -> Result<Self, StreamError> {
+    pub async fn new(ob: OrderbookBuilder, state: SharedTychoStreamState) -> Result<Self, StreamError> {
         // Build the protocol stream that yields Result<BlockUpdate, StreamDecodeError>.
         match ob.psb.build().await {
             Ok(stream) => {
-                let (sender, receiver) = mpsc::channel(config.capacity);
-                // let dup = state.clone();
-                // let state = state.clone();A
+                let (sender, receiver) = mpsc::channel(100);
                 let shared = state.clone();
                 // Spawn an asynchronous task that processes the protocol stream.
                 // For each message received, update the shared state and send an OrderbookEvent.
                 tracing::debug!("Starting stream processing task.");
-
                 let handle = tokio::spawn(async move {
                     futures::pin_mut!(stream);
                     while let Some(update) = stream.next().await {

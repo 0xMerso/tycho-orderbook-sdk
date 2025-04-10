@@ -10,18 +10,12 @@ use super::{
     core::book::QuoteFn,
     data::fmt::{SrzProtocolComponent, SrzToken},
 };
-use tokio::sync::mpsc;
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
 use tycho_simulation::evm::decoder::StreamDecodeError;
 use tycho_simulation::evm::stream::ProtocolStreamBuilder;
 use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
 use tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter;
 
-use crate::{
-    core::book::optimize,
-    maths::steps::{exponential, AmountStepsFn},
-};
+use crate::maths::steps::AmountStepsFn;
 
 pub type SharedTychoStreamState = Arc<RwLock<TychoStreamState>>;
 
@@ -337,24 +331,6 @@ pub enum OrderbookEvent {
     Error(StreamDecodeError),
 }
 
-/// Orderbook Provider Configuration
-#[derive(Clone)]
-pub struct OrderbookProviderConfig {
-    // The capacity of the channel used to send OrderbookEvents.
-    pub capacity: usize,
-}
-
-impl Default for OrderbookProviderConfig {
-    fn default() -> Self {
-        OrderbookProviderConfig { capacity: 100 }
-    }
-}
-
-#[derive(Clone)]
-pub struct OrderbookBuilderConfig {
-    pub filter: ComponentFilter,
-}
-
 /// Struct used to build the orderbook functions in order to customize the orderbook construction
 /// If None, default simple and naive optimization is used, including gas costs.
 pub struct OrderbookFunctions {
@@ -362,27 +338,9 @@ pub struct OrderbookFunctions {
     pub steps: AmountStepsFn, // Simulated amount/steps (returning for instance: 0.2 ETH, 2 ETH, 20 ETH, etc.). By default, it's an exponential curve based, up to 25% of total onchain liquidity
 }
 
-impl Default for OrderbookFunctions {
-    fn default() -> Self {
-        OrderbookFunctions { optimize, steps: exponential }
-    }
-}
-
-/// SDK prderbook provider (OBP) that wraps a ProtocolStreamBuistrlder stream
-pub struct OrderbookProvider {
-    /// The spawned task handle is stored to ensure the task remains running.
-    pub _handle: JoinHandle<()>,
-    /// Tokens given by Tycho
-    pub tokens: Vec<SrzToken>,
-    /// The network used
-    pub network: Network,
-    /// Receiver side of the channel where OrderbookEvents are sent.
-    pub stream: Mutex<mpsc::Receiver<OrderbookEvent>>, // mpsc::Receiver<OrderbookEvent>,
-    // pub stream: mpsc::Receiver<OrderbookEvent>, // mpsc::Receiver<OrderbookEvent>,
-    /// The shared state, accessible both to the internal task and the client.
-    pub state: SharedTychoStreamState,
-    /// The API token used to facilitate the Tycho queries
-    pub apikey: Option<String>,
+#[derive(Clone)]
+pub struct OrderbookBuilderConfig {
+    pub filter: ComponentFilter,
 }
 
 /// Orderbook builder, used to create the OBP
