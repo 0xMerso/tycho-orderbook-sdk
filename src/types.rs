@@ -6,16 +6,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use utoipa::ToSchema;
 
-use super::{
-    core::book::QuoteFn,
-    data::fmt::{SrzProtocolComponent, SrzToken},
-};
+use super::data::fmt::{SrzProtocolComponent, SrzToken};
 use tycho_simulation::evm::decoder::StreamDecodeError;
-use tycho_simulation::evm::stream::ProtocolStreamBuilder;
 use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
-use tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter;
-
-use crate::maths::steps::AmountStepsFn;
 
 pub type SharedTychoStreamState = Arc<RwLock<TychoStreamState>>;
 
@@ -331,26 +324,6 @@ pub enum OrderbookEvent {
     Error(StreamDecodeError),
 }
 
-/// Struct used to build the orderbook functions in order to customize the orderbook construction
-/// If None, default simple and naive optimization is used, including gas costs.
-pub struct OrderbookFunctions {
-    pub optimize: QuoteFn,    // Custom optimization function, ideally a DEX aggregator algorithm
-    pub steps: AmountStepsFn, // Simulated amount/steps (returning for instance: 0.2 ETH, 2 ETH, 20 ETH, etc.). By default, it's an exponential curve based, up to 25% of total onchain liquidity
-}
-
-#[derive(Clone)]
-pub struct OrderbookBuilderConfig {
-    pub filter: ComponentFilter,
-}
-
-/// Orderbook builder, used to create the OBP
-pub struct OrderbookBuilder {
-    pub network: Network,
-    pub psb: ProtocolStreamBuilder,
-    pub tokens: Vec<SrzToken>,
-    pub apikey: Option<String>,
-}
-
 /// Tycho Stream Data, stored in a Mutex/Arc for shared access between the SDK stream and the client or API.
 pub struct TychoStreamState {
     // ProtocolSim instances, indexed by their unique identifier. Impossible to store elsewhere than memory
@@ -363,7 +336,7 @@ pub struct TychoStreamState {
 
 /// One component of the Tycho protocol, with his simulation instance
 #[derive(Clone, Debug)]
-pub struct ProtoTychoState {
+pub struct ProtoSimComp {
     pub component: SrzProtocolComponent,
     pub protosim: Box<dyn ProtocolSim>,
 }

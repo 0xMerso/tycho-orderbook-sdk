@@ -4,22 +4,22 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use tokio::task::JoinHandle;
 
-use crate::core::book::{self, optimize};
-use crate::maths::steps::exponential;
+use crate::builder::OrderbookBuilder;
+use crate::core::book::{self};
+use crate::core::solver::{DefaultOrderbookSolver, OrderbookSolver};
 
 use crate::types::{self, Network, OrderbookEvent};
 use crate::{data, maths};
 
+use data::fmt::SrzProtocolComponent;
+use data::fmt::SrzToken;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tycho_simulation::tycho_client::stream::StreamError;
-
-use data::fmt::SrzProtocolComponent;
-use data::fmt::SrzToken;
+use types::Orderbook;
 use types::OrderbookRequestParams;
+use types::ProtoSimComp;
 use types::SharedTychoStreamState;
-use types::{Orderbook, OrderbookBuilder};
-use types::{OrderbookFunctions, ProtoTychoState};
 
 /// Orderbook Provider Configuration
 #[derive(Clone)]
@@ -34,14 +34,8 @@ impl Default for OrderbookProviderConfig {
     }
 }
 
-impl Default for OrderbookFunctions {
-    fn default() -> Self {
-        OrderbookFunctions { optimize, steps: exponential }
-    }
-}
-
 /// SDK prderbook provider (OBP) that wraps a ProtocolStreamBuistrlder stream
-pub struct OrderbookProvider {
+pub struct OrderbookProvider<S: OrderbookSolver = DefaultOrderbookSolver> {
     /// The spawned task handle is stored to ensure the task remains running.
     pub _handle: JoinHandle<()>,
     /// Tokens given by Tycho
@@ -55,6 +49,8 @@ pub struct OrderbookProvider {
     pub state: SharedTychoStreamState,
     /// The API token used to facilitate the Tycho queries
     pub apikey: Option<String>,
+    /// The solver instance used to optimize trades.
+    pub solver: S,
 }
 
 /// OrderbookProvider is a struct that manages the protocol stream and shared state, and provides methods to interact with the stream, build orderbooks, and more.
@@ -66,7 +62,10 @@ impl OrderbookProvider {
     /// * `state` - A shared state structure that is both updated internally and exposed to the client.
     /// # Returns
     /// * A Result containing the OBP instance or a StreamError if the stream could not be built.
-    pub async fn new(ob: OrderbookBuilder, state: SharedTychoStreamState) -> Result<Self, StreamError> {
+    pub async fn new<S>(ob: OrderbookBuilder, state: SharedTychoStreamState, solver: S) -> Result<OrderbookProvider<S>, StreamError>
+    where
+        S: OrderbookSolver + 'static,
+    {
         // Build the protocol stream that yields Result<BlockUpdate, StreamDecodeError>.
         match ob.psb.build().await {
             Ok(stream) => {
@@ -151,7 +150,9 @@ impl OrderbookProvider {
                     tokens: ob.tokens.clone(),
                     network: ob.network.clone(),
                     apikey: ob.apikey.clone(),
+                    solver,
                 };
+
                 Ok(obp)
             }
             Err(err) => {
@@ -185,7 +186,7 @@ impl OrderbookProvider {
     }
 
     /// Compute the orderbook for the given pair by simulating trades on the components matching the requested pair
-    pub async fn get_orderbook(&self, params: OrderbookRequestParams, simufns: Option<OrderbookFunctions>) -> Result<Orderbook, anyhow::Error> {
+    pub async fn get_orderbook<S: OrderbookSolver>(&self, solver: S, params: OrderbookRequestParams) -> Result<Orderbook, anyhow::Error> {
         let single = params.point.is_some();
         let mtx = self.state.read().await;
         let comp = mtx.components.clone();
@@ -210,13 +211,13 @@ impl OrderbookProvider {
         tracing::debug!("Building orderbook for pair {}-{} | Single point: {}", targets[0].symbol.clone(), targets[1].symbol.clone(), single);
         let (base_to_eth_path, base_to_eth_comps) = maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
         let (quote_to_eth_path, quote_to_eth_comps) = maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
-        let mut to_eth_pts: Vec<ProtoTychoState> = vec![];
-        let mut pts: Vec<ProtoTychoState> = vec![];
+        let mut to_eth_pts: Vec<ProtoSimComp> = vec![];
+        let mut pts: Vec<ProtoSimComp> = vec![];
         let mtx = self.state.read().await;
         for cp in acps.clone() {
             if base_to_eth_comps.contains(&cp.id.to_lowercase()) || quote_to_eth_comps.contains(&cp.id.to_lowercase()) {
                 if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
-                    to_eth_pts.push(ProtoTychoState {
+                    to_eth_pts.push(ProtoSimComp {
                         component: cp.clone(),
                         protosim: protosim.clone(),
                     });
@@ -224,7 +225,7 @@ impl OrderbookProvider {
             }
             if book::matchcp(cp.tokens.clone(), targets.clone()) {
                 if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
-                    pts.push(ProtoTychoState {
+                    pts.push(ProtoSimComp {
                         component: cp.clone(),
                         protosim: protosim.clone(),
                     });
@@ -240,12 +241,12 @@ impl OrderbookProvider {
         let unit_quote_eth_worth = maths::path::quote(to_eth_pts.clone(), atks.clone(), quote_to_eth_path.clone());
         match (unit_base_eth_worth, unit_quote_eth_worth) {
             (Some(unit_base_eth_worth), Some(unit_quote_eth_worth)) => Ok(book::build(
+                solver,
                 self.network.clone(),
                 self.apikey.clone(),
                 pts.clone(),
                 targets.clone(),
                 params.clone(),
-                simufns,
                 unit_base_eth_worth,
                 unit_quote_eth_worth,
             )

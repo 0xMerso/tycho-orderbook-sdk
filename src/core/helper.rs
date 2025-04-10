@@ -12,9 +12,10 @@ use tycho_simulation::evm::{
     stream::ProtocolStreamBuilder,
 };
 
+use crate::builder::OrderbookBuilderConfig;
 use crate::types;
 use crate::types::Network;
-use crate::types::OrderbookBuilderConfig;
+
 use crate::types::TychoSupportedProtocol;
 
 pub async fn default_protocol_stream_builder(network: Network, apikey: String, config: OrderbookBuilderConfig, tokens: Vec<Token>) -> ProtocolStreamBuilder {

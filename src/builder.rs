@@ -1,14 +1,25 @@
+use tycho_simulation::evm::stream::ProtocolStreamBuilder;
 use tycho_simulation::models::Token;
 use tycho_simulation::tycho_client::stream::StreamError;
 
-
-use tycho_simulation::evm::stream::ProtocolStreamBuilder;
-
+use crate::core::solver::DefaultOrderbookSolver;
 use crate::data::fmt::SrzToken;
 use crate::provider::OrderbookProvider;
 use crate::types::Network;
-use crate::types::OrderbookBuilder;
 use crate::types::SharedTychoStreamState;
+use tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter;
+
+#[derive(Clone)]
+pub struct OrderbookBuilderConfig {
+    pub filter: ComponentFilter,
+}
+
+pub struct OrderbookBuilder {
+    pub network: Network,
+    pub psb: ProtocolStreamBuilder,
+    pub tokens: Vec<SrzToken>,
+    pub apikey: Option<String>,
+}
 
 /// OrderbookBuilder is a struct that allows the creation of an OrderbookProvider instance, using a default or custom ProtocolStreamBuilder from Tycho.
 impl OrderbookBuilder {
@@ -48,8 +59,8 @@ impl OrderbookBuilder {
     }
 
     // Default ProtocolStreamBuilder
-    pub async fn build(self, state: SharedTychoStreamState) -> Result<OrderbookProvider, StreamError> {
-        tracing::debug!("Building OrderbookProvider ... (it might take a while depending the API key)");
-        OrderbookProvider::new(self, state).await
+    pub async fn build(self, state: SharedTychoStreamState) -> Result<OrderbookProvider<DefaultOrderbookSolver>, StreamError> {
+        tracing::debug!("Building OrderbookProvider ... (with env API key)");
+        OrderbookProvider::new(self, state, DefaultOrderbookSolver).await
     }
 }

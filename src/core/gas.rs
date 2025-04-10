@@ -1,6 +1,6 @@
 use crate::{
     data::fmt::SrzToken,
-    types::{Network, ProtoTychoState},
+    types::{Network, ProtoSimComp},
 };
 use alloy::providers::{Provider, ProviderBuilder};
 use tycho_simulation::models::Token;
@@ -12,7 +12,7 @@ pub async fn gas_price(provider: String) -> u128 {
 }
 
 /// Find the best path and price between tokens
-pub fn pricing(network: Network, ptss: Vec<ProtoTychoState>, atks: Vec<SrzToken>, input: String) -> Option<(f64, Vec<String>)> {
+pub fn pricing(network: Network, ptss: Vec<ProtoSimComp>, atks: Vec<SrzToken>, input: String) -> Option<(f64, Vec<String>)> {
     let mut graph: std::collections::HashMap<String, Vec<(String, f64)>> = std::collections::HashMap::new();
     for state in ptss {
         let addresses: Vec<String> = state.component.tokens.iter().map(|t| t.address.to_lowercase()).collect();

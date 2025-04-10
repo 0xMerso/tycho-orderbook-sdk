@@ -2,9 +2,9 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tycho_orderbook::{
     adapters::default::DefaultOrderBookAdapter,
-    core::{book, client, exec::get_original_components, helper::default_protocol_stream_builder},
-    maths::steps::exponential,
-    types::{ExecutionRequest, Orderbook, OrderbookBuilder, OrderbookBuilderConfig, OrderbookEvent, OrderbookFunctions, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState},
+    builder::{OrderbookBuilder, OrderbookBuilderConfig},
+    core::{client, exec::get_original_components, helper::default_protocol_stream_builder, solver::DefaultOrderbookSolver},
+    types::{ExecutionRequest, Orderbook, OrderbookEvent, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState},
     utils::r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
 };
 use tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter;
@@ -104,18 +104,14 @@ async fn main() {
                             tracing::info!("Event: NewHeader: #{} with {} components updated", block, updated.len());
                             for (key, value) in tracked.clone().iter() {
                                 if value.is_none() {
-                                    let simufns = OrderbookFunctions {
-                                        optimize: book::optimize,
-                                        steps: exponential,
-                                    };
                                     tracing::info!("🧱 OBP Event: Orderbook {} isn't build yet, building it ...", key.clone());
                                     match obp
                                         .get_orderbook(
+                                            DefaultOrderbookSolver,
                                             OrderbookRequestParams {
                                                 tag: key.clone().to_lowercase(),
                                                 point: None,
                                             },
-                                            Some(simufns),
                                         )
                                         .await
                                     {
@@ -147,11 +143,8 @@ async fn main() {
                                     }
                                     if refresh {
                                         tracing::info!(" ⚖️  Orderbook {}-{} has changed, need to update it", current.base.symbol, current.quote.symbol);
-                                        let simufns = OrderbookFunctions {
-                                            optimize: book::optimize,
-                                            steps: exponential,
-                                        };
-                                        if let Ok(book) = obp.get_orderbook(OrderbookRequestParams { tag: key.clone(), point: None }, Some(simufns)).await {
+
+                                        if let Ok(book) = obp.get_orderbook(DefaultOrderbookSolver, OrderbookRequestParams { tag: key.clone(), point: None }).await {
                                             let symtag = format!("{}-{}", book.base.symbol, book.quote.symbol);
                                             tracing::info!("OBP Event: Orderbook {} has been updated", symtag);
                                             tracked.insert(key.clone(), Some(book.clone()));

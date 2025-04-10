@@ -1,6 +1,6 @@
 use crate::{
     data::fmt::SrzToken,
-    types::{ProtoTychoState, TradeResult},
+    types::{ProtoSimComp, TradeResult},
     utils::r#static::maths::{BPD, FRACTION_REALLOC, MAX_ITERATIONS, ONE_HD},
 };
 use num_bigint::BigUint;
@@ -11,7 +11,7 @@ use tycho_simulation::models::Token;
 /// Only “activate” an additional pool if the net benefit (output after gas cost) exceeds a fixed activation penalty.
 pub fn gradient(
     amount: f64, // human–readable amount (e.g. 100 meaning 100 ETH)
-    pools: &[ProtoTychoState],
+    pools: &[ProtoSimComp],
     tkinput: SrzToken,
     tkoutput: SrzToken,
     eth_usd: f64,       // ETH price in USD

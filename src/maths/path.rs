@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     data::fmt::{SrzProtocolComponent, SrzToken},
-    types::ProtoTychoState,
+    types::ProtoSimComp,
 };
 use tycho_simulation::models::Token;
 
@@ -60,7 +60,7 @@ pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) ->
 
 /// Quote a path of tokens, using components and protosim Tycho functions
 /// Used to calculate the price of a path of tokens, mostly to ETH
-pub fn quote(pts: Vec<ProtoTychoState>, atks: Vec<SrzToken>, path: Vec<String>) -> Option<f64> {
+pub fn quote(pts: Vec<ProtoSimComp>, atks: Vec<SrzToken>, path: Vec<String>) -> Option<f64> {
     // If ETH, return 1. Else, if the path is empty, return None.
     if path.len() == 1 {
         tracing::warn!(" - Path is just ETH. Returning quote of 1.0");

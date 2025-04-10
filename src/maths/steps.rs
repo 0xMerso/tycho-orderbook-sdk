@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{
-    data::fmt::{SrzProtocolComponent, SrzToken},
-    utils::{self},
-};
+use crate::data::fmt::{SrzProtocolComponent, SrzToken};
 
 /// Sum the total liquidity of a pair of tokens.
 /// @dev components Every similar components (= matching a pair)
@@ -28,22 +25,6 @@ pub fn depth(components: Vec<SrzProtocolComponent>, targets: Vec<SrzToken>, data
     cumulated
 }
 
-pub type AmountStepsFn = fn(liquidity: f64) -> Vec<f64>;
-
-/// Default steps function
-/// This function generates a set of quoted amounts based on the aggregated liquidity of the pools.
-/// Up to END_MULTIPLIER % of the aggregated liquidity, it generates a set of amounts using an exponential function with minimum delta percentage.
-pub fn exponential(liquidity: f64) -> Vec<f64> {
-    let start = liquidity / utils::r#static::maths::TEN_MILLIONS;
-    let steps = _expo(
-        utils::r#static::maths::simu::COUNT,
-        utils::r#static::maths::simu::START_MULTIPLIER,
-        utils::r#static::maths::simu::END_MULTIPLIER,
-        utils::r#static::maths::simu::END_MULTIPLIER * utils::r#static::maths::simu::MIN_EXP_DELTA_PCT,
-    );
-    steps.iter().map(|x| x * start).collect::<Vec<f64>>()
-}
-
 /// Generates `n_points` along an exponential curve between `start` and `end`.
 /// # Arguments
 /// * `n_points` - Number of points to generate.
@@ -51,7 +32,7 @@ pub fn exponential(liquidity: f64) -> Vec<f64> {
 /// * `end` - The ending value of the curve.
 /// # Returns
 /// A vector of f64 values representing the points along the exponential curve.
-fn _expo(n_points: usize, start: f64, end: f64, min_delta: f64) -> Vec<f64> {
+pub fn expo(n_points: usize, start: f64, end: f64, min_delta: f64) -> Vec<f64> {
     let lambda = 2.0; // parameter for the ease-in when start == 0
     let mut result = Vec::new();
     // Prevent division by zero if n_points == 1
