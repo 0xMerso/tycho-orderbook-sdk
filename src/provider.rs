@@ -19,7 +19,6 @@ use types::{OrderbookFunctions, ProtoTychoState};
 use types::{OrderbookProviderConfig, OrderbookRequestParams};
 
 /// OrderbookProvider is a struct that manages the protocol stream and shared state, and provides methods to interact with the stream, build orderbooks, and more.
-///
 impl OrderbookProvider {
     /// Creates a new OBP instance using a ProtocolStreamBuilder (from Tycho) with custom configuration
     /// # Arguments
@@ -32,9 +31,10 @@ impl OrderbookProvider {
         // Build the protocol stream that yields Result<BlockUpdate, StreamDecodeError>.
         match ob.psb.build().await {
             Ok(stream) => {
-                let (tx, rx) = mpsc::channel(config.capacity);
-                let dup = state.clone();
-                let state = state.clone();
+                let (sender, receiver) = mpsc::channel(config.capacity);
+                // let dup = state.clone();
+                // let state = state.clone();A
+                let shared = state.clone();
                 // Spawn an asynchronous task that processes the protocol stream.
                 // For each message received, update the shared state and send an OrderbookEvent.
                 tracing::debug!("Starting stream processing task.");
@@ -67,56 +67,55 @@ impl OrderbookProvider {
                                         // tracing::debug!("Adding new component {} to the shared state: {}", comp.protocol_system.clone(), comp.protocol_type_name.clone());
                                         targets.push(comp.id.to_string().to_lowercase());
                                     }
-                                    let mut mtx = state.write().await;
-                                    mtx.protosims = msg.states.clone();
-                                    mtx.components = msg.new_pairs.clone();
-                                    mtx.initialised = true;
-                                    drop(mtx);
+                                    let mut writing = state.write().await;
+                                    writing.protosims = msg.states.clone();
+                                    writing.components = msg.new_pairs.clone();
+                                    writing.initialised = true;
+                                    drop(writing);
                                     let event = OrderbookEvent::Initialised(msg.block_number);
-                                    let _ = tx.send(event).await;
+                                    let _ = sender.send(event).await;
                                 } else {
                                     let mut updated = vec![];
                                     if !msg.states.is_empty() {
-                                        let mut mtx = state.write().await;
+                                        let mut writing = state.write().await;
 
                                         for x in msg.states.iter() {
-                                            mtx.protosims.insert(x.0.clone().to_lowercase(), x.1.clone());
+                                            writing.protosims.insert(x.0.clone().to_lowercase(), x.1.clone());
                                             updated.push(x.0.clone().to_lowercase());
                                         }
-                                        drop(mtx);
+                                        drop(writing);
                                     }
                                     if !msg.new_pairs.is_empty() || !msg.removed_pairs.is_empty() {
-                                        let mut mtx = state.write().await;
+                                        let mut writing = state.write().await;
                                         for x in msg.new_pairs.iter() {
-                                            mtx.components.insert(x.0.clone().to_lowercase(), x.1.clone());
+                                            writing.components.insert(x.0.clone().to_lowercase(), x.1.clone());
                                         }
                                         for x in msg.removed_pairs.iter() {
-                                            mtx.components.remove(&x.0.clone().to_lowercase());
+                                            writing.components.remove(&x.0.clone().to_lowercase());
                                         }
                                         tracing::debug!("Received {} new pairs, and {} pairs to be removed. Updating Redis ...", msg.new_pairs.len(), msg.removed_pairs.len());
-                                        drop(mtx);
+                                        drop(writing);
                                     }
                                     let event = OrderbookEvent::NewHeader(msg.block_number, updated.clone());
-                                    let _ = tx.send(event).await;
+                                    let _ = sender.send(event).await;
                                 }
                             }
                             Err(err) => {
                                 let event = OrderbookEvent::Error(err);
-                                let _ = tx.send(event).await;
+                                let _ = sender.send(event).await;
                             }
                         }
                     }
                 });
 
                 let obp = OrderbookProvider {
-                    stream: Mutex::new(rx),
-                    state: dup, // ---> Anormal here, but it works, need to clarify. Arc pointing to the same memory location, it should be ok, but incoherent to need dup
+                    stream: Mutex::new(receiver),
+                    state: shared, // ---> Anormal here, but it works, need to clarify. Arc pointing to the same memory location, it should be ok, but incoherent to need dup
                     _handle: handle,
                     tokens: ob.tokens.clone(),
                     network: ob.network.clone(),
                     apikey: ob.apikey.clone(),
                 };
-
                 Ok(obp)
             }
             Err(err) => {

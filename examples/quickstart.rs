@@ -109,9 +109,10 @@ async fn main() {
     let state = Arc::clone(&obp.state);
     tracing::debug!("OBP Client started. Waiting for updates");
     loop {
+        // Arc prevents moving out inner fields, and this loop is creating multiple consumers.
         // Loop indefinitely over the stream, printing received events.
-        let mut locked = obp.stream.lock().await;
-        if let Some(event) = locked.recv().await {
+        let mut stream = obp.stream.lock().await;
+        if let Some(event) = stream.recv().await {
             match event {
                 OrderbookEvent::Initialised(block) => {
                     tracing::info!("Event: Initialised: : ✅ Initialised at block {}", block);
@@ -254,8 +255,7 @@ async fn main() {
                 }
                 OrderbookEvent::Error(err) => {
                     tracing::error!("OBP Event: Error: {:?}", err);
-                } // OrderbookEvent : OrderbookBuilt(tag)
-                  // OrderbookEvent : OrderbookUdapted(tag)
+                }
             }
         }
     }

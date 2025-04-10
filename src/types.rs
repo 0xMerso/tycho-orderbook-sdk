@@ -6,17 +6,17 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use utoipa::ToSchema;
 
+use super::{
+    core::book::QuoteFn,
+    data::fmt::{SrzProtocolComponent, SrzToken},
+};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tycho_simulation::evm::decoder::StreamDecodeError;
 use tycho_simulation::evm::stream::ProtocolStreamBuilder;
-
-use super::{
-    core::book::QuoteFn,
-    data::fmt::{SrzProtocolComponent, SrzToken},
-};
 use tycho_simulation::protocol::{models::ProtocolComponent, state::ProtocolSim};
+use tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter;
 
 use crate::{
     core::book::optimize,
@@ -352,8 +352,7 @@ impl Default for OrderbookProviderConfig {
 
 #[derive(Clone)]
 pub struct OrderbookBuilderConfig {
-    pub filter: tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter,
-    // pub filter: tycho_client::feed::component_tracker::ComponentFilter,
+    pub filter: ComponentFilter,
 }
 
 /// Struct used to build the orderbook functions in order to customize the orderbook construction
