@@ -1,7 +1,5 @@
 use futures::StreamExt;
 
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
 use tokio::task::JoinHandle;
 
 use crate::builder::OrderbookBuilder;
@@ -192,108 +190,81 @@ impl OrderbookProvider {
         let comp = mtx.components.clone();
         drop(mtx);
         let acps = comp.iter().map(|x| SrzProtocolComponent::from(x.1.clone())).collect::<Vec<SrzProtocolComponent>>(); // Not efficient at all
+
+        // --- Check if the pair is valid ---
         let targets = params.tag.clone().split("-").map(|x| x.to_string().to_lowercase()).collect::<Vec<String>>();
         if targets.len() != 2 {
             return Err(anyhow::anyhow!("Invalid pair"));
         }
-        let atks = self.tokens.clone();
-        let srzt0 = atks
+        let all_tokens = self.tokens.clone();
+        let srzt0 = all_tokens
             .iter()
             .find(|x| x.address.to_lowercase() == targets[0].clone())
-            .ok_or_else(|| anyhow::anyhow!("Token {} not found", targets[0]))
-            .unwrap();
-        let srzt1 = atks
+            .ok_or_else(|| anyhow::anyhow!("Token not found: {}", targets[0]));
+        let srzt1 = all_tokens
             .iter()
             .find(|x| x.address.to_lowercase() == targets[1].clone())
-            .ok_or_else(|| anyhow::anyhow!("Token {} not found", targets[0]))
-            .unwrap();
+            .ok_or_else(|| anyhow::anyhow!("Token not found: {}", targets[0]));
+        let (srzt0, srzt1) = match (srzt0, srzt1) {
+            (Ok(t0), Ok(t1)) => (t0.clone(), t1.clone()),
+            (Err(e), _) => return Err(e),
+            (_, Err(e)) => return Err(e),
+        };
+
         let targets = vec![srzt0.clone(), srzt1.clone()];
         tracing::debug!("Building orderbook for pair {}-{} | Single point: {}", targets[0].symbol.clone(), targets[1].symbol.clone(), single);
-        let (base_to_eth_path, base_to_eth_comps) = maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
-        let (quote_to_eth_path, quote_to_eth_comps) = maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), self.network.eth.to_lowercase()).unwrap_or_default();
-        let mut to_eth_pts: Vec<ProtoSimComp> = vec![];
-        let mut pts: Vec<ProtoSimComp> = vec![];
-        let mtx = self.state.read().await;
-        for cp in acps.clone() {
-            if base_to_eth_comps.contains(&cp.id.to_lowercase()) || quote_to_eth_comps.contains(&cp.id.to_lowercase()) {
-                if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
-                    to_eth_pts.push(ProtoSimComp {
-                        component: cp.clone(),
-                        protosim: protosim.clone(),
-                    });
+        // --- Compute path ---
+        let base_to_eth: Result<types::ValorisationPath, String> = maths::path::routing(acps.clone(), srzt0.address.to_string().to_lowercase(), self.network.eth.to_lowercase());
+        let quote_to_eth: Result<types::ValorisationPath, String> = maths::path::routing(acps.clone(), srzt1.address.to_string().to_lowercase(), self.network.eth.to_lowercase());
+        match (base_to_eth, quote_to_eth) {
+            (Ok(base_to_eth), Ok(quote_to_eth)) => {
+                let mut to_eth_pts: Vec<ProtoSimComp> = vec![];
+                let mut pts: Vec<ProtoSimComp> = vec![];
+                let mtx = self.state.read().await;
+                for cp in acps.clone() {
+                    if base_to_eth.comp_path.contains(&cp.id.to_lowercase()) || quote_to_eth.comp_path.contains(&cp.id.to_lowercase()) {
+                        if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
+                            to_eth_pts.push(ProtoSimComp {
+                                component: cp.clone(),
+                                protosim: protosim.clone(),
+                            });
+                        }
+                    }
+                    if book::matchcp(cp.tokens.clone(), targets.clone()) {
+                        if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
+                            pts.push(ProtoSimComp {
+                                component: cp.clone(),
+                                protosim: protosim.clone(),
+                            });
+                        }
+                    }
+                }
+                drop(mtx);
+                if pts.is_empty() {
+                    return Err(anyhow::anyhow!("No components found for the given pair"));
+                }
+                tracing::debug!("Found {} components for the pair. Evaluation t0/t1 ETH value ...", pts.len());
+                let unit_base_eth_worth = maths::path::quote(to_eth_pts.clone(), all_tokens.clone(), base_to_eth.token_path.clone());
+                let unit_quote_eth_worth = maths::path::quote(to_eth_pts.clone(), all_tokens.clone(), quote_to_eth.token_path.clone());
+                match (unit_base_eth_worth, unit_quote_eth_worth) {
+                    (Some(unit_base_eth_worth), Some(unit_quote_eth_worth)) => {
+                        book::build(
+                            solver,
+                            self.network.clone(),
+                            self.apikey.clone(),
+                            pts.clone(),
+                            targets.clone(),
+                            params.clone(),
+                            unit_base_eth_worth,
+                            unit_quote_eth_worth,
+                        )
+                        .await
+                    }
+                    _ => Err(anyhow::anyhow!("Failed to quote the pair in ETH")),
                 }
             }
-            if book::matchcp(cp.tokens.clone(), targets.clone()) {
-                if let Some(protosim) = mtx.protosims.get(&cp.id.to_lowercase()) {
-                    pts.push(ProtoSimComp {
-                        component: cp.clone(),
-                        protosim: protosim.clone(),
-                    });
-                }
-            }
+            (Err(e), _) => Err(anyhow::anyhow!(e)),
+            (_, Err(e)) => Err(anyhow::anyhow!(e)),
         }
-        drop(mtx);
-        if pts.is_empty() {
-            return Err(anyhow::anyhow!("No components found for the given pair"));
-        }
-        tracing::debug!("Found {} components for the pair. Evaluation t0/t1 ETH value ...", pts.len());
-        let unit_base_eth_worth = maths::path::quote(to_eth_pts.clone(), atks.clone(), base_to_eth_path.clone());
-        let unit_quote_eth_worth = maths::path::quote(to_eth_pts.clone(), atks.clone(), quote_to_eth_path.clone());
-        match (unit_base_eth_worth, unit_quote_eth_worth) {
-            (Some(unit_base_eth_worth), Some(unit_quote_eth_worth)) => Ok(book::build(
-                solver,
-                self.network.clone(),
-                self.apikey.clone(),
-                pts.clone(),
-                targets.clone(),
-                params.clone(),
-                unit_base_eth_worth,
-                unit_quote_eth_worth,
-            )
-            .await),
-            _ => Err(anyhow::anyhow!("Failed to quote the pair in ETH")),
-        }
-    }
-
-    /// Generates the struct param to build an orderbook
-    /// Min_comps is the minimum number of components that the pair should have (= liquidity pools), the higher it is, the more iterations it will take to find a pair
-    pub async fn generate_random_orderbook_params(&self, min_comps: usize) -> OrderbookRequestParams {
-        tracing::debug!("Generating random orderbook ...");
-        let seed = [42u8; 32]; // 256-bit seed
-        let mut rng = StdRng::from_seed(seed);
-        let tokens = self.tokens.clone();
-        let size = tokens.len();
-        let mut iterations = 0;
-        let mut components = vec![];
-        let mut tag = "".to_string();
-        while components.len() < min_comps {
-            let t0 = rng.gen_range(1..=size - 1);
-            let token0 = tokens.get(t0).unwrap();
-            let token1 = tokens.get(t0 - 1).unwrap();
-            let tgcps = self.get_components_for_target(vec![token0.clone(), token1.clone()]).await;
-            if tgcps.len() >= min_comps {
-                if token0.symbol == *"WETH" || token1.symbol == *"WETH" || token0.symbol == *"SolvBTC" || token1.symbol == *"SolvBTC" {
-                    continue;
-                }
-                tracing::debug!(
-                    "Got {} components found for pair >>> {}  🔄  {} ({}-{}) (after {} iterations)",
-                    tgcps.len(),
-                    token0.symbol.clone(),
-                    token1.symbol.clone(),
-                    token0.address.clone(),
-                    token1.address.clone(),
-                    iterations
-                );
-
-                tag = format!("{}-{}", token0.address.to_lowercase(), token1.address.to_lowercase());
-                components = tgcps;
-            } else {
-                if iterations % 1000 == 0 {
-                    tracing::debug!("No components found for pair {}-{} (iterations # {})", token0.symbol.clone(), token1.symbol.clone(), iterations);
-                }
-                iterations += 1;
-            }
-        }
-        OrderbookRequestParams { tag, point: None }
     }
 }
