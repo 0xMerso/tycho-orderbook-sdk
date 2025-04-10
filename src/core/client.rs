@@ -60,7 +60,10 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
             let mut result = HashMap::new();
             for cb in component_balances.iter() {
                 for c in cb.iter() {
-                    result.insert(c.0.clone().to_string().to_lowercase(), u128::from_str_radix(c.1.to_string().trim_start_matches("0x"), 16).unwrap());
+                    let b = u128::from_str_radix(c.1.to_string().trim_start_matches("0x"), 16);
+                    if let Ok(b) = b {
+                        result.insert(c.0.clone().to_string().to_lowercase(), b);
+                    }
                 }
             }
             Some(result)
@@ -88,15 +91,17 @@ pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
                         if t.symbol.len() >= 20 {
                             continue; // Symbol has been mistaken for a contract address, possibly.
                         }
-                        tokens.push(Token {
-                            address: tycho_simulation::tycho_core::Bytes::from_str(t.address.clone().to_string().as_str()).unwrap(),
-                            decimals: t.decimals as usize,
-                            symbol: t.symbol.clone(),
-                            gas: BigUint::from(g),
-                        });
+                        if let Ok(addr) = tycho_simulation::tycho_core::Bytes::from_str(t.address.clone().to_string().as_str()) {
+                            tokens.push(Token {
+                                address: addr,
+                                decimals: t.decimals as usize,
+                                symbol: t.symbol.clone(),
+                                gas: BigUint::from(g),
+                            });
+                        }
                     }
                     tokens = filter_valid_strings(tokens);
-                    let elasped = time.elapsed().unwrap().as_millis();
+                    let elasped = time.elapsed().unwrap_or_default().as_millis();
                     tracing::debug!("Took {:?} ms to get {} tokens on {}", elasped, tokens.len(), network.name);
 
                     Some(tokens)
@@ -141,7 +146,7 @@ pub async fn erc20b(provider: &RootProvider<Http<Client>>, owner: String, tokens
         let contract = IERC20::new(t.parse().unwrap(), client.clone());
         match contract.balanceOf(owner.parse().unwrap()).call().await {
             Ok(res) => {
-                let balance = res.balance.to_string().parse::<u128>().unwrap();
+                let balance = res.balance.to_string().parse::<u128>().unwrap_or_default();
                 balances.push(balance);
             }
             Err(e) => {
@@ -155,6 +160,7 @@ pub async fn erc20b(provider: &RootProvider<Http<Client>>, owner: String, tokens
 
 /// Fetch the price of and oracle, in this case of the 'gas_token' of a network
 /// Assume the oracle in under the 'Chainlink' interface
+/// Unwrap are assumed safe, given the configuration SDK is correct.
 pub async fn get_eth_usd_chainlink(rpc: String, feed: String) -> Option<f64> {
     tracing::debug!("Fetching price from chainlink oracle: {}", feed.clone());
     let pfeed: Address = feed.clone().parse().unwrap();

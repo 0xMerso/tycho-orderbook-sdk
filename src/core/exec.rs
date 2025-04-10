@@ -1,6 +1,7 @@
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 use alloy::{
+    network::EthereumWallet,
     primitives::{Address, B256},
     providers::{Provider, ProviderBuilder},
     rpc::types::{
@@ -21,46 +22,9 @@ use alloy_primitives::{Bytes as AlloyBytes, U256};
 use tycho_simulation::protocol::models::ProtocolComponent;
 
 use crate::{
-    data::fmt::SrzProtocolComponent,
     types::{self, ExecutedPayload, ExecutionRequest, Network, PayloadToExecute},
     utils::r#static::{execution, maths::BPD},
 };
-
-/// Get the original components from the list of components
-/// Used when Tycho packages require the exact components
-/// Conversion from:: SrzProtocolComponent to ProtocolComponent doesn't work. Idk why.
-pub fn get_original_components(originals: HashMap<String, ProtocolComponent>, targets: Vec<SrzProtocolComponent>) -> Vec<ProtocolComponent> {
-    let mut filtered = Vec::with_capacity(targets.len());
-    for cp in targets.clone().iter().enumerate() {
-        let tgt = cp.1.id.to_string().to_lowercase();
-        if let Some(original) = originals.get(&tgt) {
-            filtered.push(original.clone());
-        } else {
-            tracing::warn!("OBP Event: Error: Component {} not found in the original list, anormal !", tgt);
-        }
-    }
-    if filtered.len() != targets.len() {
-        tracing::error!("Execution error: not all components found in the original list, anormal !");
-    }
-    let order: HashMap<String, usize> = targets.iter().enumerate().map(|(i, item)| (item.id.to_string().to_lowercase(), i)).collect();
-    filtered.sort_by_key(|item| order.get(&item.id.to_string().to_lowercase()).copied().unwrap_or(usize::MAX));
-    // --- Tmp Debug ---
-    // for o in filtered.iter() {
-    //     tracing::trace!(" - originals : {}", o.id);
-    //     let attributes = o.static_attributes.clone();
-    //     for a in attributes.iter() {
-    //         tracing::trace!("   - {}: {}", a.0, a.1);
-    //     }
-    // }
-    // for t in targets.iter() {
-    //     tracing::trace!(" - targets   : {}", t.id);
-    //     let attributes = t.static_attributes.clone();
-    //     for a in attributes.iter() {
-    //         tracing::trace!("   - {}: {}", a.0, a.1);
-    //     }
-    // }
-    filtered
-}
 
 /// Build 2 transactions for the given solution:
 /// 1. Approve the given token to the router address.
@@ -156,8 +120,8 @@ pub async fn solution(_network: Network, request: ExecutionRequest, components: 
     for (x, dist) in distributions.iter().enumerate() {
         // log::trace!("Distribution #{}: {}", x, dist);
         let original = components[x].clone(); // get
-        let input = tycho_simulation::tycho_core::Bytes::from_str(request.input.clone().address.to_lowercase().as_str()).unwrap();
-        let output = tycho_simulation::tycho_core::Bytes::from_str(request.output.clone().address.to_lowercase().as_str()).unwrap();
+        let input = tycho_simulation::tycho_core::Bytes::from_str(request.input.clone().address.to_lowercase().as_str()).unwrap(); // from_str Bytes are assumed safe
+        let output = tycho_simulation::tycho_core::Bytes::from_str(request.output.clone().address.to_lowercase().as_str()).unwrap(); // from_str Bytes are assumed safe
         if single_swap && x == single_swap_index {
             swaps.push(tycho_execution::encoding::models::Swap::new(original.clone(), input, output, 0f64));
             break;
@@ -175,10 +139,10 @@ pub async fn solution(_network: Network, request: ExecutionRequest, components: 
     tracing::debug!("Expected: {} of {} | Checked: {}", expected, request.output.symbol.clone(), checked_amount);
     let solution: Solution = Solution {
         // Addresses
-        sender: tycho_simulation::tycho_core::Bytes::from_str(request.sender.to_lowercase().as_str()).unwrap(),
-        receiver: tycho_simulation::tycho_core::Bytes::from_str(request.sender.to_lowercase().as_str()).unwrap(),
-        given_token: tycho_simulation::tycho_core::Bytes::from_str(request.input.clone().address.to_lowercase().as_str()).unwrap(),
-        checked_token: tycho_simulation::tycho_core::Bytes::from_str(request.output.clone().address.to_lowercase().as_str()).unwrap(),
+        sender: tycho_simulation::tycho_core::Bytes::from_str(request.sender.to_lowercase().as_str()).unwrap(), // from_str Bytes are assumed safe
+        receiver: tycho_simulation::tycho_core::Bytes::from_str(request.sender.to_lowercase().as_str()).unwrap(), // from_str Bytes are assumed safe
+        given_token: tycho_simulation::tycho_core::Bytes::from_str(request.input.clone().address.to_lowercase().as_str()).unwrap(), // from_str Bytes are assumed safe
+        checked_token: tycho_simulation::tycho_core::Bytes::from_str(request.output.clone().address.to_lowercase().as_str()).unwrap(), // from_str Bytes are assumed safe
         // Others fields
         given_amount: amount_in.clone(),
         slippage: Some(slippage),
@@ -192,46 +156,23 @@ pub async fn solution(_network: Network, request: ExecutionRequest, components: 
     Some(solution)
 }
 
-/// Broadcast the given transactions to the network
-pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Option<String>) -> ExecutedPayload {
-    let mut br = ExecutedPayload::default();
-    // --- Assert private key is provided ---
-    let pk = match pk.clone() {
-        Some(pk) => pk,
-        None => {
-            tracing::error!("Private key not provided");
-            return br;
-        }
-    };
-    // --- Build provider and signer ---
+pub async fn simulate_execution(network: Network, payload: PayloadToExecute, signer: EthereumWallet) -> bool {
     let alloy_chain = crate::utils::misc::get_alloy_chain(network.name.clone()).expect("Failed to get alloy chain");
-    let wallet = PrivateKeySigner::from_bytes(&B256::from_str(&pk).expect("Failed to convert swapper pk to B256")).expect("Failed to private key signer");
-    let signer = alloy::network::EthereumWallet::from(wallet.clone());
     let provider = ProviderBuilder::new().with_chain(alloy_chain).wallet(signer.clone()).on_http(network.rpc.parse().unwrap());
-    let sender = transactions.swap.from.unwrap_or_default().to_string().to_lowercase();
-    let matching = wallet.address().to_string().eq_ignore_ascii_case(sender.clone().as_str());
-    tracing::trace!(
-        "Signer imported via pk: {:?} | Request sender: {:?} | Match = {}",
-        wallet.address(),
-        transactions.swap.from.clone(),
-        matching
-    );
-
     // --- Simulate ---
     let payload = SimulatePayload {
         block_state_calls: vec![SimBlock {
             block_overrides: None,
             state_overrides: None,
-            calls: vec![transactions.approve.clone(), transactions.swap.clone()],
+            calls: vec![payload.approve.clone(), payload.swap.clone()],
         }],
         trace_transfers: true,
         validation: true,
         return_full_transactions: true,
     };
-
-    // ToDo @dev: Adapt this for Base too
     // eth_simulateV1 seems not available on Base, you can adjust the RPC to another provider supporting it (eth_simulateV1), or comment the simulate part.
-    // Exemple: https://basescan.org/tx/0xd3a2a8e2d7b752d857298ef280d63975b072f030f811a65355214fb5de616d06
+    // Example Mainnet: https://etherscan.io/tx/0x5fb3bcc10e21108cc537a6484b7689bd806bdc7702f181e38d9800aba162a44d
+    // Example Base: https://basescan.org/tx/0xd3a2a8e2d7b752d857298ef280d63975b072f030f811a65355214fb5de616d06
     let mut is_simulation_success = true;
     match network.name.as_str() {
         "ethereum" => {
@@ -257,8 +198,39 @@ pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Opt
             tracing::debug!("Simulation not supported on Base. Broadcasting directly.");
         }
         _ => {}
-    }
-    if is_simulation_success {
+    };
+    is_simulation_success
+}
+
+/// Broadcast the given transactions to the network
+pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Option<String>) -> Result<ExecutedPayload, anyhow::Error> {
+    let mut br = ExecutedPayload::default();
+    // --- Assert private key is provided ---
+    let pk = match pk.clone() {
+        Some(pk) => pk,
+        None => {
+            tracing::error!("Private key not provided");
+            return Err(anyhow::anyhow!("Private key not provided"));
+        }
+    };
+    // --- Build provider and signer ---
+    let alloy_chain = crate::utils::misc::get_alloy_chain(network.name.clone()).expect("Failed to get alloy chain");
+    let wallet = PrivateKeySigner::from_bytes(&B256::from_str(&pk).expect("Failed to convert swapper pk to B256")).expect("Failed to private key signer");
+    let signer = alloy::network::EthereumWallet::from(wallet.clone());
+    let provider = ProviderBuilder::new().with_chain(alloy_chain).wallet(signer.clone()).on_http(network.rpc.parse().unwrap());
+    let sender = transactions.swap.from.unwrap_or_default().to_string().to_lowercase();
+    let matching = wallet.address().to_string().eq_ignore_ascii_case(sender.clone().as_str());
+    tracing::trace!(
+        "Signer imported via pk: {:?} | Request sender: {:?} | Match = {}",
+        wallet.address(),
+        transactions.swap.from.clone(),
+        matching
+    );
+
+    // eth_simulateV1 seems not available on Base, you can adjust the RPC to another provider supporting it (eth_simulateV1), or comment the simulate part.
+    // Example Mainnet: https://etherscan.io/tx/0x5fb3bcc10e21108cc537a6484b7689bd806bdc7702f181e38d9800aba162a44d
+    // Example Base: https://basescan.org/tx/0xd3a2a8e2d7b752d857298ef280d63975b072f030f811a65355214fb5de616d06
+    if matching && simulate_execution(network.clone(), transactions.clone(), signer.clone()).await {
         tracing::debug!("Broadcasting to RPC URL: {}", network.rpc);
         //  --- Broadcast Approval ---
         match provider.send_transaction(transactions.approve).await {
@@ -316,9 +288,11 @@ pub async fn broadcast(network: Network, transactions: PayloadToExecute, pk: Opt
                 br.approve.error = Some(e.to_string());
             }
         }
+    } else {
+        tracing::error!("Simulation failed. No broadcast.");
+        return Err(anyhow::anyhow!("Simulation failed (or sender != pv key). No broadcast."));
     }
-
-    br
+    Ok(br)
 }
 
 /// Create swap transactions on the specified network for the given request.

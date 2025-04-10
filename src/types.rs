@@ -341,6 +341,12 @@ pub struct ProtoSimComp {
     pub protosim: Box<dyn ProtocolSim>,
 }
 
+#[derive(Clone, Debug)]
+pub struct ValorisationPath {
+    pub token_path: Vec<String>,
+    pub comp_path: Vec<String>,
+}
+
 /// Orderbook request params used to build a orderbook for a given pair
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct OrderbookRequestParams {

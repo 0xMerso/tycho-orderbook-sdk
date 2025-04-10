@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     data::fmt::{SrzProtocolComponent, SrzToken},
-    types::ProtoSimComp,
+    types::{ProtoSimComp, ValorisationPath},
 };
 use tycho_simulation::models::Token;
 
@@ -10,7 +10,7 @@ use tycho_simulation::models::Token;
 /// Used to price any token to ETH equivalent value, to reflect gas cost
 /// But can be used to price any token to any other token
 /// Only return the path, not the price
-pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) -> Option<(Vec<String>, Vec<String>)> {
+pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) -> Result<ValorisationPath, String> {
     // (destination token address, component id that provides this conversion)
     let mut graph: HashMap<String, Vec<(String, String)>> = HashMap::new();
     for comp in cps {
@@ -26,17 +26,15 @@ pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) ->
     }
     // For debugging: print the graph
     // e.g., log::info!("Graph: {:?}", graph);
-
     let start = input.to_lowercase();
     let target = target.to_lowercase();
     // Queue items: (current token, token path, component id path)
     let mut queue: VecDeque<(String, Vec<String>, Vec<String>)> = VecDeque::new();
     queue.push_back((start.clone(), vec![start.clone()], vec![]));
     let mut visited: HashSet<String> = HashSet::new();
-
     while let Some((current, token_path, comp_path)) = queue.pop_front() {
         if current == target {
-            return Some((token_path, comp_path));
+            return Ok(ValorisationPath { token_path, comp_path });
         }
         if visited.contains(&current) {
             continue;
@@ -55,7 +53,7 @@ pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) ->
             }
         }
     }
-    None
+    Err(format!("No path found from {} to {}", input, target))
 }
 
 /// Quote a path of tokens, using components and protosim Tycho functions
