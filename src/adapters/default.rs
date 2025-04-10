@@ -28,7 +28,7 @@ pub trait DefaultOrderBookAdapter: Send + Sync {
     async fn create(&self, network: Network, request: ExecutionRequest, components: Vec<ProtocolComponent>, pk: Option<String>) -> Result<PayloadToExecute, String>; // (&mut self, side: Side, quantity: f64, price: f64);
 
     /// Sends the payload of transactions (approve, swap, )
-    async fn send(&self, network: Network, payload: PayloadToExecute, pk: Option<String>) -> ExecutedPayload;
+    async fn send(&self, network: Network, payload: PayloadToExecute, pk: Option<String>) -> Result<ExecutedPayload, anyhow::Error>;
 }
 
 #[async_trait]
@@ -59,7 +59,7 @@ impl DefaultOrderBookAdapter for Orderbook {
             let amount_in_quote = ask.amount / price_in_quote;
             asks_depth.push((price_in_quote, amount_in_quote));
         }
-        // Sort quantities in ascending order
+        // Sort quantities in ascending order. Unwrap is safe here.
         bids_depth.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         asks_depth.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         // let bids_depth_str: Vec<(String, String)> = bids_depth.iter().map(|(price, amount)| (price.to_string(), amount.to_string())).collect();
@@ -94,7 +94,7 @@ impl DefaultOrderBookAdapter for Orderbook {
     }
 
     /// Send the payload of transactions
-    async fn send(&self, network: Network, payload: PayloadToExecute, pk: Option<String>) -> ExecutedPayload {
+    async fn send(&self, network: Network, payload: PayloadToExecute, pk: Option<String>) -> Result<ExecutedPayload, anyhow::Error> {
         exec::broadcast(network.clone(), payload.clone(), pk).await
     }
 }
