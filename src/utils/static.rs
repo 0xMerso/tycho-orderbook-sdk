@@ -59,7 +59,7 @@ pub mod maths {
 
     pub mod simu {
         // Config for incrementing amountIn
-        pub static COUNT: usize = 30; // Iterations MAX, less due to min delta
+        pub static COUNT: usize = 15; // Iterations MAX, less due to min delta
         pub static START_MULTIPLIER: f64 = 1.;
         pub static END_MULTIPLIER: f64 = 1_000_000.; // 10% of TEN_MILLIONS
 
