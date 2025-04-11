@@ -61,10 +61,10 @@ pub fn routing(cps: Vec<SrzProtocolComponent>, input: String, target: String) ->
 pub fn quote(pts: Vec<ProtoSimComp>, atks: Vec<SrzToken>, path: Vec<String>) -> Option<f64> {
     // If ETH, return 1. Else, if the path is empty, return None.
     if path.len() == 1 {
-        tracing::warn!(" - Path is just ETH. Returning quote of 1.0");
+        tracing::debug!(" - Path is just ETH. Returning quote of 1.0");
         return Some(1.0);
     } else if path.len() < 2 {
-        tracing::warn!("🔺 Path is too short: {:?}", path);
+        tracing::error!("🔺 Path is too short: {:?}", path);
         return None;
     }
     let mut cumulative_price = 1.0;
