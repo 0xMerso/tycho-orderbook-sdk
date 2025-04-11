@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use tycho_simulation::evm::protocol::ekubo::state::EkuboState;
 use tycho_simulation::evm::protocol::filters::{balancer_pool_filter, curve_pool_filter, uniswap_v4_pool_with_hook_filter};
 use tycho_simulation::models::Token;
 
@@ -34,7 +33,7 @@ pub async fn default_protocol_stream_builder(network: Network, apikey: String, c
         hmt.insert(t.address.clone(), t.clone());
     });
 
-    tracing::debug!("network.tycho: {} and chain: {}", network.tycho, chain);
+    tracing::debug!("Tycho endpoint: {} and chain: {}", network.tycho, chain);
     let mut psb = ProtocolStreamBuilder::new(&network.tycho, chain)
         .exchange::<UniswapV2State>(TychoSupportedProtocol::UniswapV2.to_string().as_str(), filter.clone(), None)
         .exchange::<UniswapV3State>(TychoSupportedProtocol::UniswapV3.to_string().as_str(), filter.clone(), None)
@@ -45,14 +44,14 @@ pub async fn default_protocol_stream_builder(network: Network, apikey: String, c
         .await;
 
     if network.name.as_str() == "ethereum" {
-        tracing::trace!("Prebuild. Adding mainnet-specific exchanges");
+        tracing::trace!("Adding mainnet-specific exchanges");
         psb = psb
             .exchange::<UniswapV2State>(TychoSupportedProtocol::Sushiswap.to_string().as_str(), filter.clone(), None)
             .exchange::<UniswapV2State>(TychoSupportedProtocol::PancakeswapV2.to_string().as_str(), filter.clone(), None)
             .exchange::<UniswapV3State>(TychoSupportedProtocol::PancakeswapV3.to_string().as_str(), filter.clone(), None)
-            .exchange::<EkuboState>(TychoSupportedProtocol::EkuboV2.to_string().as_str(), filter.clone(), None)
             .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::BalancerV2.to_string().as_str(), filter.clone(), Some(balancer))
             .exchange::<EVMPoolState<PreCachedDB>>(TychoSupportedProtocol::Curve.to_string().as_str(), filter.clone(), Some(curve));
+        // .exchange::<EkuboState>(TychoSupportedProtocol::EkuboV2.to_string().as_str(), filter.clone(), None)
     }
     psb
 }
