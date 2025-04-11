@@ -172,9 +172,11 @@ async fn main() {
                                                     drop(mtx);
                                                     let originals = get_original_components(originals, book.pools.clone());
 
+                                                    tracing::info!("Creating the transactions to execute ...");
                                                     // match book.create(network.clone(), request, originals.clone(), Some(env.pvkey.clone())).await {
                                                     match book.create(network.clone(), request, originals.clone(), pk.clone()).await {
                                                         Ok(payload) => {
+                                                            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await; // Wait a bit before executing the transaction, to check the logs.
                                                             if real_exec {
                                                                 if !executed {
                                                                     match book.send(network.clone(), payload, pk.clone()).await {
