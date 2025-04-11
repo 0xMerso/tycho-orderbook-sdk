@@ -20,6 +20,8 @@ use crate::types::Network;
 
 use crate::types::TychoSupportedProtocol;
 
+/// Get the default protocol stream builder
+/// But any other configuration of ProtocolStreamBuilder can be used to build an orderbook
 pub async fn default_protocol_stream_builder(network: Network, apikey: String, config: OrderbookBuilderConfig, tokens: Vec<Token>) -> ProtocolStreamBuilder {
     let (_, _, chain) = types::chain(network.name.clone()).expect("Invalid chain");
     let u4 = uniswap_v4_pool_with_hook_filter;

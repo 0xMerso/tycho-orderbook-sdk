@@ -409,13 +409,20 @@ pub struct TradeResult {
 /// Orderbook data used to compute spread, and other metrics
 #[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MidPriceData {
+    // Best ask price
     pub ask: f64,
+    // Best bid price
     pub bid: f64,
+    // Mid price (ask + bid) / 2
     pub mid: f64,
+    // Spread is the difference between the best ask and bid price
     pub spread: f64,
     pub spread_pct: f64,
+    // Amount in of the trade used to get best bid/ask
     pub amount: f64,
+    // Amount out of the trade
     pub received: f64,
+    // Distribution result of the trade (likely 100% on 1 pool)
     pub distribution: Vec<f64>,
 }
 
