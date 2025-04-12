@@ -111,7 +111,7 @@ pub async fn build<S: OrderbookSolver>(
         }
         Err(e) => {
             tracing::error!("Error while building Tycho client: {}", e);
-            return Err(anyhow::anyhow!("Error while building Tycho client: {}", e));
+            Err(anyhow::anyhow!("Error while building Tycho client: {}", e))
         }
     }
 }
