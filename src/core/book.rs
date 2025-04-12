@@ -1,7 +1,10 @@
 use tycho_simulation::models::Token;
 
 use crate::{
-    core::{client, gas},
+    core::{
+        client::{self, build_tycho_client},
+        gas,
+    },
     data::fmt::{SrzProtocolComponent, SrzToken},
     maths::{self},
     types::{MidPriceData, Network, Orderbook, OrderbookRequestParams, ProtoSimComp, TradeResult},
@@ -36,70 +39,79 @@ pub async fn build<S: OrderbookSolver>(
     let mut base_lqdty = vec![];
     let mut quote_lqdty = vec![];
     let mut balances = HashMap::new();
-    for pdata in state.clone() {
-        pools.push(pdata.clone());
-        let proto = pdata.protosim.clone();
-        let price_base_to_quote = proto.spot_price(&base, &quote).unwrap_or_default();
-        let price_quote_to_base = proto.spot_price(&quote, &base).unwrap_or_default();
-        prices_base_to_quote.push(price_base_to_quote);
-        prices_quote_to_base.push(price_quote_to_base);
-        tracing::trace!(
-            "- Pool: {} | {} | Spot price for {}-{} => price_base_to_quote = {} and price_quote_to_base = {} | Fee = {}",
-            pdata.component.id,
-            pdata.component.protocol_type_name,
-            base.symbol,
-            quote.symbol,
-            price_base_to_quote,
-            price_quote_to_base,
-            pdata.component.fee
-        );
-        if let Some(cpbs) = client::get_component_balances(network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone(), tycho_token_api.clone()).await {
-            let base_bal = cpbs.get(&srzt0.address.to_lowercase()).unwrap_or(&0u128);
-            let base_bal = *base_bal as f64 / 10f64.powi(srzt0.decimals as i32);
-            base_lqdty.push(base_bal);
-            let quote_bal = cpbs.get(&srzt1.address.to_lowercase()).unwrap_or(&0u128);
-            let quote_bal = *quote_bal as f64 / 10f64.powi(srzt1.decimals as i32);
-            quote_lqdty.push(quote_bal);
-            let mut tmpb = HashMap::new();
-            tmpb.insert(srzt0.address.clone(), base_bal);
-            tmpb.insert(srzt1.address.clone(), quote_bal);
-            balances.insert(pdata.component.id.clone().to_lowercase(), tmpb);
-        } else {
-            base_lqdty.push(0f64);
-            quote_lqdty.push(0f64);
-            balances.insert(pdata.component.id.clone().to_lowercase(), HashMap::new());
-        }
-    }
-    let cps: Vec<SrzProtocolComponent> = pools.clone().iter().map(|p| p.component.clone()).collect();
-    let aggregated = maths::steps::depth(cps.clone(), tokens.clone(), balances.clone());
-    let avg_price_base_to_quote = prices_base_to_quote.iter().sum::<f64>() / prices_base_to_quote.len() as f64;
-    let avg_price_quote_to_base = prices_quote_to_base.iter().sum::<f64>() / prices_quote_to_base.len() as f64; // Ponderation by TVL ?
-    tracing::trace!("Average price 0to1: {} | Average price 1to0: {}", avg_price_base_to_quote, avg_price_quote_to_base);
-    match simulate(
-        solver,
-        network.clone(),
-        pools.clone(),
-        tokens,
-        query.clone(),
-        aggregated.clone(),
-        base_worth_eth,
-        quote_worth_eth,
-        avg_price_base_to_quote,
-        avg_price_quote_to_base,
-    )
-    .await
-    {
-        Ok(mut pso) => {
-            pso.prices_base_to_quote = prices_base_to_quote;
-            pso.prices_quote_to_base = prices_quote_to_base;
-            pso.base_lqdty = base_lqdty.clone();
-            pso.quote_lqdty = quote_lqdty.clone();
-            tracing::debug!("Done. Returning simulated orderbook for pair (base-quote) => '{}-{}'", base.symbol, quote.symbol);
-            Ok(pso)
+
+    match build_tycho_client(&network, tycho_token_api.clone()).await {
+        Ok(client) => {
+            for pdata in state.clone() {
+                pools.push(pdata.clone());
+                let proto = pdata.protosim.clone();
+                let price_base_to_quote = proto.spot_price(&base, &quote).unwrap_or_default();
+                let price_quote_to_base = proto.spot_price(&quote, &base).unwrap_or_default();
+                prices_base_to_quote.push(price_base_to_quote);
+                prices_quote_to_base.push(price_quote_to_base);
+                tracing::trace!(
+                    "- Pool: {} | {} | Spot price for {}-{} => price_base_to_quote = {} and price_quote_to_base = {} | Fee = {}",
+                    pdata.component.id,
+                    pdata.component.protocol_type_name,
+                    base.symbol,
+                    quote.symbol,
+                    price_base_to_quote,
+                    price_quote_to_base,
+                    pdata.component.fee
+                );
+                if let Some(cpbs) = client::get_component_balances(&client, network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone()).await {
+                    let base_bal = cpbs.get(&srzt0.address.to_lowercase()).unwrap_or(&0u128);
+                    let base_bal = *base_bal as f64 / 10f64.powi(srzt0.decimals as i32);
+                    base_lqdty.push(base_bal);
+                    let quote_bal = cpbs.get(&srzt1.address.to_lowercase()).unwrap_or(&0u128);
+                    let quote_bal = *quote_bal as f64 / 10f64.powi(srzt1.decimals as i32);
+                    quote_lqdty.push(quote_bal);
+                    let mut tmpb = HashMap::new();
+                    tmpb.insert(srzt0.address.clone(), base_bal);
+                    tmpb.insert(srzt1.address.clone(), quote_bal);
+                    balances.insert(pdata.component.id.clone().to_lowercase(), tmpb);
+                } else {
+                    base_lqdty.push(0f64);
+                    quote_lqdty.push(0f64);
+                    balances.insert(pdata.component.id.clone().to_lowercase(), HashMap::new());
+                }
+            }
+            let cps: Vec<SrzProtocolComponent> = pools.clone().iter().map(|p| p.component.clone()).collect();
+            let aggregated = maths::steps::depth(cps.clone(), tokens.clone(), balances.clone());
+            let avg_price_base_to_quote = prices_base_to_quote.iter().sum::<f64>() / prices_base_to_quote.len() as f64;
+            let avg_price_quote_to_base = prices_quote_to_base.iter().sum::<f64>() / prices_quote_to_base.len() as f64; // Ponderation by TVL ?
+            tracing::trace!("Average price 0to1: {} | Average price 1to0: {}", avg_price_base_to_quote, avg_price_quote_to_base);
+            match simulate(
+                solver,
+                network.clone(),
+                pools.clone(),
+                tokens,
+                query.clone(),
+                aggregated.clone(),
+                base_worth_eth,
+                quote_worth_eth,
+                avg_price_base_to_quote,
+                avg_price_quote_to_base,
+            )
+            .await
+            {
+                Ok(mut pso) => {
+                    pso.prices_base_to_quote = prices_base_to_quote;
+                    pso.prices_quote_to_base = prices_quote_to_base;
+                    pso.base_lqdty = base_lqdty.clone();
+                    pso.quote_lqdty = quote_lqdty.clone();
+                    tracing::debug!("Done. Returning simulated orderbook for pair (base-quote) => '{}-{}'", base.symbol, quote.symbol);
+                    Ok(pso)
+                }
+                Err(e) => {
+                    tracing::error!("Error while simulating orderbook: {}", e);
+                    Err(anyhow::anyhow!("Error while simulating orderbook: {}", e))
+                }
+            }
         }
         Err(e) => {
-            tracing::error!("Error while simulating orderbook: {}", e);
-            Err(anyhow::anyhow!("Error while simulating orderbook: {}", e))
+            tracing::error!("Error while building Tycho client: {}", e);
+            return Err(anyhow::anyhow!("Error while building Tycho client: {}", e));
         }
     }
 }
