@@ -1,3 +1,4 @@
+use std::any;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -30,18 +31,7 @@ use crate::utils::r#static::endpoints::COINGECKO_ETH_USD;
 /// Get the balances of the component in the specified protocol system.
 /// Returns a HashMap of component addresses and their balances.
 /// Balance is returned as a u128, with decimals.
-pub async fn get_component_balances(network: Network, cp: String, protosys: String, api_token: Option<String>) -> Option<HashMap<String, u128>> {
-    let key: &str = match &api_token {
-        Some(t) => t.as_str(),
-        None => "sampletoken",
-    };
-    let client = match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(key)) {
-        Ok(client) => client,
-        Err(e) => {
-            tracing::error!("Failed to create client: {:?}", e.to_string());
-            return None;
-        }
-    };
+pub async fn get_component_balances(client: &HttpRPCClient, network: Network, cp: String, protosys: String) -> Option<HashMap<String, u128>> {
     let (chain, _, _) = types::chain(network.name.clone()).expect("Invalid chain");
     let body = ProtocolStateRequestBody {
         protocol_ids: Some(vec![cp.clone()]),
@@ -69,8 +59,7 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
             Some(result)
         }
         Err(e) => {
-            let key_short: String = key.chars().take(5).collect();
-            tracing::error!("Failed to get protocol states: {} (with api key: {}...): {:?}", cp.clone(), key_short, e.to_string());
+            tracing::error!("Failed to get protocol states: {}: {:?}", cp.clone(), e.to_string());
             None
         }
     }
@@ -79,6 +68,7 @@ pub async fn get_component_balances(network: Network, cp: String, protosys: Stri
 /// Get the tokens from the Tycho API
 /// Filters are hardcoded for now.
 pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
+    tracing::info!("Getting tokens for network {}", network.name);
     match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(apikey.as_str())) {
         Ok(client) => {
             let time = std::time::SystemTime::now();
@@ -115,6 +105,22 @@ pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
         Err(e) => {
             tracing::error!("Failed to create client: {:?}", e.to_string());
             None
+        }
+    }
+}
+
+/// Get the tokens from the Tycho API
+/// Filters are hardcoded for now.
+pub async fn build_tycho_client(network: &Network, key: Option<String>) -> Result<HttpRPCClient, anyhow::Error> {
+    let key: &str = match &key {
+        Some(t) => t.as_str(),
+        None => "sampletoken",
+    };
+    match HttpRPCClient::new(format!("https://{}", &network.tycho).as_str(), Some(key)) {
+        Ok(client) => Ok(client),
+        Err(e) => {
+            tracing::error!("Failed to create client: {:?}", e.to_string());
+            Err(anyhow::anyhow!("Failed to create client: {:?}", e.to_string()))
         }
     }
 }
