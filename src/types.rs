@@ -47,8 +47,6 @@ pub struct Network {
     pub exp: String,
     #[schema(example = "http://tycho-beta.propellerheads.xyz")]
     pub tycho: String,
-    #[schema(example = "4242")]
-    pub port: u64,
     #[schema(example = "0x")]
     pub router: String,
     #[schema(example = "0x")]
@@ -57,6 +55,8 @@ pub struct Network {
     pub tag: String,
     #[schema(example = "0x")]
     pub chainlink: String,
+    #[schema(example = "12000")]
+    pub block_time_ms: u64,
 }
 
 /// Tycho protocol, used to configure ProtocolStreamBuilder
@@ -289,24 +289,10 @@ pub fn chain(name: String) -> Option<(ChainCommon, ChainSimCore, ChainSimu)> {
         "ethereum" => Some((ChainCommon::Ethereum, ChainSimCore::Ethereum, ChainSimu::Ethereum)),
         "arbitrum" => Some((ChainCommon::Arbitrum, ChainSimCore::Arbitrum, ChainSimu::Arbitrum)),
         "base" => Some((ChainCommon::Base, ChainSimCore::Base, ChainSimu::Base)),
+        "unichain" => Some((ChainCommon::Unichain, ChainSimCore::Unichain, ChainSimu::Unichain)),
         _ => {
             tracing::error!("Unknown chain: {}", name);
             None
-        }
-    }
-}
-
-/// Overwriting - Returns the default block time and timeout values for the given blockchain network.
-pub fn chain_timing(name: String) -> u64 {
-    match name.as_str() {
-        "ethereum" => 600,
-        "starknet" => 30,
-        "zksync" => 1,
-        "arbitrum" => 1,
-        "base" => 10,
-        _ => {
-            tracing::error!("Unknown chain: {}", name);
-            600
         }
     }
 }
