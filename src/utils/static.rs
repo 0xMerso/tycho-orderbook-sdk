@@ -59,12 +59,12 @@ pub mod maths {
 
     pub mod simu {
         // Config for incrementing amountIn
-        pub static COUNT: usize = 15; // Iterations MAX, less due to min delta
+        pub static COUNT: usize = 40; // Iterations MAX, less due to min delta
         pub static START_MULTIPLIER: f64 = 1.;
-        pub static END_MULTIPLIER: f64 = 1_000_000.; // 10% of TEN_MILLIONS
+        pub static END_MULTIPLIER: f64 = 1_500_000.; // 10% of TEN_MILLIONS
 
         // pub static MIN_EXP_DELTA: f64 = 15.; Instead of hardcoding it, we use a % of the end multiplier
-        pub static MIN_EXP_DELTA_PCT: f64 = 0.00005; // To ensure distance between points
+        pub static MIN_EXP_DELTA_PCT: f64 = 0.00001; // To ensure distance between points
     }
 }
 
