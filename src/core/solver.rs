@@ -121,5 +121,7 @@ pub fn exponential(liquidity: f64) -> Vec<f64> {
         utils::r#static::maths::simu::END_MULTIPLIER,
         utils::r#static::maths::simu::END_MULTIPLIER * utils::r#static::maths::simu::MIN_EXP_DELTA_PCT,
     );
-    steps.iter().map(|x| x * start).collect::<Vec<f64>>()
+    let steps = steps.iter().map(|x| x * start).collect::<Vec<f64>>();
+    let r8 = steps.iter().map(|x| (x * 100_000_000.0).round() / 100_000_000.0).collect::<Vec<f64>>();
+    r8
 }
