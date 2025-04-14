@@ -1,3 +1,4 @@
+use chrono::DateTime;
 use tycho_simulation::models::Token;
 
 use crate::{
@@ -10,7 +11,10 @@ use crate::{
     types::{MidPriceData, Network, Orderbook, OrderbookRequestParams, ProtoSimComp, TradeResult},
     utils::{self},
 };
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{Duration, UNIX_EPOCH},
+};
 
 use super::solver::OrderbookSolver; // Ensure Rayon is in your dependencies.
 
@@ -47,17 +51,22 @@ pub async fn build<S: OrderbookSolver>(
                 let proto = pdata.protosim.clone();
                 let price_base_to_quote = proto.spot_price(&base, &quote).unwrap_or_default();
                 let price_quote_to_base = proto.spot_price(&quote, &base).unwrap_or_default();
+                let d = UNIX_EPOCH + Duration::from_secs(pdata.component.last_updated_at);
+                let datetime = DateTime::<chrono::Utc>::from(d);
+                let timestamp = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+
                 prices_base_to_quote.push(price_base_to_quote);
                 prices_quote_to_base.push(price_quote_to_base);
                 tracing::trace!(
-                    "- Pool: {} | {} | Spot price for {}-{} => price_base_to_quote = {} and price_quote_to_base = {} | Fee = {}",
+                    "- Pool: {} | {} | Spot price for {}-{} => price_base_to_quote = {} and price_quote_to_base = {} | Fee = {} | Last updated at {}",
                     pdata.component.id,
                     pdata.component.protocol_type_name,
                     base.symbol,
                     quote.symbol,
                     price_base_to_quote,
                     price_quote_to_base,
-                    pdata.component.fee
+                    pdata.component.fee,
+                    timestamp
                 );
                 if let Some(cpbs) = client::get_component_balances(&client, network.clone(), pdata.component.id.clone(), pdata.component.protocol_system.clone()).await {
                     let base_bal = cpbs.get(&srzt0.address.to_lowercase()).unwrap_or(&0u128);
@@ -247,10 +256,12 @@ pub async fn simulate<S: OrderbookSolver>(
         }
         None => {
             let steps = solver.generate_steps(adjusted_total_balance_base);
+            let steps: Vec<f64> = steps.iter().cloned().filter(|&s| s > amount_test_best_base_to_quote * 3.).collect();
             let bids = solver.optimize(&pcsdata, steps.clone(), eth_worth_usd, gas_price, &base, &quote, price_base_to_quote, quote_worth_eth);
             result.bids = bids;
             tracing::trace!(" 🔄  Bids done, now switching to asks");
             let steps = solver.generate_steps(adjusted_total_balance_quote);
+            let steps: Vec<f64> = steps.iter().cloned().filter(|&s| s > amount_test_best_quote_to_base * 3.).collect();
             let asks = solver.optimize(&pcsdata, steps.clone(), eth_worth_usd, gas_price, &quote, &base, price_quote_to_base, base_worth_eth);
             result.asks = asks;
         }
