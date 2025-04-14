@@ -167,7 +167,7 @@ pub async fn erc20b(provider: &RootProvider<Http<Client>>, owner: String, tokens
 /// Assume the oracle in under the 'Chainlink' interface
 /// Unwrap are assumed safe, given the configuration SDK is correct.
 pub async fn get_eth_usd_chainlink(rpc: String, feed: String) -> Option<f64> {
-    tracing::debug!("Fetching price from chainlink oracle: {}", feed.clone());
+    tracing::debug!("Fetching price from chainlink oracle: {} with RPC = {}", feed.clone(), rpc.clone());
     let pfeed: Address = feed.clone().parse().unwrap();
     let provider = ProviderBuilder::new().on_http(rpc.parse().unwrap());
     let client = Arc::new(provider);
