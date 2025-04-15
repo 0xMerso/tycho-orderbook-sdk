@@ -13,6 +13,7 @@ use super::book::remove_decreasing_price;
 pub trait OrderbookSolver: Send + Sync {
     fn generate_steps(&self, liquidity: f64) -> Vec<f64>;
     /// Protosims contains the required functions to get the amount out of a swap
+    #[allow(clippy::too_many_arguments)]
     fn optimize(&self, protosims: &[ProtoSimComp], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, price_from_to: f64, output_eth_worth: f64) -> Vec<TradeResult>;
 }
 
@@ -25,6 +26,7 @@ impl OrderbookSolver for DefaultOrderbookSolver {
         exponential(liquidity)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn optimize(&self, protosim: &[ProtoSimComp], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, price_from_to: f64, output_eth_worth: f64) -> Vec<TradeResult> {
         tracing::debug!("Default solver: optimize called with steps: {:?}", steps);
         optimize(protosim, steps, eth_usd, gas_price, from, to, price_from_to, output_eth_worth)
@@ -38,6 +40,7 @@ impl OrderbookSolver for CustomOrderbookSolver {
         exponential(liquidity)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn optimize(&self, protosim: &[ProtoSimComp], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, price_from_to: f64, output_eth_worth: f64) -> Vec<TradeResult> {
         // For custom logic, take the last available step if present.
         tracing::debug!("Custom solver: optimize called with steps: {:?}", steps);

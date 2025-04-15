@@ -6,6 +6,8 @@ use crate::{
 use num_bigint::BigUint;
 use num_traits::{ToPrimitive, Zero};
 use tycho_simulation::models::Token;
+
+#[allow(clippy::too_many_arguments)]
 pub fn gradient(
     amount: f64, // human–readable amount (e.g. 100 meaning 100 ETH)
     pools: &[ProtoSimComp],
@@ -103,7 +105,8 @@ pub fn gradient(
         let (min_active_index, min_net_marginal) = active_indices
             .iter()
             .map(|&i| (i, net_marginals[i]))
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)).unwrap_or((0, 0.0));
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or((0, 0.0));
 
         if (max_net_marginal - min_net_marginal).abs() < 1e-12 {
             break;

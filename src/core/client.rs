@@ -26,7 +26,6 @@ use crate::utils::misc::filter_valid_strings;
 use crate::utils::r#static::endpoints::COINGECKO_ETH_USD;
 
 /// ========================================================================================= Tycho Client =============================================================================================
-
 /// Get the balances of the component in the specified protocol system.
 /// Returns a HashMap of component addresses and their balances.
 /// Balance is returned as a u128, with decimals.
@@ -125,7 +124,6 @@ pub async fn build_tycho_client(network: &Network, key: Option<String>) -> Resul
 }
 
 /// =========================================================================================== HTTP Provider/RPC ======================================================================================
-
 /// Retrieve eth usd price
 pub async fn coingecko() -> Option<f64> {
     match reqwest::get(COINGECKO_ETH_USD).await {

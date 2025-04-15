@@ -276,6 +276,7 @@ pub async fn simulate<S: OrderbookSolver>(
 /// Doing that for 0to1 and 1to0 we have our best bid/ask, then we can compute the mid price
 /// --- --- --- --- ---
 /// Amount out is net of gas cost
+#[allow(clippy::too_many_arguments)]
 pub fn compute_best_trade(pcs: &[ProtoSimComp], eth_worth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, amount: f64, spot_price: f64, output_u_ethworth: f64) -> TradeResult {
     tracing::debug!(" - 🥇 Computing best price for {} (amount in = {})", from.symbol, amount);
     let result = maths::opti::gradient(amount, pcs, from.clone(), to.clone(), eth_worth_usd, gas_price, spot_price, output_u_ethworth);

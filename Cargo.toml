@@ -8,7 +8,7 @@ edition = "2021"
 description = "Transposes onchain liquidity from AMMs into a familiar orderbook format with Tycho"
 license = "MIT" 
 readme = "README.md"
-repository = "https://github.com/0xMerso/tycho-orderbook-sdkk"
+repository = "https://github.com/0xMerso/tycho-orderbook-sdk"
 homepage = "https://github.com/0xMerso/tycho-orderbook-sdk"
 
 keywords = [ "dex", "mev", "blockchain", "ethereum", "orderbook", "tycho", "defi", "amm", "cex", "binance", "liquidity", "swap", "crypto", "solver"]
@@ -31,7 +31,6 @@ num-bigint = "0.4.6"
 toml = "0.8.12"
 serde = { version = "1.0.104", features = ["derive"] }
 tracing-subscriber = "0.3"
-clippy = "0.0.302"
 env_logger = "0.11.3"
 eyre = "0.6.11"
 log = "0.4.20"
@@ -60,14 +59,13 @@ alloy = { version = "0.5.4", features = [
     "transport-http",
     "signers",
     ] }
-
 num-traits = "0.2.19"
 alloy-chains = "0.1.63"
 primitive-types = "0.10.1"
 indicatif = "0.17.11"
 alloy-primitives = "0.8.23"
 # Struct doc (swagger) when SDK is used with an external API, SDK struct will be added to schema
-utoipa = "5.3.1"
+utoipa = "5.3.1" 
 
 # ======================================================================================================================================================================================================
 

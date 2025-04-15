@@ -27,8 +27,8 @@ use crate::{
 };
 
 /// Build 2 transactions for the given solution:
-/// 1. Approve the given token to the router address.
-/// 2. Swap the given token for the checked token using the router address.
+///     Approve the given token to the router address.
+///     Swap the given token for the checked token using the router address.
 /// The transactions are built using the given network and nonce + 1 on the 2nd transaction.
 pub fn prepare(network: Network, solution: Solution, encoded: Transaction, block: alloy::rpc::types::Block, nonce: u64) -> Option<(TransactionRequest, TransactionRequest)> {
     let base_fee = block.header.base_fee_per_gas.expect("Base fee not available");
