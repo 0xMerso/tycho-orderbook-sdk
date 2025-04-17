@@ -1,7 +1,7 @@
 use crate::{
     data::fmt::SrzToken,
     types::{ProtoSimComp, TradeResult},
-    utils::r#static::maths::{BPD, FRACTION_REALLOC, MAX_ITERATIONS, ONE_HD},
+    utils::r#static::maths::{BPD, FRACTION_REALLOC, MAX_ITERATIONS, MIN_CONVERGENCE_THRESHOLD, ONE_HD},
 };
 use num_bigint::BigUint;
 use num_traits::{ToPrimitive, Zero};
@@ -108,7 +108,7 @@ pub fn gradient(
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((0, 0.0));
 
-        if (max_net_marginal - min_net_marginal).abs() < 1e-12 {
+        if (max_net_marginal - min_net_marginal).abs() < MIN_CONVERGENCE_THRESHOLD {
             break;
         }
 
