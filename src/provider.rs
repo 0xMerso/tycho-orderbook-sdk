@@ -1,18 +1,21 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use futures::StreamExt;
 
 use tokio::task::JoinHandle;
+use tycho_simulation::evm::stream::ProtocolStreamBuilder;
 
-use crate::builder::OrderbookBuilder;
 use crate::core::book::{self};
 use crate::core::solver::{DefaultOrderbookSolver, OrderbookSolver};
-
+use crate::types::TychoStreamState;
 use crate::types::{self, Network, OrderbookEvent};
 use crate::{data, maths};
 
 use data::fmt::SrzProtocolComponent;
 use data::fmt::SrzToken;
-use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+use tokio::sync::{mpsc, RwLock};
 use tycho_simulation::tycho_client::stream::StreamError;
 use types::Orderbook;
 use types::OrderbookRequestParams;
@@ -34,8 +37,8 @@ impl Default for OrderbookProviderConfig {
 
 /// SDK prderbook provider (OBP) that wraps a ProtocolStreamBuistrlder stream
 pub struct OrderbookProvider<S: OrderbookSolver = DefaultOrderbookSolver> {
-    /// The spawned task handle is stored to ensure the task remains running.
-    pub _handle: JoinHandle<()>,
+    /// The spawned task task is stored to ensure the task remains running.
+    pub _task: JoinHandle<()>,
     /// Tokens given by Tycho
     pub tokens: Vec<SrzToken>,
     /// The network used
@@ -45,8 +48,8 @@ pub struct OrderbookProvider<S: OrderbookSolver = DefaultOrderbookSolver> {
     // pub stream: mpsc::Receiver<OrderbookEvent>, // mpsc::Receiver<OrderbookEvent>,
     /// The shared state, accessible both to the internal task and the client.
     pub state: SharedTychoStreamState,
-    /// The API token used to facilitate the Tycho queries
-    pub apikey: Option<String>,
+    /// The API token for Tycho queries
+    pub key: Option<String>,
     /// The solver instance used to optimize trades.
     pub solver: S,
 }
@@ -55,39 +58,39 @@ pub struct OrderbookProvider<S: OrderbookSolver = DefaultOrderbookSolver> {
 impl OrderbookProvider {
     /// Creates a new OBP instance using a ProtocolStreamBuilder (from Tycho) with custom configuration
     /// # Arguments
-    /// * `psb` - A ProtocolStreamBuilder used to build the underlying stream.
+    /// * `stream` - A ProtocolStreamBuilder used to build the underlying stream.
     /// * `config` - An OrderbookProviderConfig allowing customization of parameters (e.g. channel capacity).
     /// * `state` - A shared state structure that is both updated internally and exposed to the client.
     /// # Returns
     /// * A Result containing the OBP instance or a StreamError if the stream could not be built.
-    pub async fn new<S>(ob: OrderbookBuilder, state: SharedTychoStreamState, solver: S) -> Result<OrderbookProvider<S>, StreamError>
+    pub async fn new<S>(network: Network, stream: ProtocolStreamBuilder, tokens: Vec<SrzToken>, key: Option<String>, solver: S) -> Result<OrderbookProvider<S>, StreamError>
     where
         S: OrderbookSolver + 'static,
     {
         // Build the protocol stream that yields Result<BlockUpdate, StreamDecodeError>.
-        match ob.psb.build().await {
+        match stream.build().await {
             Ok(stream) => {
                 let (sender, receiver) = mpsc::channel(100);
-                let shared = state.clone();
-                // Spawn an asynchronous task that processes the protocol stream.
-                // For each message received, update the shared state and send an OrderbookEvent.
-                tracing::debug!("Starting stream processing task.");
-                let handle = tokio::spawn(async move {
+                let shared = Arc::new(RwLock::new(TychoStreamState {
+                    protosims: HashMap::new(),
+                    components: HashMap::new(),
+                    initialised: false,
+                }));
+                // Why do we need to clone the shared state here ?
+                let state = shared.clone();
+                tracing::debug!("Starting stream processing task ...");
+                let task = tokio::spawn(async move {
                     futures::pin_mut!(stream);
                     while let Some(update) = stream.next().await {
-                        // The stream created emits BlockUpdate messages which consist of:
-                        // - block number- the block this update message refers to
-                        // - new_pairs- new components witnessed (either recently created or newly meeting filter criteria)
-                        // - removed_pairs- components no longer tracked (either deleted due to a reorg or no longer meeting filter criteria)
-                        // - states- the updated ProtocolSimstates for all components modified in this block
-                        // The first message received will contain states for all protocol components registered to. Thereafter, further block updates will only contain data for updated or new components.
+                        // The first message received will contain states for all protocol components registered to
+                        // Thereafter, further block updates will only contain data for updated or new components.
                         let mtx = state.read().await;
                         let initialised = mtx.initialised;
                         drop(mtx);
                         match update {
                             Ok(msg) => {
                                 tracing::debug!(
-                                    "🔸 OBP: TychoStream: b#{} with {} states, pairs: +{} -{}",
+                                    "🔸 TychoStream: b#{} with {} states, pairs: +{} -{}",
                                     msg.block_number,
                                     msg.states.len(),
                                     msg.new_pairs.len(),
@@ -142,12 +145,13 @@ impl OrderbookProvider {
                 });
 
                 let obp = OrderbookProvider {
+                    //stream: receiver,
                     stream: Mutex::new(receiver),
                     state: shared, // ---> Anormal here, but it works, need to clarify. Arc pointing to the same memory location, it should be ok, but incoherent to need dup
-                    _handle: handle,
-                    tokens: ob.tokens.clone(),
-                    network: ob.network.clone(),
-                    apikey: ob.apikey.clone(),
+                    _task: task,
+                    tokens: tokens.clone(),
+                    network: network.clone(),
+                    key: key.clone(),
                     solver,
                 };
 
@@ -158,7 +162,6 @@ impl OrderbookProvider {
                     "Failed to create stream abd build orderbook provider: {:?}. Retry by changing the Tycho Stream filters, or with a dedicated API key",
                     err.to_string()
                 );
-
                 Err(err)
             }
         }
@@ -251,7 +254,7 @@ impl OrderbookProvider {
                         book::build(
                             solver,
                             self.network.clone(),
-                            self.apikey.clone(),
+                            self.key.clone(),
                             pts.clone(),
                             targets.clone(),
                             params.clone(),

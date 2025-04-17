@@ -9,8 +9,9 @@ NETWORK="$1"
 # sh examples/quickstart.sh ethereum|base
 # By default, it would swap 0.001 worth of WETH in USDC token (< 2$) (base to quote)
 # You just need to provide the private key with 0.001 WETH in the wallet, Erc20 wrapped ETH.
-
 # You can also edit the quickstart.rs file to change the .env file to the one gitignored (.env.quickstart) and put your private key there.
+
+# The .env.quickstart file is expected to be in examples folder, NOT in the root folder.
 
 function start() {
     trap '' SIGINT

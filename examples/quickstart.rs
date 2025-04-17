@@ -1,17 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::RwLock;
 use tycho_orderbook::{
     adapters::default::DefaultOrderBookAdapter,
-    builder::{OrderbookBuilder, OrderbookBuilderConfig},
-    core::{
-        client,
-        helper::{default_protocol_stream_builder, get_original_components},
-        solver::DefaultOrderbookSolver,
-    },
-    types::{ExecutionRequest, Orderbook, OrderbookEvent, OrderbookRequestParams, SharedTychoStreamState, TychoStreamState},
-    utils::r#static::filter::{ADD_TVL_THRESHOLD, REMOVE_TVL_THRESHOLD},
+    builder::OrderbookBuilder,
+    core::{client, helper::get_original_components, solver::DefaultOrderbookSolver},
+    types::{ExecutionRequest, Orderbook, OrderbookEvent, OrderbookRequestParams},
 };
-use tycho_simulation::tycho_client::feed::component_tracker::ComponentFilter;
 
 /// Quickstart example for Tycho Orderbook
 /// This example demonstrates how to use the Tycho Orderbook library to create an orderbook provider and execute trades on it.
@@ -26,10 +19,11 @@ async fn main() {
     tracing::info!("--- --- --- Launching Quickstart Tycho Orderbook --- --- ---");
 
     // --- Load environment variables ---
-    dotenv::from_filename("examples/.env.quickstart.ex").ok(); // Use .env.ex for testing
+    //  The env file is expected to be in examples/ folder, nott in the root folder.
+    dotenv::from_filename("examples/.env.quickstart.ex").ok();
     let network_name = std::env::var("NETWORK").expect("Variable 'NETWORK' not found in environment");
     let real_exec = std::env::var("REAL_EXEC").expect("Variable 'REAL_EXEC' not found in environment") == "true";
-    let tycho_api_key = std::env::var("TYCHO_API_KEY").expect("Variable 'TYCHO_API_KEY' not found in environment");
+    let tychokey = std::env::var("TYCHO_API_KEY").expect("Variable 'TYCHO_API_KEY' not found in environment");
     let sender = std::env::var("SENDER").expect("Variable 'SENDER' not found in environment");
     let pk = match std::env::var("PV_KEY") {
         Ok(v) => {
@@ -41,7 +35,7 @@ async fn main() {
             None
         }
     };
-    tracing::info!("Tycho API Key: {}", tycho_api_key);
+    tracing::info!("Tycho API Key: {}", tychokey);
     tracing::info!("Network: {}", network_name);
     tracing::info!("Sender: {}", sender);
     tracing::info!("Real Execution: {}", real_exec);
@@ -50,7 +44,7 @@ async fn main() {
     tracing::debug!("Tycho Stream for '{}' network", network.name.clone());
 
     // --- Token list ---
-    let tokens = match client::tokens(&network, tycho_api_key.clone()).await {
+    let tokens = match client::tokens(&network, tychokey.clone()).await {
         Some(t) => t,
         None => {
             tracing::error!("Failed to get tokens. Something anormal, make sure Tycho endpoint is operational. Exiting.");
@@ -84,24 +78,13 @@ async fn main() {
     tracing::debug!("Execution on a specific orderbook for quickstart demo: {:?}", obtag);
     let mut executed = false; // Flag to check if the transaction has been executed, to keep one execution only
 
-    // --- Create cross/shared state for the protocol stream ---
-    let xstate: SharedTychoStreamState = Arc::new(RwLock::new(TychoStreamState {
-        protosims: HashMap::new(),
-        components: HashMap::new(),
-        initialised: false,
-    }));
-
-    // --- Create Protocol stream builder --- Create your own protocol stream builder if you want to custom it.
-    let filter = ComponentFilter::with_tvl_range(REMOVE_TVL_THRESHOLD, ADD_TVL_THRESHOLD);
-    let psb = default_protocol_stream_builder(network.clone(), tycho_api_key.clone(), OrderbookBuilderConfig { filter }, tokens.clone()).await;
-
     // --- Create the provider ---
-    let builder = OrderbookBuilder::new(network.clone(), psb, tycho_api_key.clone(), tokens.clone());
-    match builder.build(xstate).await {
+    let obb = OrderbookBuilder::new(network.clone(), None, tychokey.clone(), tokens.clone()).await;
+    match obb.build().await {
         Ok(provider) => {
             let obp = Arc::new(provider);
             let state = Arc::clone(&obp.state);
-            tracing::debug!("OBP Client started. Waiting for updates");
+            tracing::debug!("OrderbookProvider built. Waiting for updates");
             loop {
                 // Arc prevents moving out inner fields, and this loop is creating multiple consumers.
                 // Loop indefinitely over the stream, printing received events.
