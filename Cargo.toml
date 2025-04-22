@@ -19,10 +19,10 @@ documentation = "https://tycho-orderbook.gitbook.io/docs"
 # ======================================================================================================================================================================================================
 
 [dependencies]
-tycho-simulation = { git = "https://github.com/propeller-heads/tycho-simulation.git", rev = "662c37fd2cc7cff65407e3534584860aab184d69" }
+tycho-simulation = { git = "https://github.com/propeller-heads/tycho-simulation.git", rev = "2ef64b9bcc20de865303efceb3a5d245c34b32c0" }
 tycho-common = { version = "0.66.4" }
 tycho-client = { version = "0.66.4" }
-tycho-execution = { version = "0.73.0",  features = ["evm"] }
+tycho-execution = { version = "0.81.0",  features = ["evm"] }
 
 tokio = { version = "1.28", features = ["full"] }
 chrono = "0.4.23"
