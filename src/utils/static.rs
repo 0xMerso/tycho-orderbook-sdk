@@ -59,10 +59,11 @@ pub mod maths {
     pub static BEST_BID_ASK_ETH_BPS: f64 = 100.; // 100/10_000 = 0.01 ETH = ~20$
 
     pub mod simu {
+
         // Config for incrementing amountIn
-        pub static COUNT: usize = 30; // Iterations MAX, less due to min delta
+        pub static COUNT: usize = 50; // Iterations MAX, less due to min delta
         pub static START_MULTIPLIER: f64 = 1.;
-        pub static END_MULTIPLIER: f64 = 4_200_000.; // 30% of TEN_MILLIONS
+        pub static END_MULTIPLIER: f64 = 4_200_000.; // 42%
 
         // pub static MIN_EXP_DELTA: f64 = 15.; Instead of hardcoding it, we use a % of the end multiplier
         pub static MIN_EXP_DELTA_PCT: f64 = 0.00005; // To ensure distance between points
