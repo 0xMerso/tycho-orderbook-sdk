@@ -53,8 +53,8 @@ use std::panic::{self, AssertUnwindSafe};
 #[allow(clippy::too_many_arguments)]
 pub fn optimize(protosim: &[ProtoSimComp], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, spot_price: f64, output_eth_worth: f64) -> Vec<TradeResult> {
     let trades: Vec<Option<TradeResult>> = steps
-        .iter()
-        // .par_iter()
+        //.iter()
+        .par_iter()
         .enumerate()
         .map(|(x, amount)| {
             let res = panic::catch_unwind(AssertUnwindSafe(|| {
