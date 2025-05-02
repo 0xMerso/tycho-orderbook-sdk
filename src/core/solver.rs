@@ -8,8 +8,6 @@ use crate::{
     utils::{self, r#static::maths::ONE_HD},
 };
 
-use super::book::remove_decreasing_price;
-
 pub trait OrderbookSolver: Send + Sync {
     fn generate_steps(&self, liquidity: f64) -> Vec<f64>;
     /// Protosims contains the required functions to get the amount out of a swap
@@ -55,7 +53,8 @@ use std::panic::{self, AssertUnwindSafe};
 #[allow(clippy::too_many_arguments)]
 pub fn optimize(protosim: &[ProtoSimComp], steps: Vec<f64>, eth_usd: f64, gas_price: u128, from: &SrzToken, to: &SrzToken, spot_price: f64, output_eth_worth: f64) -> Vec<TradeResult> {
     let trades: Vec<Option<TradeResult>> = steps
-        .par_iter()
+        .iter()
+        // .par_iter()
         .enumerate()
         .map(|(x, amount)| {
             let res = panic::catch_unwind(AssertUnwindSafe(|| {
@@ -107,9 +106,7 @@ pub fn optimize(protosim: &[ProtoSimComp], steps: Vec<f64>, eth_usd: f64, gas_pr
     // Remove trades that have a non-increasing price impact.
     let size = trades.len();
     let (filtered_trades, removed) = remove_decreasing_price(&trades);
-    if removed > 0 {
-        tracing::debug!("Removed {} out of {} trades with decreasing price.", removed, size);
-    }
+    tracing::debug!("Removed {} out of {} trades with decreasing price.", removed, size);
     filtered_trades
 }
 
@@ -127,4 +124,38 @@ pub fn exponential(liquidity: f64) -> Vec<f64> {
     let steps = steps.iter().map(|x| x * start).collect::<Vec<f64>>();
     let r8 = steps.iter().map(|x| (x * 100_000_000.0).round() / 100_000_000.0).collect::<Vec<f64>>();
     r8
+}
+
+/// Removes trades with decreasing price
+/// Example: [0.1, 0.4, 0.3, 0.5] => [0.1, 0.4, 0.5]
+fn remove_decreasing_price_once(items: &[TradeResult]) -> (Vec<TradeResult>, usize) {
+    if items.is_empty() {
+        return (Vec::new(), 0);
+    }
+    let (head, tail) = items.split_at(items.len().min(1));
+    let mut filtered = Vec::new();
+    if let Some(first) = head.first() {
+        filtered.push(first.clone());
+        for item in head.iter().skip(1) {
+            if let Some(last) = filtered.last() {
+                if item.average_sell_price < last.average_sell_price {
+                    filtered.push(item.clone());
+                }
+            }
+        }
+    }
+    filtered.extend_from_slice(tail);
+    let count = items.len() - filtered.len();
+    (filtered, count)
+}
+
+pub fn remove_decreasing_price(items: &[TradeResult]) -> (Vec<TradeResult>, usize) {
+    let (filtered, count) = remove_decreasing_price_once(items);
+    if count == 0 {
+        (filtered, 0)
+    } else {
+        let (final_filtered, more_removed) = remove_decreasing_price(&filtered);
+        tracing::debug!("more_removed: {}", more_removed);
+        (final_filtered, count + more_removed)
+    }
 }

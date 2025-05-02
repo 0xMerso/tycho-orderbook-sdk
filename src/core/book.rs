@@ -319,35 +319,3 @@ pub fn derive_mid_price(trade_base_to_quote: TradeResult, trade_quote_to_base: T
 pub fn matchcp(cptks: Vec<SrzToken>, tokens: Vec<SrzToken>) -> bool {
     tokens.iter().all(|token| cptks.iter().any(|cptk| cptk.address.eq_ignore_ascii_case(&token.address)))
 }
-
-/// Removes trades with decreasing price
-/// ! [WIP] We keep the 5 first trades because it make sense to have a decreasing price due to gas
-/// Temporarily, need a better convex optimization function
-/// Example: [0.1, 0.4, 0.3, 0.5] => [0.1, 0.4, 0.5]
-pub fn remove_decreasing_price(items: &[TradeResult]) -> (Vec<TradeResult>, usize) {
-    if items.is_empty() {
-        return (Vec::new(), 0);
-    }
-
-    // Process the first five items (or all if fewer than five)
-    let (head, tail) = items.split_at(items.len().min(5));
-    let mut filtered = Vec::new();
-    if let Some(first) = head.first() {
-        filtered.push(first.clone());
-        for item in head.iter().skip(1) {
-            if let Some(last) = filtered.last() {
-                // Only push the item if its average_sell_price is less than the last one
-                if item.average_sell_price < last.average_sell_price {
-                    filtered.push(item.clone());
-                }
-            }
-        }
-    }
-
-    // Append the remaining items after the fifth, unfiltered
-    filtered.extend_from_slice(tail);
-
-    // The count is still the difference between original length and the filtered length
-    let count = items.len() - filtered.len();
-    (filtered, count)
-}
