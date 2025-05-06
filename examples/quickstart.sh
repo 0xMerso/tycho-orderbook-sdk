@@ -36,4 +36,4 @@ function start() {
 start
 
 # --- Or just run the binary directly ---
-# cargo run --bin quickstart
+# export RUST_LOG="off,tycho_orderbook=trace,quickstart=trace" && cargo run --bin quickstart
