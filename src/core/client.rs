@@ -109,7 +109,7 @@ pub async fn tokens(network: &Network, apikey: String) -> Option<Vec<Token>> {
 
 /// Get the tokens from the Tycho API
 /// Filters are hardcoded for now.
-pub async fn build_tycho_client(network: &Network, key: Option<String>) -> Result<HttpRPCClient, anyhow::Error> {
+pub fn build_tycho_client(network: &Network, key: Option<String>) -> Result<HttpRPCClient, anyhow::Error> {
     let key: &str = match &key {
         Some(t) => t.as_str(),
         None => "sampletoken",

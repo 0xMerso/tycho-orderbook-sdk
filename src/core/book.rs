@@ -44,7 +44,7 @@ pub async fn build<S: OrderbookSolver>(
     let mut quote_lqdty = vec![];
     let mut balances = HashMap::new();
 
-    match build_tycho_client(&network, tycho_token_api.clone()).await {
+    match build_tycho_client(&network, tycho_token_api.clone()) {
         Ok(client) => {
             for pdata in state.clone() {
                 pools.push(pdata.clone());
