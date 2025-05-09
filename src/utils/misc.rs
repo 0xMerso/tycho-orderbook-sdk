@@ -1,6 +1,15 @@
 use alloy_chains::NamedChain;
 use tycho_simulation::models::Token;
 
+/// Test logs
+pub fn tlog()  {
+    tracing::info!("Tycho log");
+    tracing::debug!("Tycho log");
+    tracing::trace!("Tycho log");
+    tracing::warn!("Tycho log");
+    tracing::error!("Tycho log");
+}   
+
 /// Get an environment variable
 pub fn get(key: &str) -> String {
     match std::env::var(key) {
