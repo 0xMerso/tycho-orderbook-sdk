@@ -61,9 +61,9 @@ pub mod maths {
     pub mod simu {
 
         // Config for incrementing amountIn
-        pub static COUNT: usize = 50; // Iterations MAX, less due to min delta
+        pub static COUNT: usize = 40; // Iterations MAX, less due to min delta
         pub static START_MULTIPLIER: f64 = 1.;
-        pub static END_MULTIPLIER: f64 = 3_000_000.; // 30%
+        pub static END_MULTIPLIER: f64 = 1_000_000.; // 10%
 
         // pub static MIN_EXP_DELTA: f64 = 15.; Instead of hardcoding it, we use a % of the end multiplier
         pub static MIN_EXP_DELTA_PCT: f64 = 0.00005; // To ensure distance between points
