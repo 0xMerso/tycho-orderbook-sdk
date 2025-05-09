@@ -55,13 +55,13 @@ pub mod maths {
     pub static ONE_PERCENT_IN_MN: f64 = 10_000.; // 1% in millionths
     pub static MAX_ITERATIONS: u32 = 50; // 50 iteration maximum to optimize allocation
     pub static MIN_CONVERGENCE_THRESHOLD: f64 = 1e-10; // The lower, the less accurate the result, but faster
-    pub static FRACTION_REALLOC: u32 = 5; // 50 iteration maximum to optimize allocation
+    pub static FRACTION_REALLOC: u32 = 2;
     pub static BEST_BID_ASK_ETH_BPS: f64 = 100.; // 100/10_000 = 0.01 ETH = ~20$
 
     pub mod simu {
 
         // Config for incrementing amountIn
-        pub static COUNT: usize = 40; // Iterations MAX, less due to min delta
+        pub static COUNT: usize = 30; // Iterations MAX, less due to min delta
         pub static START_MULTIPLIER: f64 = 1.;
         pub static END_MULTIPLIER: f64 = 1_000_000.; // 10%
 
