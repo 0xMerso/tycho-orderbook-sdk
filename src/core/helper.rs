@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use tycho_simulation::evm::protocol::ekubo::state::EkuboState;
-use tycho_simulation::evm::protocol::filters::{balancer_pool_filter, curve_pool_filter, uniswap_v4_pool_with_hook_filter};
+use tycho_simulation::evm::protocol::filters::{balancer_pool_filter, uniswap_v4_pool_with_hook_filter};
 use tycho_simulation::models::Token;
 
 use tycho_simulation::evm::protocol::uniswap_v3::state::UniswapV3State;
@@ -26,7 +26,7 @@ pub async fn default_protocol_stream_builder(network: Network, apikey: String, c
     let (_, _, chain) = types::chain(network.name.clone()).expect("Invalid chain");
     let u4 = uniswap_v4_pool_with_hook_filter;
     let balancer = balancer_pool_filter;
-    let curve = curve_pool_filter;
+    // let curve = curve_pool_filter;
     let filter = config.filter.clone();
 
     let mut hmt = HashMap::new();
