@@ -30,6 +30,7 @@ pub fn gradient(
     // Fixed parameters.
     let fraction = BigUint::from(FRACTION_REALLOC); // e.g., 10% reallocation fraction.
     let epsilon = &amountpow / BigUint::from(10_000u32); // finite difference step.
+
     let max_iterations = MAX_ITERATIONS;
 
     // 1. INITIAL CONCENTRATION:
@@ -79,9 +80,22 @@ pub fn gradient(
             };
 
             let marginal = perturbed - base;
+            // let activation_penalty = if current_alloc.is_zero() {
+            //     if let Ok(step_result) = pool.protosim.get_amount_out(amountpow.clone(), &tkinput, &tkoutput) {
+            //         let gas_units: u128 = step_result.gas.to_string().parse::<u128>().unwrap_or_default();
+            //         let gas_cost_eth = (gas_units.saturating_mul(gas_price)) as f64 / 1e18;
+            //         gas_cost_eth / out_eth_worth
+            //     } else {
+            //         0.0
+            //     }
+            // } else {
+            //     0.0
+            // };
+
             let activation_penalty = if current_alloc.is_zero() {
-                if let Ok(result) = pool.protosim.get_amount_out(amountpow.clone(), &tkinput, &tkoutput) {
-                    let gas_units: u128 = result.gas.to_string().parse::<u128>().unwrap_or_default();
+                if let Ok(step_result) = pool.protosim.get_amount_out(epsilon.clone(), &tkinput, &tkoutput) {
+                    // ⚡ only charge gas on the *increment* ε, not the whole trade
+                    let gas_units: u128 = step_result.gas.to_string().parse::<u128>().unwrap_or_default();
                     let gas_cost_eth = (gas_units.saturating_mul(gas_price)) as f64 / 1e18;
                     gas_cost_eth / out_eth_worth
                 } else {
@@ -90,6 +104,7 @@ pub fn gradient(
             } else {
                 0.0
             };
+
             let adjusted_marginal = if current_alloc.is_zero() { marginal - activation_penalty } else { marginal };
             net_marginals.push(adjusted_marginal);
         }
