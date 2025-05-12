@@ -80,18 +80,6 @@ pub fn gradient(
             };
 
             let marginal = perturbed - base;
-            // let activation_penalty = if current_alloc.is_zero() {
-            //     if let Ok(step_result) = pool.protosim.get_amount_out(amountpow.clone(), &tkinput, &tkoutput) {
-            //         let gas_units: u128 = step_result.gas.to_string().parse::<u128>().unwrap_or_default();
-            //         let gas_cost_eth = (gas_units.saturating_mul(gas_price)) as f64 / 1e18;
-            //         gas_cost_eth / out_eth_worth
-            //     } else {
-            //         0.0
-            //     }
-            // } else {
-            //     0.0
-            // };
-
             let activation_penalty = if current_alloc.is_zero() {
                 if let Ok(step_result) = pool.protosim.get_amount_out(epsilon.clone(), &tkinput, &tkoutput) {
                     // ⚡ only charge gas on the *increment* ε, not the whole trade
