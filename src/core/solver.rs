@@ -59,22 +59,13 @@ pub fn optimize(protosim: &[ProtoSimComp], steps: Vec<f64>, eth_usd: f64, gas_pr
         .map(|(x, amount)| {
             let res = panic::catch_unwind(AssertUnwindSafe(|| {
                 let tmstp = Instant::now();
-                let result = maths::opti::gradient(
-                    *amount,
-                    protosim,
-                    from.clone(),
-                    to.clone(),
-                    eth_usd,
-                    gas_price,
-                    spot_price,
-                    output_eth_worth,
-                );
+                let result = maths::opti::gradient(*amount, protosim, from.clone(), to.clone(), eth_usd, gas_price, spot_price, output_eth_worth);
                 let elapsed = tmstp.elapsed().as_millis();
                 let gas_cost: f64 = result.gas_costs_usd.iter().sum();
-                let sum_distribution: f64 = result.distribution.iter().sum();
-                let sum_distributed: f64 = result.distributed.iter().sum();
+                // let sum_distribution: f64 = result.distribution.iter().sum();
+                // let sum_distributed: f64 = result.distributed.iter().sum();
                 tracing::trace!(
-                    " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at avg price {:.7} (vs spot_price {:.7}) | Price impact %: {:.4} | Gas cost {:.5}$ | Distribution: {:?} on {:.3} | Distributed: {:?} on {:.3} | Took: {} ms",
+                    " - #{:<2} | In: {:.7} {}, Out: {:.7} {} at avg price {:.7} (vs spot_price {:.7}) | Price impact %: {:.4} | Gas cost {:.5}$ | Took: {} ms",
                     x,
                     result.amount,
                     from.symbol,
@@ -84,10 +75,6 @@ pub fn optimize(protosim: &[ProtoSimComp], steps: Vec<f64>, eth_usd: f64, gas_pr
                     spot_price,
                     result.price_impact * ONE_HD,
                     gas_cost,
-                    result.distribution,
-                    sum_distribution,
-                    result.distributed,
-                    sum_distributed,
                     elapsed
                 );
                 result
@@ -105,7 +92,9 @@ pub fn optimize(protosim: &[ProtoSimComp], steps: Vec<f64>, eth_usd: f64, gas_pr
     let trades: Vec<TradeResult> = trades.into_iter().flatten().collect();
     // Remove trades that have a non-increasing price impact.
     let size = trades.len();
-    let (filtered_trades, removed) = remove_decreasing_price(&trades);
+    // let (filtered_trades, removed) = remove_decreasing_price(&trades); // [old]
+    let (filtered_trades, removed) = remove_decreasing_price_with_sensitivity(&trades, 0.05); // [new]
+
     tracing::debug!("Removed {} out of {} trades with decreasing price.", removed, size);
     filtered_trades
 }
@@ -125,37 +114,32 @@ pub fn exponential(liquidity: f64) -> Vec<f64> {
     let r8 = steps.iter().map(|x| (x * 100_000_000.0).round() / 100_000_000.0).collect::<Vec<f64>>();
     r8
 }
-
-/// Removes trades with decreasing price
-/// Example: [0.1, 0.4, 0.3, 0.5] => [0.1, 0.4, 0.5]
-fn remove_decreasing_price_once(items: &[TradeResult]) -> (Vec<TradeResult>, usize) {
+/// Retains only those trades whose average_sell_price does not drop more than `max_drop_pct`
+/// relative to the previous kept trade. Returns (filtered, removed_count).
+pub fn remove_decreasing_price_with_sensitivity(
+    items: &[TradeResult],
+    max_drop_pct: f64, // e.g. 0.05 for 5%
+) -> (Vec<TradeResult>, usize) {
     if items.is_empty() {
         return (Vec::new(), 0);
     }
-    let (head, tail) = items.split_at(items.len().min(1));
-    let mut filtered = Vec::new();
-    if let Some(first) = head.first() {
-        filtered.push(first.clone());
-        for item in head.iter().skip(1) {
-            if let Some(last) = filtered.last() {
-                if item.average_sell_price < last.average_sell_price {
-                    filtered.push(item.clone());
-                }
-            }
+
+    let mut filtered = Vec::with_capacity(items.len());
+    // start with first trade unconditionally
+    let mut last_kept_price = items[0].average_sell_price;
+    filtered.push(items[0].clone());
+
+    for trade in &items[1..] {
+        let price = trade.average_sell_price;
+        // compute relative drop: (previous – current) / previous
+        let drop_ratio = (last_kept_price - price) / last_kept_price;
+        // keep trade only if drop ≤ threshold
+        if drop_ratio <= max_drop_pct {
+            filtered.push(trade.clone());
+            last_kept_price = price;
         }
     }
-    filtered.extend_from_slice(tail);
-    let count = items.len() - filtered.len();
-    (filtered, count)
-}
 
-pub fn remove_decreasing_price(items: &[TradeResult]) -> (Vec<TradeResult>, usize) {
-    let (filtered, count) = remove_decreasing_price_once(items);
-    if count == 0 {
-        (filtered, 0)
-    } else {
-        let (final_filtered, more_removed) = remove_decreasing_price(&filtered);
-        tracing::debug!("more_removed: {}", more_removed);
-        (final_filtered, count + more_removed)
-    }
+    let removed = items.len() - filtered.len();
+    (filtered, removed)
 }
