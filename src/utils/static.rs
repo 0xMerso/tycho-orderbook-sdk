@@ -36,7 +36,7 @@ pub fn networks() -> Vec<Network> {
             eth: "0x4200000000000000000000000000000000000006".to_string(),
             chainlink: "0x0000000000000000000000000000000000000000".to_string(), // None, using Coingecko instead ?
             rpc: "https://unichain.drpc.org".to_string(),
-            exp: "https://unichain.blockscout.com/".to_string(),
+            exp: "https://uniscan.xyz/".to_string(),
             tycho: "tycho-unichain-beta.propellerheads.xyz".to_string(),
             permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3".to_string(),
             router: "0x9bdc3be75440dbe563527cb39bb11cfbd1e21b09".to_string(),
