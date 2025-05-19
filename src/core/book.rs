@@ -143,7 +143,8 @@ pub async fn simulate<S: OrderbookSolver>(
     price_quote_to_base: f64,
 ) -> Result<Orderbook, anyhow::Error> {
     let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_secs();
-    let eth_worth_usd = client::get_eth_usd_chainlink(network.rpc.clone(), network.chainlink.clone()).await.unwrap_or(2000.);
+    // let eth_worth_usd = client::get_eth_usd_chainlink(network.rpc.clone(), network.chainlink.clone()).await.unwrap_or(2500.);
+    let eth_worth_usd = client::coingecko().await.unwrap_or(2500.);
     let gas_price = gas::gas_price(network.rpc.clone()).await;
     let latest = client::get_latest_block(network.rpc.clone()).await;
     let base = tokens[0].clone();

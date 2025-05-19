@@ -9,7 +9,7 @@ pub fn networks() -> Vec<Network> {
             name: "ethereum".to_string(),
             eth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".to_string(),
             chainlink: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419".to_string(),
-            rpc: "https://eth.llamarpc.com".to_string(),
+            rpc: "https://ethereum-rpc.publicnode.com".to_string(),
             exp: "https://etherscan.io/".to_string(),
             tycho: "tycho-beta.propellerheads.xyz".to_string(),
             permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3".to_string(),
